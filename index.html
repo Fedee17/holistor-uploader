@@ -173,6 +173,14 @@ async function startUpload() {
   document.getElementById('progressWrap').style.display = 'block';
   let done = 0;
   const total = pending.length;
+
+  try {
+    await fetch(WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ init: true, total: total })
+    });
+  } catch(e) { console.error('Error al inicializar', e); }
  
   for (let i = 0; i < files.length; i++) {
     if (files[i].status !== 'pending') continue;

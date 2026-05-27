@@ -59,15 +59,15 @@
 <body>
 <div class="container">
   <h1><i class="ti ti-file-invoice"></i> Holistor — Subir facturas</h1>
- 
+
   <div id="alert" class="alert"></div>
- 
+
   <div class="stats">
     <div class="stat"><div class="stat-label">En cola</div><div class="stat-value" id="statCola">0</div></div>
     <div class="stat"><div class="stat-label">Subidos</div><div class="stat-value" id="statSubidos">0</div></div>
     <div class="stat"><div class="stat-label">Errores</div><div class="stat-value" id="statErrores">0</div></div>
   </div>
- 
+
   <div class="card">
     <div class="card-header"><i class="ti ti-cloud-upload"></i> Subir facturas</div>
     <div class="drop-zone" id="dropZone">
@@ -76,7 +76,7 @@
       <p>Solo archivos PDF · Múltiples archivos permitidos</p>
     </div>
     <input type="file" id="fileInput" accept=".pdf" multiple />
- 
+
     <div class="queue" id="queue">
       <div class="queue-label" id="queueLabel">0 archivos</div>
       <div class="file-list" id="fileList"></div>
@@ -94,7 +94,7 @@
       </div>
     </div>
   </div>
- 
+
   <div class="card">
     <div class="card-header"><i class="ti ti-history"></i> Historial de esta sesión</div>
     <div id="historyList">
@@ -102,12 +102,12 @@
     </div>
   </div>
 </div>
- 
+
 <script>
 const WEBHOOK = 'https://fede123.app.n8n.cloud/webhook/holistor-upload';
 const WEBHOOK_PROCESO = 'https://fede123.app.n8n.cloud/webhook/holistor-procesar';
 let files = [], history = [], uploading = false, subidos = 0, errores = 0;
- 
+
 function showAlert(msg, type) {
   const el = document.getElementById('alert');
   const icons = { success: 'circle-check', error: 'alert-circle', info: 'info-circle' };
@@ -116,13 +116,13 @@ function showAlert(msg, type) {
   el.style.display = 'flex';
   if (type !== 'info') setTimeout(() => el.style.display = 'none', 5000);
 }
- 
+
 function updateStats() {
   document.getElementById('statCola').textContent = files.filter(f => f.status === 'pending').length;
   document.getElementById('statSubidos').textContent = subidos;
   document.getElementById('statErrores').textContent = errores;
 }
- 
+
 function renderQueue() {
   const q = document.getElementById('queue');
   if (!files.length) { q.style.display = 'none'; updateStats(); return; }
@@ -141,7 +141,7 @@ function renderQueue() {
   `).join('');
   updateStats();
 }
- 
+
 function renderHistory() {
   const el = document.getElementById('historyList');
   if (!history.length) { el.innerHTML = '<div class="empty"><i class="ti ti-inbox"></i>Todavía no se subieron archivos</div>'; return; }
@@ -154,17 +154,17 @@ function renderHistory() {
     </div>
   `).join('');
 }
- 
+
 function addFiles(newFiles) {
   const pdfs = Array.from(newFiles).filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'));
   if (!pdfs.length) { showAlert('Solo se aceptan archivos PDF', 'error'); return; }
   pdfs.forEach(f => files.push({ name: f.name, size: f.size, file: f, status: 'pending' }));
   renderQueue();
 }
- 
+
 function removeFile(i) { files.splice(i, 1); renderQueue(); }
 function clearPending() { files = files.filter(f => f.status !== 'pending'); renderQueue(); }
- 
+
 async function startUpload() {
   if (uploading) return;
   const pending = files.filter(f => f.status === 'pending');
@@ -174,7 +174,7 @@ async function startUpload() {
   document.getElementById('progressWrap').style.display = 'block';
   let done = 0;
   const total = pending.length;
- 
+
   for (let i = 0; i < files.length; i++) {
     if (files[i].status !== 'pending') continue;
     files[i].status = 'uploading';
@@ -197,13 +197,13 @@ async function startUpload() {
     renderQueue();
     renderHistory();
   }
- 
+
   uploading = false;
   document.getElementById('btnSubir').disabled = false;
- 
+
   const ok = files.filter(f => f.status === 'done').length;
   const err = files.filter(f => f.status === 'error').length;
- 
+
   if (ok > 0) {
     try {
       await fetch(WEBHOOK_PROCESO, {
@@ -220,16 +220,16 @@ async function startUpload() {
     showAlert('No se pudo subir ningún archivo.', 'error');
   }
 }
- 
+
 async function sendFlush() {
   try {
     document.getElementById('btnProcesar').disabled = true;
-    await fetch(WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ flush: true }) });
+    await fetch(WEBHOOK_PROCESO, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ flush: true }) });
     showAlert('Señal enviada — n8n va a procesar el lote ahora', 'success');
   } catch(e) { showAlert('No se pudo enviar la señal', 'error'); }
   document.getElementById('btnProcesar').disabled = false;
 }
- 
+
 const dz = document.getElementById('dropZone');
 const fi = document.getElementById('fileInput');
 dz.addEventListener('click', () => fi.click());

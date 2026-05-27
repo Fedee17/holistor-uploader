@@ -187,9 +187,10 @@ async function startUpload() {
     files[i].status = 'uploading';
     renderQueue();
     try {
-      const fd = new FormData();
-      fd.append('file', files[i].file, files[i].name);
-      const res = await fetch(WEBHOOK, { method: 'POST', body: fd });
+     const fd = new FormData();
+     fd.append('file', files[i].file, files[i].name);
+     fd.append('isLast', done + 1 >= total ? 'true' : 'false');
+     const res = await fetch(WEBHOOK, { method: 'POST', body: fd });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       files[i].status = 'done';
       subidos++;

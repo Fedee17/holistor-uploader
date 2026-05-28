@@ -56,6 +56,7 @@
   .empty i { font-size: 28px; display: block; margin-bottom: 8px; }
   .btn-periodo { background: #f5f5f0; border: 0.5px solid #ccc; border-radius: 8px; padding: 7px 16px; font-size: 13px; cursor: pointer; color: #444; }
   .btn-periodo.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -115,6 +116,8 @@
     </div>
   </div>
 
+  <div id="estadoProceso" class="alert" style="display:none;"></div>
+
   <div class="card" id="cardFallidos" style="display:none; border-color:#f5b8b5;">
     <div class="card-header" style="color:#c5221f;"><i class="ti ti-alert-circle"></i> Facturas con error</div>
     <div id="listFallidos"></div>
@@ -149,6 +152,7 @@ async function reintentar() {
     const data = await res.json();
     document.getElementById('cardFallidos').style.display = 'none';
     archivosFallidos = [];
+    iniciarPolling();
     if (data.fallidos && data.fallidos.length > 0) {
       mostrarFallidos(data.fallidos);
       showAlert(`Procesamiento completado. Aún quedan ${data.fallidos.length} archivo${data.fallidos.length!==1?'s':''} con error.`, 'error');
@@ -193,7 +197,45 @@ function setPeriodo(p) {
 const WEBHOOK = 'https://fede123.app.n8n.cloud/webhook/holistor-upload';
 const WEBHOOK_PROCESO   = 'https://fede123.app.n8n.cloud/webhook/holistor-procesar';
 const WEBHOOK_VERIFICAR = 'https://fede123.app.n8n.cloud/webhook/holistor-verificar';
+const WEBHOOK_ESTADO   = 'https://fede123.app.n8n.cloud/webhook/holistor-estado';
 let files = [], history = [], uploading = false, subidos = 0, errores = 0;
+let pollingInterval = null;
+
+function iniciarPolling() {
+  if (pollingInterval) clearInterval(pollingInterval);
+  mostrarEstadoProceso('procesando');
+  pollingInterval = setInterval(async () => {
+    try {
+      const res = await fetch(WEBHOOK_ESTADO);
+      const data = await res.json();
+      if (data.listo === true) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+        mostrarEstadoProceso('listo', data.fallidos);
+        if (data.fallidos && data.fallidos.length > 0) {
+          mostrarFallidos(data.fallidos);
+        }
+      }
+    } catch(e) {}
+  }, 5000);
+}
+
+function mostrarEstadoProceso(estado, fallidos) {
+  const el = document.getElementById('estadoProceso');
+  if (!el) return;
+  if (estado === 'procesando') {
+    el.style.display = 'flex';
+    el.className = 'alert a-info';
+    el.innerHTML = '<i class="ti ti-loader" style="font-size:16px;margin-top:1px;flex-shrink:0;animation:spin 1s linear infinite;"></i><span>n8n está procesando las facturas — te avisamos cuando esté listo el PRN...</span>';
+  } else if (estado === 'listo') {
+    el.style.display = 'flex';
+    el.className = 'alert a-success';
+    const msg = fallidos && fallidos.length > 0
+      ? `✓ PRN generado correctamente. ${fallidos.length} factura${fallidos.length!==1?'s':''} con error — revisá la sección de errores.`
+      : '✓ PRN generado correctamente. Ya podés importarlo en Holistor.';
+    el.innerHTML = `<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span>${msg}</span>`;
+  }
+}
 
 function showAlert(msg, type) {
   const el = document.getElementById('alert');
@@ -337,6 +379,7 @@ async function startUpload() {
           mostrarFallidos(dataProceso.fallidos);
         }
       } catch(e) {}
+      iniciarPolling();
       const lotesEjecutados = Math.ceil(ok / 50);
       document.getElementById('loteResultado').style.display = 'block';
       document.getElementById('loteResultadoText').textContent = `${ok} archivo${ok!==1?'s':''} subido${ok!==1?'s':''} — ${lotesEjecutados} lote${lotesEjecutados!==1?'s':''} en proceso`;

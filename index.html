@@ -93,9 +93,15 @@
 
     <div class="queue" id="queue">
       <div class="queue-label" id="queueLabel">0 archivos</div>
+      <div id="loteInfo" style="display:none; font-size:13px; color:#1a73e8; background:#e8f0fe; border-radius:8px; padding:8px 12px; margin-bottom:8px;">
+        <i class="ti ti-stack-2" style="font-size:14px;"></i> <span id="loteInfoText"></span>
+      </div>
       <div class="file-list" id="fileList"></div>
       <div class="progress-wrap" id="progressWrap">
         <div class="progress-bar" id="progressBar" style="width:0%"></div>
+      </div>
+      <div id="loteResultado" style="display:none; font-size:13px; color:#188038; background:#e6f4ea; border-radius:8px; padding:8px 12px; margin-bottom:8px;">
+        <i class="ti ti-circle-check" style="font-size:14px;"></i> <span id="loteResultadoText"></span>
       </div>
       <div class="btn-row">
         <button class="btn-primary" id="btnSubir" onclick="startUpload()">
@@ -162,6 +168,14 @@ function renderQueue() {
   q.style.display = 'block';
   const pending = files.filter(f => f.status === 'pending').length;
   document.getElementById('queueLabel').textContent = `${files.length} archivo${files.length !== 1 ? 's' : ''} — ${pending} pendiente${pending !== 1 ? 's' : ''}`;
+  if (pending > 0) {
+    const lotes = Math.ceil(pending / 50);
+    document.getElementById('loteInfo').style.display = 'block';
+    document.getElementById('loteInfoText').textContent = `Se van a generar ${lotes} lote${lotes !== 1 ? 's' : ''} de hasta 50 facturas cada uno`;
+    document.getElementById('loteResultado').style.display = 'none';
+  } else {
+    document.getElementById('loteInfo').style.display = 'none';
+  }
   const labels = { pending: 'pendiente', uploading: 'subiendo', done: 'listo', error: 'error' };
   document.getElementById('fileList').innerHTML = files.map((f, i) => `
     <div class="file-item">
@@ -244,6 +258,10 @@ async function startUpload() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ flush: true, periodo: periodo })
       });
+      const lotesEjecutados = Math.ceil(ok / 50);
+      document.getElementById('loteResultado').style.display = 'block';
+      document.getElementById('loteResultadoText').textContent = `${ok} archivo${ok!==1?'s':''} subido${ok!==1?'s':''} — ${lotesEjecutados} lote${lotesEjecutados!==1?'s':''} en proceso`;
+      document.getElementById('loteInfo').style.display = 'none';
       showAlert(`${ok} archivo${ok!==1?'s':''} subido${ok!==1?'s':''}${err ? ' · ' + err + ' con error' : ''}. n8n está procesando el lote.`, 'success');
     } catch(e) {
       showAlert(`${ok} archivo${ok!==1?'s':''} subido${ok!==1?'s':''}. No se pudo iniciar el proceso automático — usá el botón "Procesar ahora".`, 'error');

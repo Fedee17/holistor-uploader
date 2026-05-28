@@ -115,6 +115,16 @@
     </div>
   </div>
 
+  <div class="card" id="cardFallidos" style="display:none; border-color:#f5b8b5;">
+    <div class="card-header" style="color:#c5221f;"><i class="ti ti-alert-circle"></i> Facturas con error</div>
+    <div id="listFallidos"></div>
+    <div class="btn-row" style="margin-top:1rem;">
+      <button class="btn-primary" style="background:#c5221f;" onclick="reintentar()">
+        <i class="ti ti-refresh"></i> Reintentar fallidas
+      </button>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-header"><i class="ti ti-history"></i> Historial de esta sesión</div>
     <div id="historyList">
@@ -125,6 +135,34 @@
 
 <script>
 let periodo = 'anterior';
+let archivosFallidos = [];
+
+async function reintentar() {
+  if (!archivosFallidos.length) return;
+  showAlert(`Reintentando ${archivosFallidos.length} archivo${archivosFallidos.length!==1?'s':''}...`, 'info');
+  // Buscar los archivos fallidos en la cola y resetearlos a pending
+  archivosFallidos.forEach(nombre => {
+    const idx = files.findIndex(f => f.name === nombre);
+    if (idx !== -1) files[idx].status = 'pending';
+  });
+  archivosFallidos = [];
+  document.getElementById('cardFallidos').style.display = 'none';
+  renderQueue();
+  await startUpload();
+}
+
+function mostrarFallidos(fallidos) {
+  if (!fallidos || !fallidos.length) return;
+  archivosFallidos = fallidos;
+  document.getElementById('cardFallidos').style.display = 'block';
+  document.getElementById('listFallidos').innerHTML = fallidos.map(nombre => `
+    <div class="history-item">
+      <i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;"></i>
+      <span class="history-name">${nombre}</span>
+      <span class="badge b-error">error</span>
+    </div>
+  `).join('');
+}
 
 function setPeriodo(p) {
   periodo = p;
@@ -144,7 +182,8 @@ function setPeriodo(p) {
 }
 
 const WEBHOOK = 'https://fede123.app.n8n.cloud/webhook/holistor-upload';
-const WEBHOOK_PROCESO = 'https://fede123.app.n8n.cloud/webhook/holistor-procesar';
+const WEBHOOK_PROCESO   = 'https://fede123.app.n8n.cloud/webhook/holistor-procesar';
+const WEBHOOK_VERIFICAR = 'https://fede123.app.n8n.cloud/webhook/holistor-verificar';
 let files = [], history = [], uploading = false, subidos = 0, errores = 0;
 
 function showAlert(msg, type) {
@@ -202,10 +241,35 @@ function renderHistory() {
   `).join('');
 }
 
-function addFiles(newFiles) {
+async function verificarDuplicado(nombre) {
+  try {
+    const res = await fetch(WEBHOOK_VERIFICAR, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre })
+    });
+    const data = await res.json();
+    return data.existe === true;
+  } catch(e) { return false; }
+}
+
+async function addFiles(newFiles) {
   const pdfs = Array.from(newFiles).filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'));
   if (!pdfs.length) { showAlert('Solo se aceptan archivos PDF', 'error'); return; }
-  pdfs.forEach(f => files.push({ name: f.name, size: f.size, file: f, status: 'pending' }));
+
+  const duplicados = [];
+  for (const f of pdfs) {
+    const existe = await verificarDuplicado(f.name);
+    if (existe) {
+      duplicados.push(f.name);
+    } else {
+      files.push({ name: f.name, size: f.size, file: f, status: 'pending' });
+    }
+  }
+
+  if (duplicados.length > 0) {
+    showAlert(`${duplicados.length} archivo${duplicados.length!==1?'s ya existían':'  ya existía'} en Drive y ${duplicados.length!==1?'fueron omitidos':'fue omitido'}: ${duplicados.join(', ')}`, 'error');
+  }
   renderQueue();
 }
 
@@ -253,11 +317,17 @@ async function startUpload() {
 
   if (ok > 0) {
     try {
-      await fetch(WEBHOOK_PROCESO, {
+      const respProceso = await fetch(WEBHOOK_PROCESO, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ flush: true, periodo: periodo })
       });
+      try {
+        const dataProceso = await respProceso.json();
+        if (dataProceso.fallidos && dataProceso.fallidos.length > 0) {
+          mostrarFallidos(dataProceso.fallidos);
+        }
+      } catch(e) {}
       const lotesEjecutados = Math.ceil(ok / 50);
       document.getElementById('loteResultado').style.display = 'block';
       document.getElementById('loteResultadoText').textContent = `${ok} archivo${ok!==1?'s':''} subido${ok!==1?'s':''} — ${lotesEjecutados} lote${lotesEjecutados!==1?'s':''} en proceso`;

@@ -139,16 +139,25 @@ let archivosFallidos = [];
 
 async function reintentar() {
   if (!archivosFallidos.length) return;
-  showAlert(`Reintentando ${archivosFallidos.length} archivo${archivosFallidos.length!==1?'s':''}...`, 'info');
-  // Buscar los archivos fallidos en la cola y resetearlos a pending
-  archivosFallidos.forEach(nombre => {
-    const idx = files.findIndex(f => f.name === nombre);
-    if (idx !== -1) files[idx].status = 'pending';
-  });
-  archivosFallidos = [];
-  document.getElementById('cardFallidos').style.display = 'none';
-  renderQueue();
-  await startUpload();
+  showAlert(`Reintentando ${archivosFallidos.length} archivo${archivosFallidos.length!==1?'s':''}... Las facturas siguen en Drive.`, 'info');
+  try {
+    const res = await fetch(WEBHOOK_PROCESO, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ flush: true, periodo: periodo })
+    });
+    const data = await res.json();
+    document.getElementById('cardFallidos').style.display = 'none';
+    archivosFallidos = [];
+    if (data.fallidos && data.fallidos.length > 0) {
+      mostrarFallidos(data.fallidos);
+      showAlert(`Procesamiento completado. Aún quedan ${data.fallidos.length} archivo${data.fallidos.length!==1?'s':''} con error.`, 'error');
+    } else {
+      showAlert('Reintento completado. Todas las facturas procesadas correctamente.', 'success');
+    }
+  } catch(e) {
+    showAlert('No se pudo reintentar. Intentá de nuevo.', 'error');
+  }
 }
 
 function mostrarFallidos(fallidos) {

@@ -54,6 +54,8 @@
   .history-time { font-size: 12px; color: #888; white-space: nowrap; }
   .empty { text-align: center; padding: 2rem; color: #aaa; font-size: 13px; }
   .empty i { font-size: 28px; display: block; margin-bottom: 8px; }
+  .btn-periodo { background: #f5f5f0; border: 0.5px solid #ccc; border-radius: 8px; padding: 7px 16px; font-size: 13px; cursor: pointer; color: #444; }
+  .btn-periodo.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
 </style>
 </head>
 <body>
@@ -70,6 +72,18 @@
 
   <div class="card">
     <div class="card-header"><i class="ti ti-cloud-upload"></i> Subir facturas</div>
+    <div style="margin-bottom:1rem;">
+      <label style="font-size:13px;font-weight:500;color:#444;display:block;margin-bottom:6px;">Período de carga</label>
+      <div style="display:flex;gap:8px;">
+        <button id="btnMesAnt" onclick="setPeriodo('anterior')" class="btn-periodo active">
+          Mes anterior
+        </button>
+        <button id="btnMesAct" onclick="setPeriodo('actual')" class="btn-periodo">
+          Mes actual
+        </button>
+      </div>
+      <div id="periodoInfo" style="font-size:12px;color:#888;margin-top:6px;"></div>
+    </div>
     <div class="drop-zone" id="dropZone">
       <i class="ti ti-file-upload"></i>
       <p><strong>Arrastrá los PDFs acá</strong> o hacé clic para seleccionarlos</p>
@@ -104,6 +118,25 @@
 </div>
 
 <script>
+let periodo = 'anterior';
+
+function setPeriodo(p) {
+  periodo = p;
+  document.getElementById('btnMesAnt').classList.toggle('active', p === 'anterior');
+  document.getElementById('btnMesAct').classList.toggle('active', p === 'actual');
+  const hoy = new Date();
+  let mes, anio;
+  if (p === 'anterior') {
+    const ult = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+    mes = ult.toLocaleString('es-AR', { month: 'long' });
+    anio = ult.getFullYear();
+  } else {
+    mes = hoy.toLocaleString('es-AR', { month: 'long' });
+    anio = hoy.getFullYear();
+  }
+  document.getElementById('periodoInfo').textContent = `Fecha de recepción: último día de ${mes} ${anio}`;
+}
+
 const WEBHOOK = 'https://fede123.app.n8n.cloud/webhook/holistor-upload';
 const WEBHOOK_PROCESO = 'https://fede123.app.n8n.cloud/webhook/holistor-procesar';
 let files = [], history = [], uploading = false, subidos = 0, errores = 0;
@@ -209,7 +242,7 @@ async function startUpload() {
       await fetch(WEBHOOK_PROCESO, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ flush: true })
+        body: JSON.stringify({ flush: true, periodo: periodo })
       });
       showAlert(`${ok} archivo${ok!==1?'s':''} subido${ok!==1?'s':''}${err ? ' · ' + err + ' con error' : ''}. n8n está procesando el lote.`, 'success');
     } catch(e) {
@@ -224,12 +257,13 @@ async function startUpload() {
 async function sendFlush() {
   try {
     document.getElementById('btnProcesar').disabled = true;
-    await fetch(WEBHOOK_PROCESO, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ flush: true }) });
+    await fetch(WEBHOOK_PROCESO, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ flush: true, periodo: periodo }) });
     showAlert('Señal enviada — n8n va a procesar el lote ahora', 'success');
   } catch(e) { showAlert('No se pudo enviar la señal', 'error'); }
   document.getElementById('btnProcesar').disabled = false;
 }
 
+setPeriodo('anterior');
 const dz = document.getElementById('dropZone');
 const fi = document.getElementById('fileInput');
 dz.addEventListener('click', () => fi.click());

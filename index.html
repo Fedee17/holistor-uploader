@@ -145,11 +145,24 @@
 </div>
 
 <script>
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 let periodo = null;
 let archivosFallidos = [];
 
 async function reintentar() {
   if (!archivosFallidos.length) return;
+  // Bloquear botón mientras procesa
+  const btns = document.querySelectorAll('#cardFallidos button');
+  btns.forEach(b => b.disabled = true);
   showAlert(`Reintentando ${archivosFallidos.length} archivo${archivosFallidos.length!==1?'s':''}... Las facturas siguen en Drive.`, 'info');
   try {
     const res = await fetch(WEBHOOK_PROCESO, {
@@ -167,6 +180,7 @@ async function reintentar() {
     } else {
       showAlert('Reintento completado. Todas las facturas procesadas correctamente.', 'success');
     }
+    btns.forEach(b => b.disabled = false);
   } catch(e) {
     showAlert('No se pudo reintentar. Intentá de nuevo.', 'error');
   }
@@ -179,7 +193,7 @@ function mostrarFallidos(fallidos) {
   document.getElementById('listFallidos').innerHTML = fallidos.map(nombre => `
     <div class="history-item">
       <i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;"></i>
-      <span class="history-name">${nombre}</span>
+      <span class="history-name">${escapeHtml(nombre)}</span>
       <span class="badge b-error">error</span>
     </div>
   `).join('');
@@ -263,7 +277,7 @@ function renderQueue() {
   document.getElementById('fileList').innerHTML = files.map((f, i) => `
     <div class="file-item">
       <i class="ti ti-file-type-pdf" style="font-size:16px;color:#c5221f;flex-shrink:0;"></i>
-      <span class="file-name">${f.name}</span>
+      <span class="file-name">${escapeHtml(f.name)}</span>
       <span class="file-size">${(f.size/1024).toFixed(0)} KB</span>
       <span class="badge b-${f.status}">${labels[f.status]}</span>
       ${f.status === 'pending' ? `<button class="btn-remove" onclick="removeFile(${i})" aria-label="Quitar"><i class="ti ti-x"></i></button>` : ''}
@@ -278,7 +292,7 @@ function renderHistory() {
   el.innerHTML = history.map(h => `
     <div class="history-item">
       <i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;"></i>
-      <span class="history-name">${h.name}</span>
+      <span class="history-name">${escapeHtml(h.name)}</span>
       <span class="history-time">${h.time}</span>
       <span class="badge ${h.ok ? 'b-done' : 'b-error'}">${h.ok ? 'subido' : 'error'}</span>
     </div>
@@ -312,7 +326,7 @@ async function addFiles(newFiles) {
   }
 
   if (duplicados.length > 0) {
-    showAlert(`${duplicados.length} archivo${duplicados.length!==1?'s ya existían':'  ya existía'} en Drive y ${duplicados.length!==1?'fueron omitidos':'fue omitido'}: ${duplicados.join(', ')}`, 'error');
+    showAlert(`${duplicados.length} archivo${duplicados.length!==1?'s ya existían':'  ya existía'} en Drive y ${duplicados.length!==1?'fueron omitidos':'fue omitido'}: ${duplicados.map(escapeHtml).join(', ')}`, 'error');
   }
   renderQueue();
 }
@@ -322,6 +336,10 @@ function clearPending() { files = files.filter(f => f.status !== 'pending'); ren
 
 async function startUpload() {
   if (uploading) return;
+  if (pollingInterval) {
+    showAlert('Ya hay un proceso en ejecución. Esperá a que termine.', 'error');
+    return;
+  }
   const pending = files.filter(f => f.status === 'pending');
   if (!pending.length) return;
   uploading = true;

@@ -306,19 +306,28 @@ async function verificarDuplicado(nombre) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nombre })
     });
+    if (!res.ok) return 'error';
     const data = await res.json();
     return data.existe === true;
-  } catch(e) { return false; }
+  } catch(e) { return 'error'; }
 }
 
 async function addFiles(newFiles) {
   const pdfs = Array.from(newFiles).filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'));
   if (!pdfs.length) { showAlert('Solo se aceptan archivos PDF', 'error'); return; }
 
+  if (pdfs.length > 5) {
+    showAlert(`Verificando ${pdfs.length} archivos en Drive...`, 'info');
+  }
+
   const duplicados = [];
+  const erroresVerif = [];
   for (const f of pdfs) {
-    const existe = await verificarDuplicado(f.name);
-    if (existe) {
+    const resultado = await verificarDuplicado(f.name);
+    if (resultado === 'error') {
+      erroresVerif.push(f.name);
+      // Si falló la verificación, no agregarlo para evitar duplicados accidentales
+    } else if (resultado === true) {
       duplicados.push(f.name);
     } else {
       files.push({ name: f.name, size: f.size, file: f, status: 'pending' });
@@ -326,11 +335,13 @@ async function addFiles(newFiles) {
   }
 
   if (duplicados.length > 0) {
-    showAlert(`${duplicados.length} archivo${duplicados.length!==1?'s ya existían':'  ya existía'} en Drive y ${duplicados.length!==1?'fueron omitidos':'fue omitido'}: ${duplicados.map(escapeHtml).join(', ')}`, 'error');
+    showAlert(`${duplicados.length} archivo${duplicados.length!==1?'s ya existían':' ya existía'} en Drive y ${duplicados.length!==1?'fueron omitidos':'fue omitido'}`, 'error');
+  }
+  if (erroresVerif.length > 0) {
+    showAlert(`No se pudo verificar ${erroresVerif.length} archivo${erroresVerif.length!==1?'s':''}. Reintentá más tarde.`, 'error');
   }
   renderQueue();
 }
-
 function removeFile(i) { files.splice(i, 1); renderQueue(); }
 function clearPending() { files = files.filter(f => f.status !== 'pending'); renderQueue(); }
 
@@ -386,6 +397,10 @@ async function startUpload() {
       });
       try {
         const dataProceso = await respProceso.json();
+        if (dataProceso.proceso_ya_activo === true) {
+          showAlert(dataProceso.mensaje || 'Ya hay un proceso en ejecución. Esperá a que termine.', 'error');
+          return;
+        }
         if (dataProceso.fallidos && dataProceso.fallidos.length > 0) {
           mostrarFallidos(dataProceso.fallidos);
         }

@@ -411,6 +411,33 @@ async function sendFlush() {
   document.getElementById('btnProcesar').disabled = false;
 }
 
+function actualizarPeriodo() {
+  const mes  = parseInt(document.getElementById('selMes').value);
+  const anio = parseInt(document.getElementById('selAnio').value);
+  periodo = { mes, anio };
+  const ultimoDia = new Date(anio, mes, 0).getDate();
+  const mesNombre = new Date(anio, mes - 1, 1).toLocaleString('es-AR', { month: 'long' });
+  document.getElementById('periodoInfo').textContent = `Fecha de recepción: ${String(ultimoDia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${anio} (último día de ${mesNombre} ${anio})`;
+}
+
+function inicializarSelectores() {
+  const hoy = new Date();
+  const anioActual = hoy.getFullYear();
+  const selAnio = document.getElementById('selAnio');
+  for (let a = anioActual - 3; a <= anioActual; a++) {
+    const opt = document.createElement('option');
+    opt.value = a;
+    opt.textContent = a;
+    if (a === anioActual) opt.selected = true;
+    selAnio.appendChild(opt);
+  }
+  const mesPorDefecto = hoy.getMonth() === 0 ? 12 : hoy.getMonth();
+  const anioPorDefecto = hoy.getMonth() === 0 ? anioActual - 1 : anioActual;
+  document.getElementById('selMes').value = mesPorDefecto;
+  selAnio.value = anioPorDefecto;
+  actualizarPeriodo();
+}
+
 inicializarSelectores();
 const dz = document.getElementById('dropZone');
 const fi = document.getElementById('fileInput');

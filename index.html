@@ -145,7 +145,7 @@
 </div>
 
 <script>
-let periodo = 'anterior';
+let periodo = null;
 let archivosFallidos = [];
 
 async function reintentar() {
@@ -185,22 +185,7 @@ function mostrarFallidos(fallidos) {
   `).join('');
 }
 
-function setPeriodo(p) {
-  periodo = p;
-  document.getElementById('btnMesAnt').classList.toggle('active', p === 'anterior');
-  document.getElementById('btnMesAct').classList.toggle('active', p === 'actual');
-  const hoy = new Date();
-  let mes, anio;
-  if (p === 'anterior') {
-    const ult = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
-    mes = ult.toLocaleString('es-AR', { month: 'long' });
-    anio = ult.getFullYear();
-  } else {
-    mes = hoy.toLocaleString('es-AR', { month: 'long' });
-    anio = hoy.getFullYear();
-  }
-  document.getElementById('periodoInfo').textContent = `Fecha de recepción: último día de ${mes} ${anio}`;
-}
+
 
 const WEBHOOK = 'https://fede123.app.n8n.cloud/webhook/holistor-upload';
 const WEBHOOK_PROCESO   = 'https://fede123.app.n8n.cloud/webhook/holistor-procesar';

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Holistor — Subir Facturas</title>
 <link rel="stylesheet" href="https://unpkg.com/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a1a; min-height: 100vh; padding: 2rem 1rem; }
@@ -17,12 +18,44 @@
   .stat { background: #f5f5f0; border-radius: 8px; padding: 12px; }
   .stat-label { font-size: 12px; color: #888; margin-bottom: 4px; }
   .stat-value { font-size: 22px; font-weight: 500; }
+  .field-label { font-size: 13px; font-weight: 500; color: #444; display: block; margin-bottom: 6px; }
+  .form-row { margin-bottom: 1rem; }
+  .divider { border: none; border-top: 0.5px solid #e8e8e0; margin: 1rem 0; }
+  /* Cliente selector */
+  .field-select { border: 0.5px solid #ccc; border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; color: #1a1a1a; background: #fff; width: 100%; }
+  .field-select:disabled { opacity: 0.5; cursor: not-allowed; }
+  .field-hint { font-size: 12px; color: #888; margin-top: 4px; }
+  .field-error { font-size: 12px; color: #c5221f; margin-top: 4px; }
+  /* Drop zone PDFs */
   .drop-zone { border: 1.5px dashed #ccc; border-radius: 12px; padding: 2.5rem; text-align: center; cursor: pointer; transition: background 0.15s; }
   .drop-zone:hover, .drop-zone.dragover { background: #f5f5f0; }
   .drop-zone i { font-size: 32px; color: #aaa; display: block; margin-bottom: 8px; }
   .drop-zone p { color: #888; font-size: 14px; margin-top: 4px; }
   .drop-zone strong { color: #1a1a1a; }
   input[type=file] { display: none; }
+  /* Excel zone */
+  .excel-zone { border: 1.5px dashed #b0c9b0; border-radius: 10px; padding: 0.85rem 1rem; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: all 0.15s; background: #f9fdf9; }
+  .excel-zone:hover { background: #f0faf0; border-color: #188038; }
+  .excel-zone.dragover { background: #f0faf0; border-color: #188038; }
+  .excel-zone.loaded { border-style: solid; border-color: #188038; background: #f0faf3; cursor: default; }
+  .excel-zone.highlight { border-color: #e37400; background: #fff8e0; animation: pulseWarn 0.9s ease-in-out 3; }
+  .ez-icon { font-size: 20px; color: #4a9a4a; flex-shrink: 0; }
+  .ez-text { flex: 1; min-width: 0; }
+  .ez-title { font-size: 13px; font-weight: 500; color: #2e7d32; }
+  .excel-zone:not(.loaded) .ez-title { color: #444; }
+  .ez-sub { font-size: 11px; color: #888; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .excel-zone.loaded .ez-sub { color: #4a9a4a; }
+  .ez-action { font-size: 12px; color: #1a73e8; white-space: nowrap; flex-shrink: 0; }
+  .ez-remove { background: none; border: none; cursor: pointer; color: #bbb; font-size: 16px; flex-shrink: 0; padding: 2px; line-height: 1; }
+  .ez-remove:hover { color: #c5221f; }
+  @keyframes pulseWarn { 0%,100% { border-color: #e37400; } 50% { border-color: #fcc; } }
+  /* Registry warning */
+  .registry-warn { background: #fff8e0; border: 0.5px solid #fcd34d; border-radius: 8px; padding: 10px 14px; margin-top: 8px; display: none; font-size: 13px; color: #92400e; }
+  .registry-warn-head { display: flex; align-items: center; gap: 6px; font-weight: 500; margin-bottom: 6px; }
+  .registry-warn-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .rw-btn-a { background: #1a1a1a; color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; cursor: pointer; }
+  .rw-btn-b { background: none; border: 0.5px solid #92400e; border-radius: 6px; padding: 6px 14px; font-size: 12px; cursor: pointer; color: #92400e; }
+  /* Queue */
   .queue { margin-top: 1rem; display: none; }
   .queue-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; margin-bottom: 8px; }
   .file-list { max-height: 260px; overflow-y: auto; }
@@ -30,10 +63,10 @@
   .file-name { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .file-size { font-size: 12px; color: #888; white-space: nowrap; }
   .badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
-  .b-pending { background: #f0f0ea; color: #666; }
+  .b-pending   { background: #f0f0ea; color: #666; }
   .b-uploading { background: #e8f0fe; color: #1a73e8; }
-  .b-done { background: #e6f4ea; color: #188038; }
-  .b-error { background: #fce8e6; color: #c5221f; }
+  .b-done      { background: #e6f4ea; color: #188038; }
+  .b-error     { background: #fce8e6; color: #c5221f; }
   .btn-remove { background: none; border: none; cursor: pointer; color: #aaa; font-size: 16px; padding: 2px; line-height: 1; }
   .btn-remove:hover { color: #c5221f; }
   .btn-row { display: flex; gap: 10px; margin-top: 1rem; flex-wrap: wrap; }
@@ -42,19 +75,43 @@
   .btn-secondary { background: none; border: 0.5px solid #ccc; border-radius: 8px; padding: 9px 20px; font-size: 14px; cursor: pointer; color: #1a1a1a; }
   .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
   .progress-wrap { height: 3px; background: #e0e0d8; border-radius: 2px; margin-top: 8px; overflow: hidden; display: none; }
-  .progress-bar { height: 100%; background: #1a73e8; border-radius: 2px; transition: width 0.2s; }
+  .progress-bar  { height: 100%; background: #1a73e8; border-radius: 2px; transition: width 0.2s; }
+  /* Alerts */
   .alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 1rem; display: none; align-items: flex-start; gap: 8px; }
   .alert i { font-size: 16px; margin-top: 1px; flex-shrink: 0; }
   .a-success { background: #e6f4ea; color: #188038; border: 0.5px solid #a8d5b5; }
-  .a-error { background: #fce8e6; color: #c5221f; border: 0.5px solid #f5b8b5; }
-  .a-info { background: #e8f0fe; color: #1a73e8; border: 0.5px solid #aac4f5; }
+  .a-error   { background: #fce8e6; color: #c5221f; border: 0.5px solid #f5b8b5; }
+  .a-info    { background: #e8f0fe; color: #1a73e8; border: 0.5px solid #aac4f5; }
+  .a-warn    { background: #fff8e0; color: #92400e; border: 0.5px solid #fcd34d; }
+  /* History */
   .history-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 0.5px solid #e8e8e0; font-size: 13px; }
   .history-item:last-child { border-bottom: none; }
   .history-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .history-time { font-size: 12px; color: #888; white-space: nowrap; }
   .empty { text-align: center; padding: 2rem; color: #aaa; font-size: 13px; }
   .empty i { font-size: 28px; display: block; margin-bottom: 8px; }
-
+  /* Conciliation panel */
+  .concil-section { border: 0.5px solid #e8e8e0; border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
+  .concil-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; user-select: none; }
+  .concil-head:hover { background: #f9f9f7; }
+  .concil-icon  { font-size: 16px; flex-shrink: 0; }
+  .concil-title { flex: 1; font-size: 13px; font-weight: 500; }
+  .concil-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; }
+  .cb-ok   { background: #e6f4ea; color: #188038; }
+  .cb-warn { background: #fff3e0; color: #e37400; }
+  .cb-err  { background: #fce8e6; color: #c5221f; }
+  .ci-ok   { color: #188038; }
+  .ci-warn { color: #e37400; }
+  .ci-err  { color: #c5221f; }
+  .concil-toggle { font-size: 14px; color: #aaa; transition: transform 0.2s; }
+  .concil-head.open .concil-toggle { transform: rotate(180deg); }
+  .concil-body { display: none; border-top: 0.5px solid #e8e8e0; max-height: 220px; overflow-y: auto; }
+  .concil-body.open { display: block; }
+  .concil-row { display: flex; align-items: baseline; gap: 8px; padding: 7px 14px; border-bottom: 0.5px solid #f0f0ea; font-size: 12px; }
+  .concil-row:last-child { border-bottom: none; }
+  .concil-key   { font-family: monospace; font-size: 11px; color: #666; flex-shrink: 0; }
+  .concil-denom { flex: 1; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .concil-total { color: #888; white-space: nowrap; font-size: 11px; }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -72,34 +129,67 @@
 
   <div class="card">
     <div class="card-header"><i class="ti ti-cloud-upload"></i> Subir facturas</div>
-    <div style="margin-bottom:1rem;">
-      <label style="font-size:13px;font-weight:500;color:#444;display:block;margin-bottom:6px;">Período de carga</label>
+
+    <!-- Cliente -->
+    <div class="form-row">
+      <label class="field-label">Cliente</label>
+      <select id="selCliente" class="field-select" onchange="onClienteChange()">
+        <option value="">— Cargando clientes… —</option>
+      </select>
+      <div id="clienteHint" class="field-hint"></div>
+    </div>
+
+    <!-- Período -->
+    <div class="form-row">
+      <label class="field-label">Período de carga</label>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <select id="selMes" onchange="actualizarPeriodo()" style="border:0.5px solid #ccc;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;color:#1a1a1a;background:#fff;">
-          <option value="1">Enero</option>
-          <option value="2">Febrero</option>
-          <option value="3">Marzo</option>
-          <option value="4">Abril</option>
-          <option value="5">Mayo</option>
-          <option value="6">Junio</option>
-          <option value="7">Julio</option>
-          <option value="8">Agosto</option>
-          <option value="9">Septiembre</option>
-          <option value="10">Octubre</option>
-          <option value="11">Noviembre</option>
-          <option value="12">Diciembre</option>
+          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
         </select>
         <select id="selAnio" onchange="actualizarPeriodo()" style="border:0.5px solid #ccc;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;color:#1a1a1a;background:#fff;"></select>
       </div>
       <div id="periodoInfo" style="font-size:12px;color:#888;margin-top:6px;"></div>
     </div>
-    <div class="drop-zone" id="dropZone">
-      <i class="ti ti-file-upload"></i>
-      <p><strong>Arrastrá los PDFs acá</strong> o hacé clic para seleccionarlos</p>
-      <p>Solo archivos PDF · Múltiples archivos permitidos</p>
-    </div>
-    <input type="file" id="fileInput" accept=".pdf" multiple />
 
+    <hr class="divider">
+
+    <!-- Drop zone PDFs -->
+    <div class="form-row" style="margin-bottom:0.75rem;">
+      <label class="field-label"><i class="ti ti-file-type-pdf" style="color:#c5221f;font-size:14px;"></i> Facturas PDF</label>
+      <div class="drop-zone" id="dropZone">
+        <i class="ti ti-file-upload"></i>
+        <p><strong>Arrastrá los PDFs acá</strong> o hacé clic para seleccionarlos</p>
+        <p>Solo archivos PDF · Múltiples archivos permitidos</p>
+      </div>
+      <input type="file" id="fileInput" accept=".pdf" multiple />
+    </div>
+
+    <!-- Excel / Registro ARCA -->
+    <div>
+      <label class="field-label"><i class="ti ti-table" style="color:#188038;font-size:14px;"></i> Registro ARCA — Mis Comprobantes Recibidos (.xlsx)</label>
+      <div class="excel-zone" id="excelZone" onclick="triggerExcelPick()">
+        <i class="ti ti-file-spreadsheet ez-icon"></i>
+        <div class="ez-text">
+          <div class="ez-title" id="ezTitle">Arrastrá el Excel de ARCA o hacé clic</div>
+          <div class="ez-sub" id="ezSub">Necesario para la conciliación de comprobantes</div>
+        </div>
+        <span class="ez-action" id="ezAction">Seleccionar</span>
+      </div>
+      <input type="file" id="excelInput" accept=".xlsx,.xls" />
+      <div class="registry-warn" id="registryWarn">
+        <div class="registry-warn-head"><i class="ti ti-alert-triangle" style="font-size:14px;"></i> Sin registro de comprobantes</div>
+        Podés procesar igual, pero no se realizará conciliación y todas las facturas quedarán sin validar contra ARCA.
+        <div class="registry-warn-btns">
+          <button class="rw-btn-a" onclick="focusExcelZone()"><i class="ti ti-table" style="font-size:11px;"></i> Subir registro primero</button>
+          <button class="rw-btn-b" onclick="procesarSinRegistro()">Procesar sin registro</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Queue -->
     <div class="queue" id="queue">
       <div class="queue-label" id="queueLabel">0 archivos</div>
       <div id="loteInfo" style="display:none; font-size:13px; color:#1a73e8; background:#e8f0fe; border-radius:8px; padding:8px 12px; margin-bottom:8px;">
@@ -113,7 +203,7 @@
         <i class="ti ti-circle-check" style="font-size:14px;"></i> <span id="loteResultadoText"></span>
       </div>
       <div class="btn-row">
-        <button class="btn-primary" id="btnSubir" onclick="startUpload()">
+        <button class="btn-primary" id="btnSubir" onclick="handleSubir()">
           <i class="ti ti-upload"></i> Subir y procesar
         </button>
         <button class="btn-secondary" id="btnProcesar" onclick="sendFlush()" style="display:none;">
@@ -136,6 +226,12 @@
     </div>
   </div>
 
+  <!-- Conciliation panel — visible after process completes -->
+  <div class="card" id="cardConciliacion" style="display:none;">
+    <div class="card-header"><i class="ti ti-report-analytics" style="color:#1a73e8;"></i> Conciliación de comprobantes</div>
+    <div id="concilContent"></div>
+  </div>
+
   <div class="card">
     <div class="card-header"><i class="ti ti-history"></i> Historial de esta sesión</div>
     <div id="historyList">
@@ -145,83 +241,260 @@
 </div>
 
 <script>
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function escapeHtml(s) {
   if (s === null || s === undefined) return '';
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 }
 
-let periodo = null;
-let archivosFallidos = [];
-
-async function reintentar() {
-  if (!archivosFallidos.length) return;
-  // Bloquear botón mientras procesa
-  const btns = document.querySelectorAll('#cardFallidos button');
-  btns.forEach(b => b.disabled = true);
-  showAlert(`Reintentando ${archivosFallidos.length} archivo${archivosFallidos.length!==1?'s':''}... Las facturas siguen en Drive.`, 'info');
-  try {
-    const res = await fetch(WEBHOOK_PROCESO, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ flush: true, mes: periodo?.mes, anio: periodo?.anio })
-    });
-    const data = await res.json();
-    document.getElementById('cardFallidos').style.display = 'none';
-    archivosFallidos = [];
-    iniciarPolling();
-    if (data.fallidos && data.fallidos.length > 0) {
-      mostrarFallidos(data.fallidos);
-      showAlert(`Procesamiento completado. Aún quedan ${data.fallidos.length} archivo${data.fallidos.length!==1?'s':''} con error.`, 'error');
-    } else {
-      showAlert('Reintento completado. Todas las facturas procesadas correctamente.', 'success');
-    }
-    btns.forEach(b => b.disabled = false);
-  } catch(e) {
-    showAlert('No se pudo reintentar. Intentá de nuevo.', 'error');
-  }
-}
-
-function mostrarFallidos(fallidos) {
-  if (!fallidos || !fallidos.length) return;
-  archivosFallidos = fallidos;
-  document.getElementById('cardFallidos').style.display = 'block';
-  document.getElementById('listFallidos').innerHTML = fallidos.map(nombre => `
-    <div class="history-item">
-      <i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;"></i>
-      <span class="history-name">${escapeHtml(nombre)}</span>
-      <span class="badge b-error">error</span>
-    </div>
-  `).join('');
-}
-
-
-
-const WEBHOOK = 'https://fede123.app.n8n.cloud/webhook/holistor-upload';
+// ── Webhooks ──────────────────────────────────────────────────────────────────
+const WEBHOOK           = 'https://fede123.app.n8n.cloud/webhook/holistor-upload';
 const WEBHOOK_PROCESO   = 'https://fede123.app.n8n.cloud/webhook/holistor-procesar';
 const WEBHOOK_VERIFICAR = 'https://fede123.app.n8n.cloud/webhook/holistor-verificar';
-const WEBHOOK_ESTADO   = 'https://fede123.app.n8n.cloud/webhook/holistor-estado';
+const WEBHOOK_ESTADO    = 'https://fede123.app.n8n.cloud/webhook/holistor-estado';
+const WEBHOOK_CLIENTES  = 'https://fede123.app.n8n.cloud/webhook/holistor-clientes';
+const WEBHOOK_REGISTRO  = 'https://fede123.app.n8n.cloud/webhook/holistor-registro';
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let periodo             = null;
+let clienteSeleccionado = null;   // { cuit, nombre }
+let registroSubido      = false;  // Excel was parsed + sent to n8n
+let archivosFallidos    = [];
 let files = [], history = [], uploading = false, subidos = 0, errores = 0;
 let pollingInterval = null;
 
+// ── Alerts ────────────────────────────────────────────────────────────────────
+function showAlert(msg, type) {
+  const el = document.getElementById('alert');
+  const icons = { success:'circle-check', error:'alert-circle', info:'info-circle', warn:'alert-triangle' };
+  el.className = 'alert a-' + type;
+  el.innerHTML = `<i class="ti ti-${icons[type]||'info-circle'}"></i><span>${msg}</span>`;
+  el.style.display = 'flex';
+  if (type !== 'info') setTimeout(() => el.style.display = 'none', 6000);
+}
+
+// ── Clientes ──────────────────────────────────────────────────────────────────
+async function loadClientes() {
+  const sel  = document.getElementById('selCliente');
+  const hint = document.getElementById('clienteHint');
+  sel.innerHTML = '<option value="">— Cargando… —</option>';
+  sel.disabled = true;
+  try {
+    const res = await fetch(WEBHOOK_CLIENTES);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const lista = await res.json();
+    if (!Array.isArray(lista) || !lista.length) throw new Error('Lista vacía');
+    sel.innerHTML = '<option value="">— Seleccionar cliente —</option>' +
+      lista.map(c => `<option value="${escapeHtml(c.cuit)}" data-nombre="${escapeHtml(c.nombre)}">${escapeHtml(c.nombre)}</option>`).join('');
+    sel.disabled = false;
+    hint.textContent = '';
+    hint.className = 'field-hint';
+  } catch(e) {
+    sel.innerHTML = '<option value="">— Error al cargar —</option>';
+    sel.disabled = false;
+    hint.className = 'field-error';
+    hint.innerHTML = 'No se pudo cargar la lista. <a href="#" onclick="loadClientes();return false;" style="color:inherit;text-decoration:underline;">Reintentar</a>';
+  }
+}
+
+function onClienteChange() {
+  const sel = document.getElementById('selCliente');
+  const opt = sel.options[sel.selectedIndex];
+  if (sel.value) {
+    clienteSeleccionado = { cuit: sel.value, nombre: opt.dataset.nombre };
+    document.getElementById('clienteHint').textContent = `CUIT: ${sel.value}`;
+    document.getElementById('clienteHint').className = 'field-hint';
+  } else {
+    clienteSeleccionado = null;
+    document.getElementById('clienteHint').textContent = '';
+  }
+  resetRegistro(); // reset Excel when client changes
+}
+
+// ── Excel / Registro ARCA ─────────────────────────────────────────────────────
+function triggerExcelPick() {
+  if (registroSubido) return;
+  document.getElementById('excelInput').click();
+}
+
+function resetRegistro() {
+  registroSubido = false;
+  const zone = document.getElementById('excelZone');
+  zone.classList.remove('loaded','highlight');
+  zone.onclick = () => triggerExcelPick();
+  const xBtn = zone.querySelector('.ez-remove');
+  if (xBtn) xBtn.remove();
+  document.getElementById('ezTitle').textContent  = 'Arrastrá el Excel de ARCA o hacé clic';
+  document.getElementById('ezSub').textContent    = 'Necesario para la conciliación de comprobantes';
+  document.getElementById('ezAction').textContent = 'Seleccionar';
+  document.getElementById('excelInput').value = '';
+  document.getElementById('registryWarn').style.display = 'none';
+}
+
+function focusExcelZone() {
+  document.getElementById('registryWarn').style.display = 'none';
+  const zone = document.getElementById('excelZone');
+  zone.classList.add('highlight');
+  zone.scrollIntoView({ behavior:'smooth', block:'center' });
+  setTimeout(() => zone.classList.remove('highlight'), 3000);
+  document.getElementById('excelInput').click();
+}
+
+function procesarSinRegistro() {
+  document.getElementById('registryWarn').style.display = 'none';
+  startUpload();
+}
+
+async function handleExcelFile(file) {
+  if (!file || (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls'))) {
+    showAlert('El registro debe ser un archivo .xlsx exportado desde ARCA', 'error');
+    return;
+  }
+  if (!clienteSeleccionado) {
+    showAlert('Primero seleccioná el cliente antes de subir el registro', 'warn');
+    return;
+  }
+  if (!periodo) {
+    showAlert('Seleccioná el período antes de subir el registro', 'warn');
+    return;
+  }
+
+  document.getElementById('ezTitle').textContent  = `Procesando ${escapeHtml(file.name)}…`;
+  document.getElementById('ezSub').textContent    = 'Leyendo comprobantes…';
+  document.getElementById('ezAction').textContent = '';
+
+  try {
+    const { registros, receptorCuit } = await parsearRegistroARCA(file);
+
+    // Validar que el receptor del Excel coincide con el cliente seleccionado
+    const cuitLimpio = clienteSeleccionado.cuit.replace(/[^0-9]/g,'').padStart(11,'0');
+    if (receptorCuit !== cuitLimpio) {
+      resetRegistro();
+      showAlert(`El registro pertenece al CUIT ${receptorCuit}, pero el cliente seleccionado es ${clienteSeleccionado.cuit}. Verificá el archivo o el cliente.`, 'error');
+      return;
+    }
+
+    const periodoStr = `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}`;
+    document.getElementById('ezSub').textContent = `${registros.length} comprobantes · Enviando a n8n…`;
+
+    const res = await fetch(WEBHOOK_REGISTRO, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cliente_cuit: clienteSeleccionado.cuit, periodo: periodoStr, registros })
+    });
+
+    let cambiado = true;
+    try { const r = await res.json(); cambiado = r.cambiado !== false; } catch(e) {}
+
+    // Marcar como cargado
+    registroSubido = true;
+    const zone = document.getElementById('excelZone');
+    zone.classList.add('loaded');
+    zone.onclick = null;
+
+    const xBtn = document.createElement('button');
+    xBtn.className = 'ez-remove';
+    xBtn.innerHTML = '<i class="ti ti-x"></i>';
+    xBtn.onclick = (e) => { e.stopPropagation(); resetRegistro(); };
+    zone.appendChild(xBtn);
+
+    document.getElementById('ezTitle').textContent  = escapeHtml(file.name);
+    document.getElementById('ezSub').textContent    = `${registros.length} comprobantes · ${cambiado ? 'Registro actualizado ✓' : 'Sin cambios (igual al anterior)'}`;
+    document.getElementById('ezAction').textContent = '';
+    document.getElementById('registryWarn').style.display = 'none';
+
+    showAlert(`Registro cargado: ${registros.length} comprobante${registros.length!==1?'s':''}${cambiado ? ' (actualizado)' : ' (sin cambios)'}`, 'success');
+
+  } catch(err) {
+    resetRegistro();
+    showAlert('Error al procesar el registro: ' + err.message, 'error');
+  }
+}
+
+function parsearRegistroARCA(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        // raw:false para convertir números a strings limpios
+        const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:null, raw:false });
+        // Fila 0: título, Fila 1: headers, Fila 2+: datos
+        if (rows.length < 3) { reject(new Error('El archivo no contiene datos')); return; }
+
+        // Receptor CUIT en columna 10 (Nro. Doc. Receptor)
+        const firstData    = rows[2];
+        const receptorCuit = String(firstData[10]||'').replace(/[^0-9]/g,'').padStart(11,'0');
+
+        const registros = [];
+        for (let i = 2; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r || r[0] === null) continue;
+
+          // Col 1: Tipo ("1 - Factura A" → código "1")
+          const tipoCod  = String(r[1]||'').split(' - ')[0].trim();
+          // Col 7: CUIT emisor
+          const cuitEm   = String(r[7]||'').replace(/[^0-9]/g,'').padStart(11,'0');
+          // Col 2: Pto venta, Col 4: Número hasta
+          const ptoVta   = String(r[2]||'');
+          const numHasta = String(r[4]||'');
+          // Clave normalizada: cuit_emisor-tipo(int)-pto_vta(int)-numero_hasta(int)
+          const clave = `${cuitEm}-${parseInt(tipoCod)||0}-${parseInt(ptoVta)||0}-${parseInt(numHasta)||0}`;
+
+          registros.push({
+            clave,
+            cuit_emisor:        cuitEm,
+            tipo_cod:           tipoCod,
+            pto_vta:            ptoVta,
+            numero_hasta:       numHasta,
+            total:              String(r[29]||''),   // Col 29: Imp. Total
+            denominacion_emisor:String(r[8]||''),    // Col 8: Denominación Emisor
+            fecha:              String(r[0]||''),
+            estado:             'pendiente'
+          });
+        }
+        if (!registros.length) { reject(new Error('No se encontraron comprobantes')); return; }
+        resolve({ registros, receptorCuit });
+      } catch(err) { reject(err); }
+    };
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// ── Subir y procesar ──────────────────────────────────────────────────────────
+function handleSubir() {
+  if (!clienteSeleccionado) {
+    showAlert('Seleccioná un cliente antes de subir', 'warn');
+    return;
+  }
+  const pending = files.filter(f => f.status === 'pending');
+  if (!pending.length) {
+    showAlert('No hay facturas en cola. Arrastrá los PDFs primero.', 'warn');
+    return;
+  }
+  if (!registroSubido) {
+    document.getElementById('registryWarn').style.display = 'block';
+    return;
+  }
+  startUpload();
+}
+
+// ── Polling ───────────────────────────────────────────────────────────────────
 function iniciarPolling() {
   if (pollingInterval) clearInterval(pollingInterval);
   mostrarEstadoProceso('procesando');
   pollingInterval = setInterval(async () => {
     try {
-      const res = await fetch(WEBHOOK_ESTADO);
+      const res  = await fetch(WEBHOOK_ESTADO);
       const data = await res.json();
       if (data.listo === true) {
         clearInterval(pollingInterval);
         pollingInterval = null;
         mostrarEstadoProceso('listo', data.fallidos);
-        if (data.fallidos && data.fallidos.length > 0) {
-          mostrarFallidos(data.fallidos);
-        }
+        if (data.fallidos && data.fallidos.length > 0) mostrarFallidos(data.fallidos);
+        if (data.conciliacion) mostrarConciliacion(data.conciliacion);
       }
     } catch(e) {}
   }, 5000);
@@ -233,186 +506,244 @@ function mostrarEstadoProceso(estado, fallidos) {
   if (estado === 'procesando') {
     el.style.display = 'flex';
     el.className = 'alert a-info';
-    el.innerHTML = '<i class="ti ti-loader" style="font-size:16px;margin-top:1px;flex-shrink:0;animation:spin 1s linear infinite;"></i><span>n8n está procesando las facturas — te avisamos cuando esté listo el PRN...</span>';
+    el.innerHTML = '<i class="ti ti-loader" style="font-size:16px;margin-top:1px;flex-shrink:0;animation:spin 1s linear infinite;"></i><span id="_epMsg"></span>';
+    document.getElementById('_epMsg').textContent = 'n8n está procesando las facturas — te avisamos cuando esté listo el PRN…';
   } else if (estado === 'listo') {
     el.style.display = 'flex';
     el.className = 'alert a-success';
-    const msg = fallidos && fallidos.length > 0
-      ? `✓ PRN generado correctamente. ${fallidos.length} factura${fallidos.length!==1?'s':''} con error — revisá la sección de errores.`
+    el.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
+    const nf = fallidos && fallidos.length > 0;
+    document.getElementById('_epMsg').textContent = nf
+      ? `✓ PRN generado. ${fallidos.length} factura${fallidos.length!==1?'s':''} con error — revisá la sección de errores.`
       : '✓ PRN generado correctamente. Ya podés importarlo en Holistor.';
-    el.innerHTML = `<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span>${msg}</span>`;
   }
 }
 
-function showAlert(msg, type) {
-  const el = document.getElementById('alert');
-  const icons = { success: 'circle-check', error: 'alert-circle', info: 'info-circle' };
-  el.className = 'alert a-' + type;
-  el.innerHTML = `<i class="ti ti-${icons[type]}"></i><span>${msg}</span>`;
-  el.style.display = 'flex';
-  if (type !== 'info') setTimeout(() => el.style.display = 'none', 5000);
+// ── Conciliación ──────────────────────────────────────────────────────────────
+function mostrarConciliacion(concil) {
+  const card = document.getElementById('cardConciliacion');
+  if (!concil) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  const pr  = concil.procesadas_registradas    || [];
+  const pnr = concil.procesadas_no_registro     || [];
+  const rnp = concil.registro_no_procesadas     || [];
+
+  document.getElementById('concilContent').innerHTML = [
+    buildConcilSection('ok',   'circle-check',  'Procesadas y en el registro',             pr,  'ok'),
+    buildConcilSection('warn', 'alert-triangle','Procesadas pero NO en el registro',        pnr, 'warn'),
+    buildConcilSection('err',  'circle-x',      'En el registro pero NO procesadas (faltan)', rnp, 'err'),
+  ].join('');
+
+  // Auto-expandir secciones con items
+  document.querySelectorAll('#concilContent .concil-head').forEach(h => {
+    const body = h.nextElementSibling;
+    const count = parseInt(h.querySelector('.concil-badge')?.textContent || '0');
+    if (count > 0) { h.classList.add('open'); body.classList.add('open'); }
+    h.addEventListener('click', () => { h.classList.toggle('open'); body.classList.toggle('open'); });
+  });
 }
 
+function buildConcilSection(type, icon, title, items, style) {
+  const rows = items.slice(0, 150).map(it => `
+    <div class="concil-row">
+      <span class="concil-key">${escapeHtml(it.clave||'')}</span>
+      <span class="concil-denom">${escapeHtml(it.denominacion||it.denominacion_emisor||'')}</span>
+      <span class="concil-total">${escapeHtml(it.total||'')}</span>
+    </div>`).join('');
+  const extra = items.length > 150
+    ? `<div style="text-align:center;padding:8px;font-size:11px;color:#999;">…y ${items.length-150} más</div>` : '';
+  const emptyMsg = `<div class="empty" style="padding:1rem;"><i class="ti ti-check" style="font-size:20px;display:block;margin-bottom:4px;"></i>Sin elementos</div>`;
+
+  return `
+    <div class="concil-section">
+      <div class="concil-head">
+        <i class="ti ti-${icon} concil-icon ci-${style}"></i>
+        <span class="concil-title">${escapeHtml(title)}</span>
+        <span class="concil-badge cb-${style}">${items.length}</span>
+        <i class="ti ti-chevron-down concil-toggle"></i>
+      </div>
+      <div class="concil-body">${items.length ? rows + extra : emptyMsg}</div>
+    </div>`;
+}
+
+// ── Fallidos ──────────────────────────────────────────────────────────────────
+async function reintentar() {
+  if (!archivosFallidos.length) return;
+  document.querySelectorAll('#cardFallidos button').forEach(b => b.disabled = true);
+  showAlert(`Reintentando ${archivosFallidos.length} archivo${archivosFallidos.length!==1?'s':''}…`, 'info');
+  try {
+    const res = await fetch(WEBHOOK_PROCESO, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ flush:true, mes:periodo?.mes, anio:periodo?.anio,
+        cliente_cuit: clienteSeleccionado?.cuit||'', tiene_registro: registroSubido })
+    });
+    const data = await res.json();
+    document.getElementById('cardFallidos').style.display = 'none';
+    archivosFallidos = [];
+    iniciarPolling();
+    if (data.fallidos && data.fallidos.length > 0) {
+      mostrarFallidos(data.fallidos);
+      showAlert(`${data.fallidos.length} archivo${data.fallidos.length!==1?'s aún con':' aún con'} error.`, 'error');
+    } else {
+      showAlert('Reintento completado. Todas las facturas procesadas.', 'success');
+    }
+  } catch(e) {
+    showAlert('No se pudo reintentar. Intentá de nuevo.', 'error');
+  }
+  document.querySelectorAll('#cardFallidos button').forEach(b => b.disabled = false);
+}
+
+function mostrarFallidos(fallidos) {
+  if (!fallidos || !fallidos.length) return;
+  archivosFallidos = fallidos;
+  document.getElementById('cardFallidos').style.display = 'block';
+  document.getElementById('listFallidos').innerHTML = fallidos.map(nombre => `
+    <div class="history-item">
+      <i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;"></i>
+      <span class="history-name">${escapeHtml(nombre)}</span>
+      <span class="badge b-error">error</span>
+    </div>`).join('');
+}
+
+// ── Stats / Queue / History ───────────────────────────────────────────────────
 function updateStats() {
-  document.getElementById('statCola').textContent = files.filter(f => f.status === 'pending').length;
+  document.getElementById('statCola').textContent    = files.filter(f => f.status==='pending').length;
   document.getElementById('statSubidos').textContent = subidos;
   document.getElementById('statErrores').textContent = errores;
 }
 
 function renderQueue() {
   const q = document.getElementById('queue');
-  if (!files.length) { q.style.display = 'none'; updateStats(); return; }
+  if (!files.length) { q.style.display='none'; updateStats(); return; }
   q.style.display = 'block';
-  const pending = files.filter(f => f.status === 'pending').length;
-  document.getElementById('queueLabel').textContent = `${files.length} archivo${files.length !== 1 ? 's' : ''} — ${pending} pendiente${pending !== 1 ? 's' : ''}`;
+  const pending = files.filter(f => f.status==='pending').length;
+  document.getElementById('queueLabel').textContent = `${files.length} archivo${files.length!==1?'s':''} — ${pending} pendiente${pending!==1?'s':''}`;
   if (pending > 0) {
-    const lotes = Math.ceil(pending / 50);
+    const lotes = Math.ceil(pending/50);
     document.getElementById('loteInfo').style.display = 'block';
-    document.getElementById('loteInfoText').textContent = `Se van a generar ${lotes} lote${lotes !== 1 ? 's' : ''} de hasta 50 facturas cada uno`;
+    document.getElementById('loteInfoText').textContent = `Se van a generar ${lotes} lote${lotes!==1?'s':''} de hasta 50 facturas cada uno`;
     document.getElementById('loteResultado').style.display = 'none';
   } else {
     document.getElementById('loteInfo').style.display = 'none';
   }
-  const labels = { pending: 'pendiente', uploading: 'subiendo', done: 'listo', error: 'error' };
-  document.getElementById('fileList').innerHTML = files.map((f, i) => `
+  const labels = { pending:'pendiente', uploading:'subiendo', done:'listo', error:'error' };
+  document.getElementById('fileList').innerHTML = files.map((f,i) => `
     <div class="file-item">
       <i class="ti ti-file-type-pdf" style="font-size:16px;color:#c5221f;flex-shrink:0;"></i>
       <span class="file-name">${escapeHtml(f.name)}</span>
       <span class="file-size">${(f.size/1024).toFixed(0)} KB</span>
       <span class="badge b-${f.status}">${labels[f.status]}</span>
-      ${f.status === 'pending' ? `<button class="btn-remove" onclick="removeFile(${i})" aria-label="Quitar"><i class="ti ti-x"></i></button>` : ''}
-    </div>
-  `).join('');
+      ${f.status==='pending'?`<button class="btn-remove" onclick="removeFile(${i})"><i class="ti ti-x"></i></button>`:''}
+    </div>`).join('');
   updateStats();
 }
 
 function renderHistory() {
   const el = document.getElementById('historyList');
-  if (!history.length) { el.innerHTML = '<div class="empty"><i class="ti ti-inbox"></i>Todavía no se subieron archivos</div>'; return; }
+  if (!history.length) { el.innerHTML='<div class="empty"><i class="ti ti-inbox"></i>Todavía no se subieron archivos</div>'; return; }
   el.innerHTML = history.map(h => `
     <div class="history-item">
       <i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;"></i>
       <span class="history-name">${escapeHtml(h.name)}</span>
       <span class="history-time">${h.time}</span>
-      <span class="badge ${h.ok ? 'b-done' : 'b-error'}">${h.ok ? 'subido' : 'error'}</span>
-    </div>
-  `).join('');
+      <span class="badge ${h.ok?'b-done':'b-error'}">${h.ok?'subido':'error'}</span>
+    </div>`).join('');
 }
 
+// ── Verificar duplicado ───────────────────────────────────────────────────────
 async function verificarDuplicado(nombre) {
   try {
-    const res = await fetch(WEBHOOK_VERIFICAR, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre })
-    });
+    const res = await fetch(WEBHOOK_VERIFICAR, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({nombre}) });
     if (!res.ok) return 'error';
-    const data = await res.json();
-    return data.existe === true;
+    return (await res.json()).existe === true;
   } catch(e) { return 'error'; }
 }
 
 async function addFiles(newFiles) {
-  const pdfs = Array.from(newFiles).filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'));
-  if (!pdfs.length) { showAlert('Solo se aceptan archivos PDF', 'error'); return; }
+  const pdfs = Array.from(newFiles).filter(f => f.type==='application/pdf' || f.name.endsWith('.pdf'));
+  if (!pdfs.length) { showAlert('Solo se aceptan archivos PDF en esta zona', 'error'); return; }
+  if (pdfs.length > 3) showAlert(`Verificando ${pdfs.length} archivos en Drive…`, 'info');
 
-  if (pdfs.length > 5) {
-    showAlert(`Verificando ${pdfs.length} archivos en Drive...`, 'info');
-  }
+  // Paralelo: todas las verificaciones en simultáneo (mucho más rápido para lotes grandes)
+  const resultados = await Promise.all(pdfs.map(f => verificarDuplicado(f.name)));
 
-  const duplicados = [];
-  const erroresVerif = [];
-  for (const f of pdfs) {
-    const resultado = await verificarDuplicado(f.name);
-    if (resultado === 'error') {
-      erroresVerif.push(f.name);
-      // Si falló la verificación, no agregarlo para evitar duplicados accidentales
-    } else if (resultado === true) {
-      duplicados.push(f.name);
-    } else {
-      files.push({ name: f.name, size: f.size, file: f, status: 'pending' });
-    }
-  }
-
-  if (duplicados.length > 0) {
-    showAlert(`${duplicados.length} archivo${duplicados.length!==1?'s ya existían':' ya existía'} en Drive y ${duplicados.length!==1?'fueron omitidos':'fue omitido'}`, 'error');
-  }
-  if (erroresVerif.length > 0) {
-    showAlert(`No se pudo verificar ${erroresVerif.length} archivo${erroresVerif.length!==1?'s':''}. Reintentá más tarde.`, 'error');
-  }
+  const duplicados = [], erroresVerif = [];
+  pdfs.forEach((f, i) => {
+    const r = resultados[i];
+    if (r === 'error')   erroresVerif.push(f.name);
+    else if (r === true) duplicados.push(f.name);
+    else files.push({ name:f.name, size:f.size, file:f, status:'pending' });
+  });
+  if (duplicados.length)   showAlert(`${duplicados.length} archivo${duplicados.length!==1?'s ya existían':' ya existía'} en Drive y ${duplicados.length!==1?'fueron omitidos':'fue omitido'}`, 'error');
+  if (erroresVerif.length) showAlert(`No se pudo verificar ${erroresVerif.length} archivo${erroresVerif.length!==1?'s':''}. Reintentá más tarde.`, 'error');
   renderQueue();
 }
-function removeFile(i) { files.splice(i, 1); renderQueue(); }
-function clearPending() { files = files.filter(f => f.status !== 'pending'); renderQueue(); }
 
+function removeFile(i) { files.splice(i,1); renderQueue(); }
+function clearPending() { files = files.filter(f => f.status!=='pending'); renderQueue(); }
+
+// ── Upload ────────────────────────────────────────────────────────────────────
 async function startUpload() {
   if (uploading) return;
-  if (pollingInterval) {
-    showAlert('Ya hay un proceso en ejecución. Esperá a que termine.', 'error');
-    return;
-  }
-  const pending = files.filter(f => f.status === 'pending');
+  if (pollingInterval) { showAlert('Ya hay un proceso en ejecución. Esperá a que termine.', 'error'); return; }
+  const pending = files.filter(f => f.status==='pending');
   if (!pending.length) return;
   uploading = true;
   document.getElementById('btnSubir').disabled = true;
   document.getElementById('progressWrap').style.display = 'block';
-  let done = 0;
-  const total = pending.length;
+  let done = 0, total = pending.length;
 
   for (let i = 0; i < files.length; i++) {
     if (files[i].status !== 'pending') continue;
-    files[i].status = 'uploading';
-    renderQueue();
+    files[i].status = 'uploading'; renderQueue();
     try {
       const fd = new FormData();
       fd.append('file', files[i].file, files[i].name);
-      const res = await fetch(WEBHOOK, { method: 'POST', body: fd });
+      const res = await fetch(WEBHOOK, { method:'POST', body:fd });
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      files[i].status = 'done';
-      subidos++;
-      history.unshift({ name: files[i].name, time: new Date().toLocaleTimeString('es-AR'), ok: true });
+      files[i].status = 'done'; subidos++;
+      history.unshift({ name:files[i].name, time:new Date().toLocaleTimeString('es-AR'), ok:true });
     } catch(e) {
-      files[i].status = 'error';
-      errores++;
-      history.unshift({ name: files[i].name, time: new Date().toLocaleTimeString('es-AR'), ok: false });
+      files[i].status = 'error'; errores++;
+      history.unshift({ name:files[i].name, time:new Date().toLocaleTimeString('es-AR'), ok:false });
     }
     done++;
-    document.getElementById('progressBar').style.width = Math.round(done / total * 100) + '%';
-    renderQueue();
-    renderHistory();
+    document.getElementById('progressBar').style.width = Math.round(done/total*100) + '%';
+    renderQueue(); renderHistory();
   }
 
   uploading = false;
   document.getElementById('btnSubir').disabled = false;
-
-  const ok = files.filter(f => f.status === 'done').length;
-  const err = files.filter(f => f.status === 'error').length;
+  const ok  = files.filter(f => f.status==='done').length;
+  const err = files.filter(f => f.status==='error').length;
 
   if (ok > 0) {
     try {
       const respProceso = await fetch(WEBHOOK_PROCESO, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ flush: true, mes: periodo?.mes, anio: periodo?.anio })
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          flush:         true,
+          mes:           periodo?.mes,
+          anio:          periodo?.anio,
+          cliente_cuit:  clienteSeleccionado?.cuit || '',
+          tiene_registro: registroSubido
+        })
       });
       try {
-        const dataProceso = await respProceso.json();
-        if (dataProceso.proceso_ya_activo === true) {
-          showAlert(dataProceso.mensaje || 'Ya hay un proceso en ejecución. Esperá a que termine.', 'error');
-          return;
-        }
-        if (dataProceso.fallidos && dataProceso.fallidos.length > 0) {
-          mostrarFallidos(dataProceso.fallidos);
-        }
+        const dp = await respProceso.json();
+        if (dp.proceso_ya_activo === true) { showAlert(dp.mensaje||'Ya hay un proceso activo.', 'error'); return; }
+        if (dp.fallidos && dp.fallidos.length > 0) mostrarFallidos(dp.fallidos);
       } catch(e) {}
       iniciarPolling();
-      const lotesEjecutados = Math.ceil(ok / 50);
+      const lotesEjecutados = Math.ceil(ok/50);
       document.getElementById('loteResultado').style.display = 'block';
       document.getElementById('loteResultadoText').textContent = `${ok} archivo${ok!==1?'s':''} subido${ok!==1?'s':''} — ${lotesEjecutados} lote${lotesEjecutados!==1?'s':''} en proceso`;
       document.getElementById('loteInfo').style.display = 'none';
-      showAlert(`${ok} archivo${ok!==1?'s':''} subido${ok!==1?'s':''}${err ? ' · ' + err + ' con error' : ''}. n8n está procesando el lote.`, 'success');
+      showAlert(`${ok} archivo${ok!==1?'s':''} subido${ok!==1?'s':''}${err?' · '+err+' con error':''}.  n8n está procesando.`, 'success');
     } catch(e) {
-      showAlert(`${ok} archivo${ok!==1?'s':''} subido${ok!==1?'s':''}. No se pudo iniciar el proceso automático — usá el botón "Procesar ahora".`, 'error');
+      showAlert(`${ok} archivo${ok!==1?'s':''} subido${ok!==1?'s':''}. No se pudo iniciar el proceso — usá "Procesar ahora".`, 'error');
       document.getElementById('btnProcesar').style.display = 'inline-block';
     }
   } else {
@@ -421,49 +752,63 @@ async function startUpload() {
 }
 
 async function sendFlush() {
+  if (!clienteSeleccionado) { showAlert('Seleccioná un cliente antes de procesar', 'warn'); return; }
   try {
     document.getElementById('btnProcesar').disabled = true;
-    await fetch(WEBHOOK_PROCESO, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ flush: true, mes: periodo?.mes, anio: periodo?.anio }) });
+    await fetch(WEBHOOK_PROCESO, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ flush:true, mes:periodo?.mes, anio:periodo?.anio,
+        cliente_cuit: clienteSeleccionado?.cuit||'', tiene_registro: registroSubido })
+    });
     showAlert('Señal enviada — n8n va a procesar el lote ahora', 'success');
   } catch(e) { showAlert('No se pudo enviar la señal', 'error'); }
   document.getElementById('btnProcesar').disabled = false;
 }
 
+// ── Período ───────────────────────────────────────────────────────────────────
 function actualizarPeriodo() {
   const mes  = parseInt(document.getElementById('selMes').value);
   const anio = parseInt(document.getElementById('selAnio').value);
   periodo = { mes, anio };
   const ultimoDia = new Date(anio, mes, 0).getDate();
-  const mesNombre = new Date(anio, mes - 1, 1).toLocaleString('es-AR', { month: 'long' });
+  const mesNombre = new Date(anio, mes-1, 1).toLocaleString('es-AR', { month:'long' });
   document.getElementById('periodoInfo').textContent = `Fecha de recepción: ${String(ultimoDia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${anio} (último día de ${mesNombre} ${anio})`;
 }
 
 function inicializarSelectores() {
-  const hoy = new Date();
-  const anioActual = hoy.getFullYear();
+  const hoy = new Date(), anioActual = hoy.getFullYear();
   const selAnio = document.getElementById('selAnio');
-  for (let a = anioActual - 3; a <= anioActual; a++) {
+  for (let a = anioActual-3; a <= anioActual; a++) {
     const opt = document.createElement('option');
-    opt.value = a;
-    opt.textContent = a;
+    opt.value = a; opt.textContent = a;
     if (a === anioActual) opt.selected = true;
     selAnio.appendChild(opt);
   }
-  const mesPorDefecto = hoy.getMonth() === 0 ? 12 : hoy.getMonth();
-  const anioPorDefecto = hoy.getMonth() === 0 ? anioActual - 1 : anioActual;
+  const mesPorDefecto  = hoy.getMonth() === 0 ? 12 : hoy.getMonth();
+  const anioPorDefecto = hoy.getMonth() === 0 ? anioActual-1 : anioActual;
   document.getElementById('selMes').value = mesPorDefecto;
   selAnio.value = anioPorDefecto;
   actualizarPeriodo();
 }
 
+// ── Init ──────────────────────────────────────────────────────────────────────
 inicializarSelectores();
+loadClientes();
+
 const dz = document.getElementById('dropZone');
 const fi = document.getElementById('fileInput');
-dz.addEventListener('click', () => fi.click());
+dz.addEventListener('click',    () => fi.click());
 dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
-dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
-dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); addFiles(e.dataTransfer.files); });
-fi.addEventListener('change', e => { addFiles(e.target.files); fi.value = ''; });
+dz.addEventListener('dragleave',() => dz.classList.remove('dragover'));
+dz.addEventListener('drop',     e => { e.preventDefault(); dz.classList.remove('dragover'); addFiles(e.dataTransfer.files); });
+fi.addEventListener('change',   e => { addFiles(e.target.files); fi.value=''; });
+
+const ez = document.getElementById('excelZone');
+const ei = document.getElementById('excelInput');
+ez.addEventListener('dragover', e => { e.preventDefault(); if (!registroSubido) ez.classList.add('dragover'); });
+ez.addEventListener('dragleave',() => ez.classList.remove('dragover'));
+ez.addEventListener('drop',     e => { e.preventDefault(); ez.classList.remove('dragover'); if (!registroSubido && e.dataTransfer.files[0]) handleExcelFile(e.dataTransfer.files[0]); });
+ei.addEventListener('change',   e => { if (e.target.files[0]) { handleExcelFile(e.target.files[0]); ei.value=''; } });
 </script>
 </body>
 </html>

@@ -704,7 +704,7 @@ function renderQueue() {
   } else {
     document.getElementById('loteInfo').style.display = 'none';
   }
-  const labels = { pending:'pendiente', uploading:'subiendo', done:'listo', error:'error' };
+  const labels = { pending:'pendiente', uploading:'verificando', done:'listo', error:'error' };
   document.getElementById('fileList').innerHTML = files.map((f,i) => `
     <div class="file-item">
       <i class="ti ti-file-type-pdf" style="font-size:16px;color:#c5221f;flex-shrink:0;"></i>
@@ -741,33 +741,51 @@ async function verificarDuplicado(nombre) {
 async function addFiles(newFiles) {
   const pdfs = Array.from(newFiles).filter(f => f.type==='application/pdf' || f.name.endsWith('.pdf'));
   if (!pdfs.length) { showAlert('Solo se aceptan archivos PDF en esta zona', 'error'); return; }
-  if (pdfs.length > 3) showAlert(`Verificando ${pdfs.length} archivos en Drive…`, 'info');
 
-  // Si está en modo forzar, saltear la verificación y agregar todos
+  // Agregar archivos INMEDIATAMENTE como "verificando" para que el usuario vea feedback
+  const tempItems = pdfs.map(f => ({ name:f.name, size:f.size, file:f, status:'uploading', _temp:true }));
+  tempItems.forEach(t => files.push(t));
+  renderQueue();  // ← feedback visual inmediato
+
+  // Si está en modo forzar, confirmar como pendientes directo
   if (forzarReproceso) {
-    pdfs.forEach(f => files.push({ name:f.name, size:f.size, file:f, status:'pending' }));
-  } else {
-    // B5: paralelo con concurrencia limitada para no rate-limit Drive
-    const CONCURRENCY_VERIF = 10;
-    const resultados = new Array(pdfs.length);
-    let nextIdx = 0;
-    await Promise.all(Array.from({length: Math.min(CONCURRENCY_VERIF, pdfs.length)}, async () => {
-      while (true) {
-        const i = nextIdx++;
-        if (i >= pdfs.length) break;
-        resultados[i] = await verificarDuplicado(pdfs[i].name);
-      }
-    }));
-    const duplicados = [], erroresVerif = [];
-    pdfs.forEach((f, i) => {
-      const r = resultados[i];
-      if (r === 'error')   erroresVerif.push(f.name);
-      else if (r === true) duplicados.push(f.name);
-      else files.push({ name:f.name, size:f.size, file:f, status:'pending' });
-    });
-    if (duplicados.length)   showAlert(`${duplicados.length} archivo${duplicados.length!==1?'s ya existían':' ya existía'} en Drive y ${duplicados.length!==1?'fueron omitidos':'fue omitido'}. Para reprocesarlos activá "Forzar reprocesamiento".`, 'warn');
-    if (erroresVerif.length) showAlert(`No se pudo verificar ${erroresVerif.length} archivo${erroresVerif.length!==1?'s':''}. Reintentá más tarde.`, 'error');
+    tempItems.forEach(t => { t.status = 'pending'; delete t._temp; });
+    renderQueue();
+    return;
   }
+
+  // Verificar duplicados en paralelo
+  const CONCURRENCY_VERIF = 10;
+  const resultados = new Array(pdfs.length);
+  let nextIdx = 0;
+  await Promise.all(Array.from({length: Math.min(CONCURRENCY_VERIF, pdfs.length)}, async () => {
+    while (true) {
+      const i = nextIdx++;
+      if (i >= pdfs.length) break;
+      resultados[i] = await verificarDuplicado(pdfs[i].name);
+    }
+  }));
+
+  const duplicados = [], erroresVerif = [];
+  pdfs.forEach((f, i) => {
+    const item = files.find(x => x._temp && x.name === f.name);
+    const r = resultados[i];
+    if (r === 'error') {
+      // Error de verificación → remover de la cola, mostrar warning
+      if (item) files.splice(files.indexOf(item), 1);
+      erroresVerif.push(f.name);
+    } else if (r === true) {
+      // Duplicado → remover de la cola
+      if (item) files.splice(files.indexOf(item), 1);
+      duplicados.push(f.name);
+    } else {
+      // OK → confirmar como pendiente
+      if (item) { item.status = 'pending'; delete item._temp; }
+    }
+  });
+
+  if (duplicados.length)   showAlert(`${duplicados.length} archivo${duplicados.length!==1?'s ya existían':' ya existía'} en Drive y ${duplicados.length!==1?'fueron omitidos':'fue omitido'}. Para reprocesarlos activá "Forzar reprocesamiento".`, 'warn');
+  if (erroresVerif.length) showAlert(`No se pudo verificar ${erroresVerif.length} archivo${erroresVerif.length!==1?'s':''}. Reintentá más tarde.`, 'error');
   renderQueue();
 }
 
@@ -784,7 +802,7 @@ async function startUpload() {
   document.getElementById('btnSubir').disabled = true;
   document.getElementById('progressWrap').style.display = 'block';
   let done = 0, total = pending.length;
-  const indices = files.map((_,i)=>i).filter(i => files[i].status==='pending');
+  const indices = files.map((_,i)=>i).filter(i => files[i].status==='pending' && !files[i]._temp);
 
   // O1: subir en paralelo con concurrencia limitada
   const CONCURRENCY = 5;

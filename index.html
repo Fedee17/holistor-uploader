@@ -300,6 +300,18 @@ async function loadClientes() {
 function onClienteChange() {
   const sel = document.getElementById('selCliente');
   const opt = sel.options[sel.selectedIndex];
+  // G2: si hay PDFs en cola del cliente anterior, advertir y limpiar
+  const pdfsEnCola = files.filter(f => f.status === 'pending').length;
+  if (pdfsEnCola > 0) {
+    const ok = confirm(`Hay ${pdfsEnCola} PDF${pdfsEnCola!==1?'s':''} en cola del cliente anterior. ¿Limpiar la cola y cambiar de cliente?`);
+    if (!ok) {
+      // Revertir selección
+      sel.value = clienteSeleccionado?.cuit || '';
+      return;
+    }
+    files = files.filter(f => f.status !== 'pending');
+    renderQueue();
+  }
   if (sel.value) {
     clienteSeleccionado = { cuit: sel.value, nombre: opt.dataset.nombre };
     document.getElementById('clienteHint').textContent = `CUIT: ${sel.value}`;
@@ -308,7 +320,7 @@ function onClienteChange() {
     clienteSeleccionado = null;
     document.getElementById('clienteHint').textContent = '';
   }
-  resetRegistro(); // reset Excel when client changes
+  resetRegistro();
 }
 
 // ── Excel / Registro ARCA ─────────────────────────────────────────────────────
@@ -532,15 +544,18 @@ function iniciarPolling() {
       if (!res.ok) return;
       const data = await res.json();
       if (data.listo === true) {
-        // Limpieza completa: ambos timers
+        // Limpieza completa: timers
         clearInterval(pollingInterval);
         pollingInterval = null;
         if (pollingTimeoutMax) { clearTimeout(pollingTimeoutMax); pollingTimeoutMax = null; }
         mostrarEstadoProceso('listo', data.fallidos);
         if (data.fallidos && data.fallidos.length > 0) mostrarFallidos(data.fallidos);
         if (data.conciliacion) mostrarConciliacion(data.conciliacion);
+        // G1: limpiar archivos procesados de la cola para próximo uso
+        files = files.filter(f => f.status !== 'done');
+        renderQueue();
       }
-    } catch(e) {}
+    } catch(e) { console.warn('Polling error:', e); }
   }, 10000);
 }
 
@@ -787,8 +802,8 @@ async function startUpload() {
   const err = files.filter(f => f.status==='error').length;
 
   if (ok > 0) {
-    // B2: esperar 3s para que Drive indexe los archivos recién subidos
-    await new Promise(r => setTimeout(r, 3000));
+    // B2: esperar 5s para que Drive indexe los archivos recién subidos (3s era apurado en redes lentas)
+    await new Promise(r => setTimeout(r, 5000));
     try {
       const respProceso = await fetch(WEBHOOK_PROCESO, {
         method:'POST', headers:{'Content-Type':'application/json'},

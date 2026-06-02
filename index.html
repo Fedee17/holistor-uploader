@@ -423,14 +423,35 @@ function parsearRegistroARCA(file) {
         // Fila 0: título, Fila 1: headers, Fila 2+: datos
         if (rows.length < 3) { reject(new Error('El archivo no contiene datos')); return; }
 
+        // B9: validar que la fila 1 (header) tenga las columnas esperadas de ARCA
+        const headers = (rows[1] || []).map(h => String(h||'').trim().toLowerCase());
+        const headerStr = headers.join('|');
+        const checks = ['tipo', 'pto', 'emisor', 'receptor'];
+        const missing = checks.filter(k => !headerStr.includes(k));
+        if (missing.length > 1) {
+          reject(new Error('El archivo no parece ser un registro de ARCA válido (faltan columnas: ' + missing.join(', ') + ')'));
+          return;
+        }
+
         // Receptor CUIT en columna 10 (Nro. Doc. Receptor)
         const firstData    = rows[2];
         const receptorCuit = String(firstData[10]||'').replace(/[^0-9]/g,'').padStart(11,'0');
 
         const registros = [];
+        const periodoMM = String(periodo.mes).padStart(2,'0');
+        const periodoYY = String(periodo.anio);
+        let fuera = 0;
         for (let i = 2; i < rows.length; i++) {
           const r = rows[i];
           if (!r || r[0] === null) continue;
+          // B15: contar comprobantes fuera del período seleccionado
+          const f = String(r[0]||'').trim();
+          const m = f.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+          if (m) {
+            const fm = m[2].padStart(2,'0');
+            const fy = m[3].length === 2 ? '20'+m[3] : m[3];
+            if (fm !== periodoMM || fy !== periodoYY) fuera++;
+          }
 
           // Col 1: Tipo ("1 - Factura A" → código "1")
           const tipoCod  = String(r[1]||'').split(' - ')[0].trim();
@@ -455,6 +476,10 @@ function parsearRegistroARCA(file) {
           });
         }
         if (!registros.length) { reject(new Error('No se encontraron comprobantes')); return; }
+        if (fuera > 0) {
+          // No bloquea, solo informa
+          setTimeout(() => showAlert(`Atención: ${fuera} comprobante${fuera!==1?'s':''} del Excel ${fuera!==1?'tienen fecha fuera':'tiene fecha fuera'} del período ${periodoMM}/${periodoYY}`, 'warn'), 50);
+        }
         resolve({ registros, receptorCuit });
       } catch(err) { reject(err); }
     };
@@ -487,7 +512,9 @@ function iniciarPolling() {
   mostrarEstadoProceso('procesando');
   pollingInterval = setInterval(async () => {
     try {
-      const res  = await fetch(WEBHOOK_ESTADO);
+      const cuit = clienteSeleccionado?.cuit || '';
+      const per  = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
+      const res  = await fetch(`${WEBHOOK_ESTADO}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`);
       const data = await res.json();
       if (data.listo === true) {
         clearInterval(pollingInterval);
@@ -655,7 +682,8 @@ function renderHistory() {
 // ── Verificar duplicado ───────────────────────────────────────────────────────
 async function verificarDuplicado(nombre) {
   try {
-    const res = await fetch(WEBHOOK_VERIFICAR, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({nombre}) });
+    const cuit = clienteSeleccionado?.cuit || '';
+    const res = await fetch(WEBHOOK_VERIFICAR, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ nombre, cliente_cuit: cuit }) });
     if (!res.ok) return 'error';
     return (await res.json()).existe === true;
   } catch(e) { return 'error'; }
@@ -666,8 +694,17 @@ async function addFiles(newFiles) {
   if (!pdfs.length) { showAlert('Solo se aceptan archivos PDF en esta zona', 'error'); return; }
   if (pdfs.length > 3) showAlert(`Verificando ${pdfs.length} archivos en Drive…`, 'info');
 
-  // Paralelo: todas las verificaciones en simultáneo (mucho más rápido para lotes grandes)
-  const resultados = await Promise.all(pdfs.map(f => verificarDuplicado(f.name)));
+  // B5: paralelo con concurrencia limitada para no rate-limit Drive
+  const CONCURRENCY_VERIF = 10;
+  const resultados = new Array(pdfs.length);
+  let nextIdx = 0;
+  await Promise.all(Array.from({length: Math.min(CONCURRENCY_VERIF, pdfs.length)}, async () => {
+    while (true) {
+      const i = nextIdx++;
+      if (i >= pdfs.length) break;
+      resultados[i] = await verificarDuplicado(pdfs[i].name);
+    }
+  }));
 
   const duplicados = [], erroresVerif = [];
   pdfs.forEach((f, i) => {
@@ -694,13 +731,17 @@ async function startUpload() {
   document.getElementById('btnSubir').disabled = true;
   document.getElementById('progressWrap').style.display = 'block';
   let done = 0, total = pending.length;
+  const indices = files.map((_,i)=>i).filter(i => files[i].status==='pending');
 
-  for (let i = 0; i < files.length; i++) {
-    if (files[i].status !== 'pending') continue;
+  // O1: subir en paralelo con concurrencia limitada
+  const CONCURRENCY = 5;
+  const cuit = clienteSeleccionado?.cuit || '';
+  async function subirUno(i) {
     files[i].status = 'uploading'; renderQueue();
     try {
       const fd = new FormData();
       fd.append('file', files[i].file, files[i].name);
+      fd.append('cliente_cuit', cuit);  // B12
       const res = await fetch(WEBHOOK, { method:'POST', body:fd });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       files[i].status = 'done'; subidos++;
@@ -714,12 +755,23 @@ async function startUpload() {
     renderQueue(); renderHistory();
   }
 
+  // Worker pool simple — N workers que consumen de la cola
+  const queue = indices.slice();
+  await Promise.all(Array.from({length: Math.min(CONCURRENCY, queue.length)}, async () => {
+    while (queue.length) {
+      const idx = queue.shift();
+      if (idx !== undefined) await subirUno(idx);
+    }
+  }));
+
   uploading = false;
   document.getElementById('btnSubir').disabled = false;
   const ok  = files.filter(f => f.status==='done').length;
   const err = files.filter(f => f.status==='error').length;
 
   if (ok > 0) {
+    // B2: esperar 3s para que Drive indexe los archivos recién subidos
+    await new Promise(r => setTimeout(r, 3000));
     try {
       const respProceso = await fetch(WEBHOOK_PROCESO, {
         method:'POST', headers:{'Content-Type':'application/json'},

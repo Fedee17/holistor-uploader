@@ -507,24 +507,41 @@ function handleSubir() {
 }
 
 // ── Polling ───────────────────────────────────────────────────────────────────
+let pollingTimeoutMax = null;
+
 function iniciarPolling() {
   if (pollingInterval) clearInterval(pollingInterval);
+  if (pollingTimeoutMax) clearTimeout(pollingTimeoutMax);
   mostrarEstadoProceso('procesando');
+  
+  // Timeout máximo absoluto: 15 minutos. Si pasa eso, paramos el polling.
+  pollingTimeoutMax = setTimeout(() => {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+      showAlert('El procesamiento está tardando demasiado. Revisá los logs en n8n para ver el estado real.', 'warn');
+    }
+  }, 15 * 60 * 1000);
+
+  // Polling cada 10s (antes era 5s — reducimos carga al backend a la mitad)
   pollingInterval = setInterval(async () => {
     try {
       const cuit = clienteSeleccionado?.cuit || '';
       const per  = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
       const res  = await fetch(`${WEBHOOK_ESTADO}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`);
+      if (!res.ok) return;
       const data = await res.json();
       if (data.listo === true) {
+        // Limpieza completa: ambos timers
         clearInterval(pollingInterval);
         pollingInterval = null;
+        if (pollingTimeoutMax) { clearTimeout(pollingTimeoutMax); pollingTimeoutMax = null; }
         mostrarEstadoProceso('listo', data.fallidos);
         if (data.fallidos && data.fallidos.length > 0) mostrarFallidos(data.fallidos);
         if (data.conciliacion) mostrarConciliacion(data.conciliacion);
       }
     } catch(e) {}
-  }, 5000);
+  }, 10000);
 }
 
 function mostrarEstadoProceso(estado, fallidos) {

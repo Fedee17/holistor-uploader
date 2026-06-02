@@ -770,22 +770,20 @@ async function addFiles(newFiles) {
   pdfs.forEach((f, i) => {
     const item = files.find(x => x._temp && x.name === f.name);
     const r = resultados[i];
-    if (r === 'error') {
-      // Error de verificación → remover de la cola, mostrar warning
-      if (item) files.splice(files.indexOf(item), 1);
-      erroresVerif.push(f.name);
-    } else if (r === true) {
-      // Duplicado → remover de la cola
+    if (r === true) {
+      // Confirmado duplicado → remover de la cola
       if (item) files.splice(files.indexOf(item), 1);
       duplicados.push(f.name);
     } else {
-      // OK → confirmar como pendiente
+      // OK o error de verificación → dejar pasar como pendiente
+      // (si era error de red, mejor subir que bloquear)
       if (item) { item.status = 'pending'; delete item._temp; }
+      if (r === 'error') erroresVerif.push(f.name);
     }
   });
 
   if (duplicados.length)   showAlert(`${duplicados.length} archivo${duplicados.length!==1?'s ya existían':' ya existía'} en Drive y ${duplicados.length!==1?'fueron omitidos':'fue omitido'}. Para reprocesarlos activá "Forzar reprocesamiento".`, 'warn');
-  if (erroresVerif.length) showAlert(`No se pudo verificar ${erroresVerif.length} archivo${erroresVerif.length!==1?'s':''}. Reintentá más tarde.`, 'error');
+  if (erroresVerif.length) showAlert(`No se pudo verificar duplicados de ${erroresVerif.length} archivo${erroresVerif.length!==1?'s':''}. Se van a subir igual.`, 'warn');
   renderQueue();
 }
 

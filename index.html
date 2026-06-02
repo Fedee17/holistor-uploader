@@ -167,6 +167,15 @@
       <input type="file" id="fileInput" accept=".pdf" multiple />
     </div>
 
+    <!-- Toggle forzar reprocesamiento -->
+    <div style="display:flex;align-items:center;gap:10px;margin-top:10px;padding:8px 12px;background:#f5f5f0;border-radius:8px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#444;user-select:none;">
+        <input type="checkbox" id="chkForzar" onchange="toggleForzar()" style="width:15px;height:15px;cursor:pointer;accent-color:#c5221f;">
+        <span>Forzar reprocesamiento</span>
+      </label>
+      <span style="font-size:12px;color:#888;">— subir aunque ya existan en Drive (para regenerar el PRN)</span>
+    </div>
+
     <!-- Excel / Registro ARCA -->
     <div>
       <label class="field-label"><i class="ti ti-table" style="color:#188038;font-size:14px;"></i> Registro ARCA — Mis Comprobantes Recibidos (.xlsx)</label>
@@ -257,6 +266,7 @@ const WEBHOOK_REGISTRO  = 'https://fede123.app.n8n.cloud/webhook/holistor-regist
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let periodo             = null;
+let forzarReproceso     = false;
 let clienteSeleccionado = null;   // { cuit, nombre }
 let registroSubido      = false;  // Excel was parsed + sent to n8n
 let archivosFallidos    = [];
@@ -294,6 +304,13 @@ async function loadClientes() {
     sel.disabled = false;
     hint.className = 'field-error';
     hint.innerHTML = 'No se pudo cargar la lista. <a href="#" onclick="loadClientes();return false;" style="color:inherit;text-decoration:underline;">Reintentar</a>';
+  }
+}
+
+function toggleForzar() {
+  forzarReproceso = document.getElementById('chkForzar').checked;
+  if (forzarReproceso) {
+    showAlert('Modo forzar activo: los archivos existentes en Drive serán resubidos y reprocesados.', 'warn');
   }
 }
 
@@ -726,27 +743,31 @@ async function addFiles(newFiles) {
   if (!pdfs.length) { showAlert('Solo se aceptan archivos PDF en esta zona', 'error'); return; }
   if (pdfs.length > 3) showAlert(`Verificando ${pdfs.length} archivos en Drive…`, 'info');
 
-  // B5: paralelo con concurrencia limitada para no rate-limit Drive
-  const CONCURRENCY_VERIF = 10;
-  const resultados = new Array(pdfs.length);
-  let nextIdx = 0;
-  await Promise.all(Array.from({length: Math.min(CONCURRENCY_VERIF, pdfs.length)}, async () => {
-    while (true) {
-      const i = nextIdx++;
-      if (i >= pdfs.length) break;
-      resultados[i] = await verificarDuplicado(pdfs[i].name);
-    }
-  }));
-
-  const duplicados = [], erroresVerif = [];
-  pdfs.forEach((f, i) => {
-    const r = resultados[i];
-    if (r === 'error')   erroresVerif.push(f.name);
-    else if (r === true) duplicados.push(f.name);
-    else files.push({ name:f.name, size:f.size, file:f, status:'pending' });
-  });
-  if (duplicados.length)   showAlert(`${duplicados.length} archivo${duplicados.length!==1?'s ya existían':' ya existía'} en Drive y ${duplicados.length!==1?'fueron omitidos':'fue omitido'}`, 'error');
-  if (erroresVerif.length) showAlert(`No se pudo verificar ${erroresVerif.length} archivo${erroresVerif.length!==1?'s':''}. Reintentá más tarde.`, 'error');
+  // Si está en modo forzar, saltear la verificación y agregar todos
+  if (forzarReproceso) {
+    pdfs.forEach(f => files.push({ name:f.name, size:f.size, file:f, status:'pending' }));
+  } else {
+    // B5: paralelo con concurrencia limitada para no rate-limit Drive
+    const CONCURRENCY_VERIF = 10;
+    const resultados = new Array(pdfs.length);
+    let nextIdx = 0;
+    await Promise.all(Array.from({length: Math.min(CONCURRENCY_VERIF, pdfs.length)}, async () => {
+      while (true) {
+        const i = nextIdx++;
+        if (i >= pdfs.length) break;
+        resultados[i] = await verificarDuplicado(pdfs[i].name);
+      }
+    }));
+    const duplicados = [], erroresVerif = [];
+    pdfs.forEach((f, i) => {
+      const r = resultados[i];
+      if (r === 'error')   erroresVerif.push(f.name);
+      else if (r === true) duplicados.push(f.name);
+      else files.push({ name:f.name, size:f.size, file:f, status:'pending' });
+    });
+    if (duplicados.length)   showAlert(`${duplicados.length} archivo${duplicados.length!==1?'s ya existían':' ya existía'} en Drive y ${duplicados.length!==1?'fueron omitidos':'fue omitido'}. Para reprocesarlos activá "Forzar reprocesamiento".`, 'warn');
+    if (erroresVerif.length) showAlert(`No se pudo verificar ${erroresVerif.length} archivo${erroresVerif.length!==1?'s':''}. Reintentá más tarde.`, 'error');
+  }
   renderQueue();
 }
 

@@ -577,7 +577,7 @@ async function reintentar() {
     const res = await fetch(WEBHOOK_PROCESO, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ flush:true, mes:periodo?.mes, anio:periodo?.anio,
-        cliente_cuit: clienteSeleccionado?.cuit||'', tiene_registro: registroSubido })
+        cliente_cuit: clienteSeleccionado?.cuit||'', cliente_nombre: clienteSeleccionado?.nombre||'', tiene_registro: registroSubido })
     });
     const data = await res.json();
     document.getElementById('cardFallidos').style.display = 'none';
@@ -728,6 +728,7 @@ async function startUpload() {
           mes:           periodo?.mes,
           anio:          periodo?.anio,
           cliente_cuit:  clienteSeleccionado?.cuit || '',
+          cliente_nombre: clienteSeleccionado?.nombre || '',
           tiene_registro: registroSubido
         })
       });
@@ -758,7 +759,7 @@ async function sendFlush() {
     await fetch(WEBHOOK_PROCESO, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ flush:true, mes:periodo?.mes, anio:periodo?.anio,
-        cliente_cuit: clienteSeleccionado?.cuit||'', tiene_registro: registroSubido })
+        cliente_cuit: clienteSeleccionado?.cuit||'', cliente_nombre: clienteSeleccionado?.nombre||'', tiene_registro: registroSubido })
     });
     showAlert('Señal enviada — n8n va a procesar el lote ahora', 'success');
   } catch(e) { showAlert('No se pudo enviar la señal', 'error'); }

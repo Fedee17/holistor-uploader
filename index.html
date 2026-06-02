@@ -294,8 +294,11 @@ async function loadClientes() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const lista = await res.json();
     if (!Array.isArray(lista) || !lista.length) throw new Error('Lista vacía');
+    // E3: filtrar clientes con CUIT vacío o inválido
+    const listaValida = lista.filter(c => c && String(c.cuit||'').replace(/[^0-9]/g,'').length >= 8 && String(c.nombre||'').trim());
+    if (!listaValida.length) throw new Error('Lista sin clientes válidos');
     sel.innerHTML = '<option value="">— Seleccionar cliente —</option>' +
-      lista.map(c => `<option value="${escapeHtml(c.cuit)}" data-nombre="${escapeHtml(c.nombre)}">${escapeHtml(c.nombre)}</option>`).join('');
+      listaValida.map(c => `<option value="${escapeHtml(c.cuit)}" data-nombre="${escapeHtml(c.nombre)}">${escapeHtml(c.nombre)}</option>`).join('');
     sel.disabled = false;
     hint.textContent = '';
     hint.className = 'field-hint';
@@ -406,14 +409,23 @@ async function handleExcelFile(file) {
     const periodoStr = `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}`;
     document.getElementById('ezSub').textContent = `${registros.length} comprobantes · Enviando a n8n…`;
 
-    const res = await fetch(WEBHOOK_REGISTRO, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cliente_cuit: clienteSeleccionado.cuit, periodo: periodoStr, registros })
-    });
-
+    // Timeout explícito de 60s para la subida del registro
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 60000);
+    let resReg;
+    try {
+      resReg = await fetch(WEBHOOK_REGISTRO, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cliente_cuit: clienteSeleccionado.cuit, periodo: periodoStr, registros }),
+        signal: ctrl.signal
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!resReg.ok) throw new Error(`Error del servidor al guardar el registro (HTTP ${resReg.status})`);
     let cambiado = true;
-    try { const r = await res.json(); cambiado = r.cambiado !== false; } catch(e) {}
+    try { const r = await resReg.json(); cambiado = r.cambiado !== false; } catch(e) {}
 
     // Marcar como cargado
     registroSubido = true;
@@ -452,7 +464,7 @@ function parsearRegistroARCA(file) {
         // Fila 0: título, Fila 1: headers, Fila 2+: datos
         if (rows.length < 3) { reject(new Error('El archivo no contiene datos')); return; }
 
-        // B9: validar que la fila 1 (header) tenga las columnas esperadas de ARCA
+        // B9 + E6: validar headers Y posiciones esperadas
         const headers = (rows[1] || []).map(h => String(h||'').trim().toLowerCase());
         const headerStr = headers.join('|');
         const checks = ['tipo', 'pto', 'emisor', 'receptor'];
@@ -461,10 +473,34 @@ function parsearRegistroARCA(file) {
           reject(new Error('El archivo no parece ser un registro de ARCA válido (faltan columnas: ' + missing.join(', ') + ')'));
           return;
         }
+        // E6: verificar que los headers están en las posiciones esperadas
+        // Col 0=Fecha, 1=Tipo, 2=Pto Vta, 7=CUIT emisor, 10=CUIT receptor, 29=Total
+        const expectedPositions = [
+          [0, ['fecha']],
+          [1, ['tipo']],
+          [10, ['receptor']],
+        ];
+        const posMisalign = expectedPositions.filter(([idx, kws]) =>
+          !kws.some(kw => (headers[idx]||'').includes(kw))
+        );
+        if (posMisalign.length > 1) {
+          reject(new Error('Las columnas del Excel ARCA no están en las posiciones esperadas. Puede ser que ARCA cambió el formato de exportación.'));
+          return;
+        }
 
-        // Receptor CUIT en columna 10 (Nro. Doc. Receptor)
-        const firstData    = rows[2];
-        const receptorCuit = String(firstData[10]||'').replace(/[^0-9]/g,'').padStart(11,'0');
+        // E8: Receptor CUIT — validar TODOS los comprobantes (puede haber mixed receptors)
+        const receptoresSet = new Set();
+        for (let i = 2; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r || r[0] === null) continue;
+          const rc = String(r[10]||'').replace(/[^0-9]/g,'').padStart(11,'0');
+          if (rc && rc !== '00000000000') receptoresSet.add(rc);
+        }
+        if (receptoresSet.size > 1) {
+          reject(new Error(`El Excel contiene comprobantes de ${receptoresSet.size} receptores distintos: ${[...receptoresSet].join(', ')}. Filtralo por un solo CUIT antes de subir.`));
+          return;
+        }
+        const receptorCuit = receptoresSet.size === 1 ? [...receptoresSet][0] : '00000000000';
 
         const registros = [];
         const periodoMM = String(periodo.mes).padStart(2,'0');
@@ -768,7 +804,8 @@ async function addFiles(newFiles) {
 
   const duplicados = [], erroresVerif = [];
   pdfs.forEach((f, i) => {
-    const item = files.find(x => x._temp && x.name === f.name);
+    // D1: matchear por referencia al objeto File (no por nombre) para no confundir duplicados
+    const item = tempItems[i];
     const r = resultados[i];
     if (r === true) {
       // Confirmado duplicado → remover de la cola

@@ -223,6 +223,11 @@
   </div>
 
   <div id="estadoProceso" class="alert" style="display:none;"></div>
+  <div id="resetPanel" style="display:none; margin-bottom:1rem; text-align:right;">
+    <button onclick="resetProceso()" style="background:none;border:0.5px solid #ccc;border-radius:6px;padding:5px 12px;font-size:12px;color:#888;cursor:pointer;">
+      <i class="ti ti-refresh" style="font-size:12px;"></i> Liberar proceso bloqueado
+    </button>
+  </div>
 
   <div class="card" id="cardFallidos" style="display:none; border-color:#f5b8b5;">
     <div class="card-header" style="color:#c5221f;"><i class="ti ti-alert-circle"></i> Facturas con error</div>
@@ -262,6 +267,7 @@ const WEBHOOK_VERIFICAR = 'https://fede123.app.n8n.cloud/webhook/holistor-verifi
 const WEBHOOK_ESTADO    = 'https://fede123.app.n8n.cloud/webhook/holistor-estado';
 const WEBHOOK_CLIENTES  = 'https://fede123.app.n8n.cloud/webhook/holistor-clientes';
 const WEBHOOK_REGISTRO  = 'https://fede123.app.n8n.cloud/webhook/holistor-registro';
+const WEBHOOK_RESET     = 'https://fede123.app.n8n.cloud/webhook/holistor-reset';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let periodo             = null;
@@ -306,6 +312,28 @@ async function loadClientes() {
     sel.disabled = false;
     hint.className = 'field-error';
     hint.innerHTML = 'No se pudo cargar la lista. <a href="#" onclick="loadClientes();return false;" style="color:inherit;text-decoration:underline;">Reintentar</a>';
+  }
+}
+
+async function resetProceso() {
+  if (!confirm('¿Liberar el proceso bloqueado? Hacé esto si el sistema quedó atascado (error de Gemini, timeout, etc).')) return;
+  try {
+    const cuit = clienteSeleccionado?.cuit || '';
+    const per  = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
+    const res  = await fetch(WEBHOOK_RESET, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cliente_cuit: cuit, periodo: per })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showAlert(`Proceso liberado (${data.liberados} proceso${data.liberados!==1?'s':''} reseteado${data.liberados!==1?'s':''}). Ya podés procesar de nuevo.`, 'success');
+      if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+      if (pollingTimeoutMax) { clearTimeout(pollingTimeoutMax); pollingTimeoutMax = null; }
+      document.getElementById('estadoProceso').style.display = 'none';
+    }
+  } catch(e) {
+    showAlert('No se pudo conectar con n8n para liberar el proceso.', 'error');
   }
 }
 
@@ -644,12 +672,16 @@ function mostrarEstadoProceso(estado, fallidos) {
   if (estado === 'procesando') {
     el.style.display = 'flex';
     el.className = 'alert a-info';
+    const rp = document.getElementById('resetPanel');
+    if (rp) rp.style.display = 'block';
     el.innerHTML = '<i class="ti ti-loader" style="font-size:16px;margin-top:1px;flex-shrink:0;animation:spin 1s linear infinite;"></i><span id="_epMsg"></span>';
     document.getElementById('_epMsg').textContent = 'n8n está procesando las facturas — te avisamos cuando esté listo el PRN…';
   } else if (estado === 'listo') {
     el.style.display = 'flex';
     el.className = 'alert a-success';
     el.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
+    const rp = document.getElementById('resetPanel');
+    if (rp) rp.style.display = 'none';
     const nf = fallidos && fallidos.length > 0;
     document.getElementById('_epMsg').textContent = nf
       ? `✓ PRN generado. ${fallidos.length} factura${fallidos.length!==1?'s':''} con error — revisá la sección de errores.`

@@ -168,19 +168,10 @@
       <input type="file" id="fileInput" accept=".pdf" multiple />
     </div>
 
-    <!-- Toggle forzar reprocesamiento -->
-    <div style="display:flex;align-items:center;gap:10px;margin-top:10px;padding:8px 12px;background:#f5f5f0;border-radius:8px;">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#444;user-select:none;">
-        <input type="checkbox" id="chkForzar" onchange="toggleForzar()" style="width:15px;height:15px;cursor:pointer;accent-color:#c5221f;">
-        <span>Forzar reprocesamiento</span>
-      </label>
-      <span style="font-size:12px;color:#888;">— subir aunque ya existan en Drive (para regenerar el PRN)</span>
-    </div>
-
     <!-- Excel / Registro ARCA -->
     <div>
       <label class="field-label"><i class="ti ti-table" style="color:#188038;font-size:14px;"></i> Registro ARCA — Mis Comprobantes Recibidos (.xlsx)</label>
-      <div class="excel-zone" id="excelZone" onclick="triggerExcelPick()">
+      <div class="excel-zone" id="excelZone">
         <i class="ti ti-file-spreadsheet ez-icon"></i>
         <div class="ez-text">
           <div class="ez-title" id="ezTitle">Arrastrá el Excel de ARCA o hacé clic</div>
@@ -212,6 +203,13 @@
       <div id="loteResultado" style="display:none; font-size:13px; color:#188038; background:#e6f4ea; border-radius:8px; padding:8px 12px; margin-bottom:8px;">
         <i class="ti ti-circle-check" style="font-size:14px;"></i> <span id="loteResultadoText"></span>
       </div>
+      <!-- Toggle forzar reprocesamiento — dentro de la cola de PDFs -->
+      <div style="display:flex;align-items:center;gap:8px;margin-top:10px;margin-bottom:6px;font-size:13px;color:#666;">
+        <input type="checkbox" id="chkForzar" onchange="toggleForzar()" style="width:14px;height:14px;cursor:pointer;accent-color:#c5221f;flex-shrink:0;">
+        <label for="chkForzar" style="cursor:pointer;user-select:none;">Forzar reprocesamiento</label>
+        <span style="font-size:11px;color:#aaa;">— subir aunque ya existan en Drive</span>
+      </div>
+
       <div class="btn-row">
         <button class="btn-primary" id="btnSubir" onclick="handleSubir()">
           <i class="ti ti-upload"></i> Subir y procesar
@@ -997,6 +995,7 @@ fi.addEventListener('change',   e => { addFiles(e.target.files); fi.value=''; })
 
 const ez = document.getElementById('excelZone');
 const ei = document.getElementById('excelInput');
+ez.addEventListener('click',    () => { if (!registroSubido) ei.click(); });
 ez.addEventListener('dragover', e => { e.preventDefault(); if (!registroSubido) ez.classList.add('dragover'); });
 ez.addEventListener('dragleave',() => ez.classList.remove('dragover'));
 ez.addEventListener('drop',     e => { e.preventDefault(); ez.classList.remove('dragover'); if (!registroSubido && e.dataTransfer.files[0]) handleExcelFile(e.dataTransfer.files[0]); });

@@ -4,8 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Holistor — Subir Facturas</title>
-<link rel="stylesheet" href="https://unpkg.com/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://unpkg.com" crossorigin>
+<link rel="preconnect" href="https://fede123.app.n8n.cloud" crossorigin>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="preload" href="https://unpkg.com/@tabler/icons-webfont@3.19.0/fonts/tabler-icons.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="https://unpkg.com/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://unpkg.com/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"></noscript>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a1a; min-height: 100vh; padding: 2rem 1rem; }
@@ -289,21 +293,43 @@ function showAlert(msg, type) {
 }
 
 // ── Clientes ──────────────────────────────────────────────────────────────────
-async function loadClientes() {
+const CLIENTES_CACHE_KEY = 'holistor_clientes_v2';
+const CLIENTES_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+async function loadClientes(forzar = false) {
   const sel  = document.getElementById('selCliente');
   const hint = document.getElementById('clienteHint');
-  sel.innerHTML = '<option value="">— Cargando… —</option>';
   sel.disabled = true;
+
+  // Intentar desde cache
+  if (!forzar) {
+    try {
+      const cached = sessionStorage.getItem(CLIENTES_CACHE_KEY);
+      if (cached) {
+        const { ts, data } = JSON.parse(cached);
+        if (Date.now() - ts < CLIENTES_CACHE_TTL) {
+          poblarSelectClientes(sel, data);
+          sel.disabled = false;
+          hint.textContent = '';
+          hint.className = 'field-hint';
+          return;
+        }
+      }
+    } catch(e) {}
+  }
+
+  // Fetch desde backend
+  sel.innerHTML = '<option value="">— Cargando… —</option>';
   try {
     const res = await fetch(WEBHOOK_CLIENTES);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const lista = await res.json();
     if (!Array.isArray(lista) || !lista.length) throw new Error('Lista vacía');
-    // E3: filtrar clientes con CUIT vacío o inválido
     const listaValida = lista.filter(c => c && String(c.cuit||'').replace(/[^0-9]/g,'').length >= 8 && String(c.nombre||'').trim());
     if (!listaValida.length) throw new Error('Lista sin clientes válidos');
-    sel.innerHTML = '<option value="">— Seleccionar cliente —</option>' +
-      listaValida.map(c => `<option value="${escapeHtml(c.cuit)}" data-nombre="${escapeHtml(c.nombre)}">${escapeHtml(c.nombre)}</option>`).join('');
+    // Guardar en cache
+    try { sessionStorage.setItem(CLIENTES_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: listaValida })); } catch(e) {}
+    poblarSelectClientes(sel, listaValida);
     sel.disabled = false;
     hint.textContent = '';
     hint.className = 'field-hint';
@@ -311,8 +337,13 @@ async function loadClientes() {
     sel.innerHTML = '<option value="">— Error al cargar —</option>';
     sel.disabled = false;
     hint.className = 'field-error';
-    hint.innerHTML = 'No se pudo cargar la lista. <a href="#" onclick="loadClientes();return false;" style="color:inherit;text-decoration:underline;">Reintentar</a>';
+    hint.innerHTML = 'No se pudo cargar la lista. <a href="#" onclick="loadClientes(true);return false;" style="color:inherit;text-decoration:underline;">Reintentar</a>';
   }
+}
+
+function poblarSelectClientes(sel, lista) {
+  sel.innerHTML = '<option value="">— Seleccionar cliente —</option>' +
+    lista.map(c => `<option value="${escapeHtml(c.cuit)}" data-nombre="${escapeHtml(c.nombre)}">${escapeHtml(c.nombre)}</option>`).join('');
 }
 
 async function resetProceso() {
@@ -496,8 +527,20 @@ async function handleExcelFile(file) {
   }
 }
 
+async function cargarXLSX() {
+  if (typeof XLSX !== 'undefined') return;  // ya cargado
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = res;
+    s.onerror = () => rej(new Error('No se pudo cargar la librería Excel'));
+    document.head.appendChild(s);
+  });
+}
+
 function parsearRegistroARCA(file) {
   return new Promise((resolve, reject) => {
+    cargarXLSX().then(() => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -594,6 +637,7 @@ function parsearRegistroARCA(file) {
     };
     reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
     reader.readAsArrayBuffer(file);
+    }).catch(reject);
   });
 }
 
@@ -990,24 +1034,30 @@ async function sendFlush() {
 }
 
 // ── Período ───────────────────────────────────────────────────────────────────
+const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio',
+                   'julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
 function actualizarPeriodo() {
   const mes  = parseInt(document.getElementById('selMes').value);
   const anio = parseInt(document.getElementById('selAnio').value);
   periodo = { mes, anio };
   const ultimoDia = new Date(anio, mes, 0).getDate();
-  const mesNombre = new Date(anio, mes-1, 1).toLocaleString('es-AR', { month:'long' });
+  const mesNombre = MESES_ES[mes - 1];
   document.getElementById('periodoInfo').textContent = `Fecha de recepción: ${String(ultimoDia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${anio} (último día de ${mesNombre} ${anio})`;
 }
 
 function inicializarSelectores() {
   const hoy = new Date(), anioActual = hoy.getFullYear();
   const selAnio = document.getElementById('selAnio');
+  // Construir opciones de año de una sola vez con fragment (evita reflows por cada appendChild)
+  const frag = document.createDocumentFragment();
   for (let a = anioActual-3; a <= anioActual; a++) {
     const opt = document.createElement('option');
     opt.value = a; opt.textContent = a;
     if (a === anioActual) opt.selected = true;
-    selAnio.appendChild(opt);
+    frag.appendChild(opt);
   }
+  selAnio.appendChild(frag);
   const mesPorDefecto  = hoy.getMonth() === 0 ? 12 : hoy.getMonth();
   const anioPorDefecto = hoy.getMonth() === 0 ? anioActual-1 : anioActual;
   document.getElementById('selMes').value = mesPorDefecto;

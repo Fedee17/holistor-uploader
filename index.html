@@ -67,6 +67,7 @@
   .b-uploading { background: #e8f0fe; color: #1a73e8; }
   .b-done      { background: #e6f4ea; color: #188038; }
   .b-error     { background: #fce8e6; color: #c5221f; }
+  .b-duplicate { background: #fff3e0; color: #e37400; }
   .btn-remove { background: none; border: none; cursor: pointer; color: #aaa; font-size: 16px; padding: 2px; line-height: 1; }
   .btn-remove:hover { color: #c5221f; }
   .btn-row { display: flex; gap: 10px; margin-top: 1rem; flex-wrap: wrap; }
@@ -384,6 +385,8 @@ async function handleExcelFile(file) {
   }
   if (!clienteSeleccionado) {
     showAlert('Primero seleccioná el cliente antes de subir el registro', 'warn');
+    document.getElementById('excelZone').classList.add('highlight');
+    setTimeout(() => document.getElementById('excelZone').classList.remove('highlight'), 3000);
     return;
   }
   if (!periodo) {
@@ -391,27 +394,49 @@ async function handleExcelFile(file) {
     return;
   }
 
-  document.getElementById('ezTitle').textContent  = `Procesando ${escapeHtml(file.name)}…`;
+  // Feedback inmediato — mostrar nombre del archivo de una
+  const zone = document.getElementById('excelZone');
+  document.getElementById('ezTitle').textContent  = escapeHtml(file.name);
   document.getElementById('ezSub').textContent    = 'Leyendo comprobantes…';
   document.getElementById('ezAction').textContent = '';
 
+  let registros, receptorCuit;
   try {
-    const { registros, receptorCuit } = await parsearRegistroARCA(file);
+    ({ registros, receptorCuit } = await parsearRegistroARCA(file));
+  } catch(err) {
+    document.getElementById('ezSub').textContent = 'Error al leer el archivo: ' + err.message;
+    showAlert('Error al leer el Excel: ' + err.message, 'error');
+    return;  // NO resetear — dejar que el usuario vea el error
+  }
 
-    // Validar que el receptor del Excel coincide con el cliente seleccionado
-    const cuitLimpio = clienteSeleccionado.cuit.replace(/[^0-9]/g,'').padStart(11,'0');
-    if (receptorCuit !== cuitLimpio) {
-      resetRegistro();
-      showAlert(`El registro pertenece al CUIT ${receptorCuit}, pero el cliente seleccionado es ${clienteSeleccionado.cuit}. Verificá el archivo o el cliente.`, 'error');
-      return;
-    }
+  // Validar CUIT receptor
+  const cuitLimpio = clienteSeleccionado.cuit.replace(/[^0-9]/g,'').padStart(11,'0');
+  if (receptorCuit !== cuitLimpio) {
+    document.getElementById('ezSub').textContent = `CUIT incorrecto: el archivo es de ${receptorCuit}, no de ${clienteSeleccionado.cuit}`;
+    showAlert(`El registro pertenece al CUIT ${receptorCuit}, pero el cliente seleccionado es ${clienteSeleccionado.cuit}.`, 'error');
+    return;
+  }
 
-    const periodoStr = `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}`;
-    document.getElementById('ezSub').textContent = `${registros.length} comprobantes · Enviando a n8n…`;
+  // Parseo OK — marcar zona como cargada ANTES de ir al backend
+  registroSubido = true;
+  zone.classList.add('loaded');
+  zone.onclick = null;
+  const existingBtn = zone.querySelector('.ez-remove');
+  if (!existingBtn) {
+    const xBtn = document.createElement('button');
+    xBtn.className = 'ez-remove';
+    xBtn.innerHTML = '<i class="ti ti-x"></i>';
+    xBtn.onclick = (e) => { e.stopPropagation(); resetRegistro(); };
+    zone.appendChild(xBtn);
+  }
+  document.getElementById('ezSub').textContent = `${registros.length} comprobantes · Guardando en n8n…`;
+  document.getElementById('registryWarn').style.display = 'none';
 
-    // Timeout explícito de 60s para la subida del registro
+  // Enviar al backend (no-bloqueante para la UI)
+  const periodoStr = `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}`;
+  try {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 60000);
+    const timer = setTimeout(() => ctrl.abort(), 90000);
     let resReg;
     try {
       resReg = await fetch(WEBHOOK_REGISTRO, {
@@ -423,32 +448,25 @@ async function handleExcelFile(file) {
     } finally {
       clearTimeout(timer);
     }
-    if (!resReg.ok) throw new Error(`Error del servidor al guardar el registro (HTTP ${resReg.status})`);
-    let cambiado = true;
-    try { const r = await resReg.json(); cambiado = r.cambiado !== false; } catch(e) {}
 
-    // Marcar como cargado
-    registroSubido = true;
-    const zone = document.getElementById('excelZone');
-    zone.classList.add('loaded');
-    zone.onclick = null;
-
-    const xBtn = document.createElement('button');
-    xBtn.className = 'ez-remove';
-    xBtn.innerHTML = '<i class="ti ti-x"></i>';
-    xBtn.onclick = (e) => { e.stopPropagation(); resetRegistro(); };
-    zone.appendChild(xBtn);
-
-    document.getElementById('ezTitle').textContent  = escapeHtml(file.name);
-    document.getElementById('ezSub').textContent    = `${registros.length} comprobantes · ${cambiado ? 'Registro actualizado ✓' : 'Sin cambios (igual al anterior)'}`;
-    document.getElementById('ezAction').textContent = '';
-    document.getElementById('registryWarn').style.display = 'none';
-
-    showAlert(`Registro cargado: ${registros.length} comprobante${registros.length!==1?'s':''}${cambiado ? ' (actualizado)' : ' (sin cambios)'}`, 'success');
-
+    let cambiado = true, mensaje = '';
+    if (resReg.ok) {
+      try { const r = await resReg.json(); cambiado = r.cambiado !== false; mensaje = r.mensaje || ''; } catch(e) {}
+      const estadoTexto = cambiado ? 'Registro guardado ✓' : 'Ya estaba guardado ✓';
+      document.getElementById('ezSub').textContent = `${registros.length} comprobantes · ${estadoTexto}`;
+      showAlert(`Registro listo: ${registros.length} comprobante${registros.length!==1?'s':''}. ${cambiado ? 'Actualizado.' : 'Ya estaba al día.'}`, 'success');
+    } else {
+      // Backend falló, pero el archivo SÍ está parseado — zona sigue loaded
+      document.getElementById('ezSub').textContent = `${registros.length} comprobantes · ⚠ No se pudo guardar en n8n (HTTP ${resReg.status})`;
+      showAlert(`El Excel se leyó bien (${registros.length} comprobantes) pero no se pudo guardar en n8n. Intentá de nuevo o verificá el workflow.`, 'warn');
+    }
   } catch(err) {
-    resetRegistro();
-    showAlert('Error al procesar el registro: ' + err.message, 'error');
+    const esTimeout = err.name === 'AbortError';
+    document.getElementById('ezSub').textContent = `${registros.length} comprobantes · ⚠ ${esTimeout ? 'Timeout — n8n tardó demasiado' : 'Error de red al guardar'}`;
+    showAlert(esTimeout
+      ? `El Excel está listo (${registros.length} comprobantes) pero n8n tardó demasiado. El registro puede haberse guardado igual — verificá la hoja de Sheets.`
+      : `El Excel está listo (${registros.length} comprobantes) pero hubo un error de red: ${err.message}`,
+      'warn');
   }
 }
 
@@ -560,9 +578,19 @@ function handleSubir() {
     return;
   }
   const pending = files.filter(f => f.status === 'pending');
-  if (!pending.length) {
+  const duplicates = files.filter(f => f.status === 'duplicate');
+  if (!pending.length && !duplicates.length) {
     showAlert('No hay facturas en cola. Arrastrá los PDFs primero.', 'warn');
     return;
+  }
+  if (!pending.length && duplicates.length > 0) {
+    showAlert(`Todos los archivos (${duplicates.length}) están marcados como "ya existe". Activá "Forzar reprocesamiento" para subirlos igual.`, 'warn');
+    return;
+  }
+  if (duplicates.length > 0 && !forzarReproceso) {
+    if (!confirm(`Hay ${duplicates.length} archivo${duplicates.length!==1?'s':''} marcados como "ya existe" que NO se van a subir. ¿Continuar con los ${pending.length} pendientes?`)) {
+      return;
+    }
   }
   if (!registroSubido) {
     document.getElementById('registryWarn').style.display = 'block';
@@ -740,14 +768,14 @@ function renderQueue() {
   } else {
     document.getElementById('loteInfo').style.display = 'none';
   }
-  const labels = { pending:'pendiente', uploading:'verificando', done:'listo', error:'error' };
+  const labels = { pending:'pendiente', uploading:'verificando', done:'listo', error:'error', duplicate:'ya existe' };
   document.getElementById('fileList').innerHTML = files.map((f,i) => `
     <div class="file-item">
       <i class="ti ti-file-type-pdf" style="font-size:16px;color:#c5221f;flex-shrink:0;"></i>
       <span class="file-name">${escapeHtml(f.name)}</span>
       <span class="file-size">${(f.size/1024).toFixed(0)} KB</span>
       <span class="badge b-${f.status}">${labels[f.status]}</span>
-      ${f.status==='pending'?`<button class="btn-remove" onclick="removeFile(${i})"><i class="ti ti-x"></i></button>`:''}
+      ${(f.status==='pending'||f.status==='duplicate')?`<button class="btn-remove" onclick="removeFile(${i})"><i class="ti ti-x"></i></button>`:''}
     </div>`).join('');
   updateStats();
 }
@@ -804,22 +832,22 @@ async function addFiles(newFiles) {
 
   const duplicados = [], erroresVerif = [];
   pdfs.forEach((f, i) => {
-    // D1: matchear por referencia al objeto File (no por nombre) para no confundir duplicados
     const item = tempItems[i];
     const r = resultados[i];
     if (r === true) {
-      // Confirmado duplicado → remover de la cola
-      if (item) files.splice(files.indexOf(item), 1);
+      // Duplicado: NO removemos, marcamos con status especial para que el usuario decida
+      if (item) { item.status = 'duplicate'; delete item._temp; }
       duplicados.push(f.name);
     } else {
       // OK o error de verificación → dejar pasar como pendiente
-      // (si era error de red, mejor subir que bloquear)
       if (item) { item.status = 'pending'; delete item._temp; }
       if (r === 'error') erroresVerif.push(f.name);
     }
   });
 
-  if (duplicados.length)   showAlert(`${duplicados.length} archivo${duplicados.length!==1?'s ya existían':' ya existía'} en Drive y ${duplicados.length!==1?'fueron omitidos':'fue omitido'}. Para reprocesarlos activá "Forzar reprocesamiento".`, 'warn');
+  if (duplicados.length) {
+    showAlert(`${duplicados.length} archivo${duplicados.length!==1?'s ya estaban':' ya estaba'} en Drive (en la cola están marcados como "ya existe"). Quitalos manualmente o activá "Forzar reprocesamiento" antes de subir.`, 'warn');
+  }
   if (erroresVerif.length) showAlert(`No se pudo verificar duplicados de ${erroresVerif.length} archivo${erroresVerif.length!==1?'s':''}. Se van a subir igual.`, 'warn');
   renderQueue();
 }
@@ -837,6 +865,11 @@ async function startUpload() {
   document.getElementById('btnSubir').disabled = true;
   document.getElementById('progressWrap').style.display = 'block';
   let done = 0, total = pending.length;
+  // Si forzar está tildado, convertir duplicates en pending para procesarlos
+  if (forzarReproceso) {
+    files.forEach(f => { if (f.status === 'duplicate') f.status = 'pending'; });
+    renderQueue();
+  }
   const indices = files.map((_,i)=>i).filter(i => files[i].status==='pending' && !files[i]._temp);
 
   // O1: subir en paralelo con concurrencia limitada

@@ -117,6 +117,13 @@
   .concil-denom { flex: 1; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .concil-total { color: #888; white-space: nowrap; font-size: 11px; }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  /* font-display: swap para Tabler Icons — evita FOIT */
+  @font-face {
+    font-family: 'tabler-icons';
+    font-display: swap;
+    src: url('https://unpkg.com/@tabler/icons-webfont@3.19.0/fonts/tabler-icons.woff2') format('woff2'),
+         url('https://unpkg.com/@tabler/icons-webfont@3.19.0/fonts/tabler-icons.woff') format('woff');
+  }
 </style>
 </head>
 <body>
@@ -341,8 +348,19 @@ async function loadClientes(forzar = false) {
 }
 
 function poblarSelectClientes(sel, lista) {
-  sel.innerHTML = '<option value="">— Seleccionar cliente —</option>' +
-    lista.map(c => `<option value="${escapeHtml(c.cuit)}" data-nombre="${escapeHtml(c.nombre)}">${escapeHtml(c.nombre)}</option>`).join('');
+  const frag = document.createDocumentFragment();
+  const def = document.createElement('option');
+  def.value = ''; def.textContent = '— Seleccionar cliente —';
+  frag.appendChild(def);
+  for (const c of lista) {
+    const opt = document.createElement('option');
+    opt.value = escapeHtml(c.cuit);
+    opt.dataset.nombre = escapeHtml(c.nombre);
+    opt.textContent = escapeHtml(c.nombre);
+    frag.appendChild(opt);
+  }
+  // Una sola escritura al DOM — sin reflows intermedios
+  sel.replaceChildren(frag);
 }
 
 async function resetProceso() {

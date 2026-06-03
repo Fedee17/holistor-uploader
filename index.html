@@ -647,9 +647,11 @@ function iniciarPolling() {
     try {
       const cuit = clienteSeleccionado?.cuit || '';
       const per  = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
-      const res  = await fetch(`${WEBHOOK_ESTADO}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`);
+      const res = await fetch(`${WEBHOOK_ESTADO}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`);
       if (!res.ok) return;
-      const data = await res.json();
+      let data;
+      try { data = await res.json(); } catch(e) { return; }
+      if (!data) return;
       if (data.listo === true) {
         // Limpieza completa: timers
         clearInterval(pollingInterval);

@@ -664,10 +664,12 @@ function handleSubir() {
     showAlert('No hay facturas en cola. Arrastrá los PDFs primero.', 'warn');
     return;
   }
+  // Si hay solo duplicados, activar forzar reprocesamiento automáticamente y continuar
   if (!pending.length && duplicates.length > 0) {
-    showAlert(`Todos los archivos (${duplicates.length}) están marcados como "ya existe". Activá "Forzar reprocesamiento" para subirlos igual.`, 'warn');
-    return;
+    duplicates.forEach(f => { f.status = 'pending'; });
+    renderQueue();
   }
+  // duplicates already converted to pending above
   if (duplicates.length > 0 && !forzarReproceso) {
     if (!confirm(`Hay ${duplicates.length} archivo${duplicates.length!==1?'s':''} marcados como "ya existe" que NO se van a subir. ¿Continuar con los ${pending.length} pendientes?`)) {
       return;
@@ -740,8 +742,10 @@ function mostrarEstadoProceso(estado, fallidos) {
     const rp = document.getElementById('resetPanel');
     if (rp) rp.style.display = 'none';
     const nf = fallidos && fallidos.length > 0;
+    const btn = document.getElementById('btnProcesar');
+    if (btn) { btn.disabled = false; btn.style.display = 'inline-block'; }
     document.getElementById('_epMsg').textContent = nf
-      ? `✓ PRN generado. ${fallidos.length} factura${fallidos.length!==1?'s':''} con error — revisá la sección de errores.`
+      ? `✓ PRN generado. ${fallidos.length} factura${fallidos.length!==1?'s':''} con error — podés volver a procesar las fallidas.`
       : '✓ PRN generado correctamente. Ya podés importarlo en Holistor.';
   }
 }

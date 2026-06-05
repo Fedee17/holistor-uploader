@@ -277,6 +277,7 @@ const WEBHOOK_RESET     = 'https://fede123.app.n8n.cloud/webhook/holistor-reset'
 let periodo             = null;
 let forzarReproceso     = false;
 let clienteSeleccionado = null;   // { cuit, nombre }
+let _archivoExcelPendiente = null; // archivo Excel guardado si se subió sin cliente
 let registroSubido      = false;  // Excel was parsed + sent to n8n
 let archivosFallidos    = [];
 let files = [], history = [], uploading = false, subidos = 0, errores = 0;
@@ -403,6 +404,12 @@ function onClienteChange() {
   }
   if (sel.value) {
     clienteSeleccionado = { cuit: sel.value, nombre: opt.dataset.nombre };
+    // Si había un Excel pendiente porque no había cliente, procesarlo ahora
+    if (_archivoExcelPendiente) {
+      const f = _archivoExcelPendiente;
+      _archivoExcelPendiente = null;
+      handleExcelFile(f);
+    }
     document.getElementById('clienteHint').textContent = `CUIT: ${sel.value}`;
     document.getElementById('clienteHint').className = 'field-hint';
   } else {
@@ -452,9 +459,14 @@ async function handleExcelFile(file) {
     return;
   }
   if (!clienteSeleccionado) {
-    showAlert('Primero seleccioná el cliente antes de subir el registro', 'warn');
+    // Guardar el archivo temporalmente — procesarlo cuando el usuario seleccione el cliente
+    _archivoExcelPendiente = file;
+    showAlert('Seleccioná el cliente primero — el Excel quedó guardado y se cargará automáticamente', 'warn');
     document.getElementById('excelZone').classList.add('highlight');
     setTimeout(() => document.getElementById('excelZone').classList.remove('highlight'), 3000);
+    // Scroll al selector de cliente
+    const sel = document.getElementById('clienteSelect') || document.getElementById('selCliente');
+    if (sel) { sel.scrollIntoView({ behavior:'smooth', block:'center' }); sel.focus(); }
     return;
   }
   if (!periodo) {
@@ -539,7 +551,7 @@ async function handleExcelFile(file) {
 }
 
 async function cargarXLSX() {
-  if (typeof XLSX !== 'undefined') return;  // ya cargado
+  if (typeof XLSX !== 'undefined') return Promise.resolve();  // ya cargado — retornar Promise resuelto
   return new Promise((res, rej) => {
     const s = document.createElement('script');
     s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';

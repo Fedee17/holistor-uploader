@@ -1039,9 +1039,11 @@ async function sendFlush() {
       body: JSON.stringify({ flush:true, mes:periodo?.mes, anio:periodo?.anio,
         cliente_cuit: clienteSeleccionado?.cuit||'', cliente_nombre: clienteSeleccionado?.nombre||'', tiene_registro: registroSubido })
     });
-    showAlert('Señal enviada — n8n va a procesar el lote ahora', 'success');
-  } catch(e) { showAlert('No se pudo enviar la señal', 'error'); }
-  document.getElementById('btnProcesar').disabled = false;
+    iniciarPolling();  // mostrar cartelito + arrancar polling de resultado
+  } catch(e) {
+    showAlert('No se pudo enviar la señal', 'error');
+    document.getElementById('btnProcesar').disabled = false;
+  }
 }
 
 // ── Período ───────────────────────────────────────────────────────────────────

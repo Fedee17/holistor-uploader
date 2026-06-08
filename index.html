@@ -71,6 +71,7 @@
   .b-done      { background: #e6f4ea; color: #188038; }
   .b-error     { background: #fce8e6; color: #c5221f; }
   .b-duplicate  { background: #fff3e0; color: #e37400; }
+  .b-en_cola    { background: #f3e8ff; color: #6b21a8; }
   .b-procesando { background: #e3f2fd; color: #1565c0; animation: pulse-badge 1.5s ease-in-out infinite; }
   .b-al_prn     { background: #e6f4ea; color: #137333; font-weight: 600; }
   .b-fallida    { background: #fce8e6; color: #a50e0e; }
@@ -90,6 +91,7 @@
   .a-success { background: #e6f4ea; color: #188038; border: 0.5px solid #a8d5b5; }
   .a-error   { background: #fce8e6; color: #c5221f; border: 0.5px solid #f5b8b5; }
   .a-info    { background: #e8f0fe; color: #1a73e8; border: 0.5px solid #aac4f5; }
+  #estadoProceso.a-info { font-size: 14px; padding: 14px 16px; }
   .a-warn    { background: #fff8e0; color: #92400e; border: 0.5px solid #fcd34d; }
   /* History */
   .history-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 0.5px solid #e8e8e0; font-size: 13px; }
@@ -705,8 +707,10 @@ function iniciarPolling() {
   if (pollingInterval) clearInterval(pollingInterval);
   if (pollingTimeoutMax) clearTimeout(pollingTimeoutMax);
   mostrarEstadoProceso('procesando');
-  // Marcar todos los archivos 'done' (subidos) como listos para procesar
-  // El backend irá actualizando a 'procesando' → 'al_prn'/'fallida'
+  // Cambiar todos los archivos 'done' (subidos) a 'en_cola' mientras se procesan
+  // para que sea claro que el proceso n8n aún no los tocó
+  files.forEach(f => { if (f.status === 'done') f.status = 'en_cola'; });
+  renderQueue();
   
   // Timeout máximo absoluto: 15 minutos. Si pasa eso, paramos el polling.
   pollingTimeoutMax = setTimeout(() => {
@@ -737,7 +741,7 @@ function iniciarPolling() {
         if (data.fallidos && data.fallidos.length > 0) mostrarFallidos(data.fallidos);
         if (data.conciliacion) mostrarConciliacion(data.conciliacion);
         // G1: limpiar archivos procesados de la cola para próximo uso
-        files = files.filter(f => f.status !== 'done');
+        files = files.filter(f => f.status !== 'done' && f.status !== 'en_cola' && f.status !== 'al_prn');
         renderQueue();
       } else if (data.archivos_estado || data.progreso) {
         // Actualizar estado por archivo en la lista de PDFs
@@ -927,7 +931,7 @@ function renderQueue() {
   } else {
     document.getElementById('loteInfo').style.display = 'none';
   }
-  const labels = { pending:'pendiente', uploading:'verificando', done:'listo', error:'error', duplicate:'ya existe', procesando:'procesando…', al_prn:'en PRN ✓', fallida:'fallida ✗' };
+  const labels = { pending:'pendiente', uploading:'verificando', done:'listo', error:'error', duplicate:'ya existe', en_cola:'en cola n8n', procesando:'procesando…', al_prn:'en PRN ✓', fallida:'fallida ✗' };
   document.getElementById('fileList').innerHTML = files.map((f,i) => `
     <div class="file-item">
       <i class="ti ti-file-type-pdf" style="font-size:16px;color:#c5221f;flex-shrink:0;"></i>
@@ -1089,6 +1093,11 @@ async function startUpload() {
         if (dp.fallidos && dp.fallidos.length > 0) mostrarFallidos(dp.fallidos);
       } catch(e) {}
       iniciarPolling();
+      // Desplazar al banner de proceso para que el usuario vea que está corriendo
+      setTimeout(() => {
+        const ep = document.getElementById('estadoProceso');
+        if (ep) ep.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
       const lotesEjecutados = Math.ceil(ok/50);
       document.getElementById('loteResultado').style.display = 'block';
       document.getElementById('loteResultadoText').textContent = `${ok} archivo${ok!==1?'s':''} subido${ok!==1?'s':''} — ${lotesEjecutados} lote${lotesEjecutados!==1?'s':''} en proceso`;

@@ -751,21 +751,36 @@ function iniciarPolling() {
         }
       }
     } catch(e) { console.warn('Polling error:', e); }
-  }, 10000);
+    }, 5000);
 }
 
 function aplicarEstadosArchivos(estados) {
-  // Actualiza el status de cada archivo en la lista según el backend
   let actualizado = false;
+  let procesandoActual = null;
   files.forEach(f => {
     const nombreBase = f.name.replace(/^\d{11}__/, '');
     const nuevoEstado = estados[f.name] || estados[nombreBase];
     if (nuevoEstado && f.status !== nuevoEstado && f.status !== 'pending' && f.status !== 'error') {
       f.status = nuevoEstado;
       actualizado = true;
+      if (nuevoEstado === 'procesando') procesandoActual = nombreBase || f.name;
     }
   });
-  if (actualizado) renderQueue();
+  if (actualizado) {
+    renderQueue();
+    // Actualizar banner con qué factura se está procesando ahora
+    const epMsg = document.getElementById('_epMsg');
+    if (epMsg && procesandoActual) {
+      const alPrn = files.filter(f => f.status === 'al_prn').length;
+      const fallida = files.filter(f => f.status === 'fallida').length;
+      const total   = files.filter(f => ['al_prn','fallida','procesando'].includes(f.status)).length;
+      let msg = `Procesando: ${procesandoActual}`;
+      if (alPrn > 0 || fallida > 0) {
+        msg += ` — ${alPrn} al PRN${fallida > 0 ? ', '+fallida+' fallida'+(fallida!==1?'s':'') : ''}`;
+      }
+      epMsg.textContent = msg;
+    }
+  }
 }
 
 function actualizarProgresoProceso(procesadas, total) {
@@ -787,7 +802,7 @@ function mostrarEstadoProceso(estado, fallidos) {
     const rp = document.getElementById('resetPanel');
     if (rp) rp.style.display = 'block';
     el.innerHTML = '<i class="ti ti-loader" style="font-size:16px;margin-top:1px;flex-shrink:0;animation:spin 1s linear infinite;"></i><span id="_epMsg"></span>';
-    document.getElementById('_epMsg').textContent = 'n8n está procesando las facturas — te avisamos cuando esté listo el PRN…';
+    document.getElementById('_epMsg').textContent = 'n8n está procesando las facturas…';
   } else if (estado === 'listo') {
     el.style.display = 'flex';
     el.className = 'alert a-success';
@@ -1049,6 +1064,7 @@ async function startUpload() {
 
   uploading = false;
   document.getElementById('btnSubir').disabled = false;
+  document.getElementById('progressWrap').style.display = 'none'; // ocultar barra tras upload
   const ok  = files.filter(f => f.status==='done').length;
   const err = files.filter(f => f.status==='error').length;
 

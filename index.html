@@ -130,14 +130,6 @@
 <div class="container">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:8px;">
   <h1 style="margin-bottom:0;"><i class="ti ti-file-invoice"></i> Holistor — Subir facturas</h1>
-  <div id="entornoWrap" style="display:flex;align-items:center;gap:8px;">
-    <span style="font-size:12px;color:#888;">Entorno:</span>
-    <select id="selEntorno" onchange="cambiarEntorno()" style="border:0.5px solid #ccc;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;background:#fff;">
-      <option value="produccion">🟢 Producción</option>
-      <option value="demo">🟡 Demo / Test</option>
-    </select>
-    <span id="entornoBadge" style="font-size:11px;padding:2px 8px;border-radius:4px;font-weight:500;"></span>
-  </div>
 </div>
 
   <div id="alert" class="alert"></div>
@@ -275,25 +267,6 @@
 
 <script>
 // ── Helpers ──────────────────────────────────────────────────────────────────
-function cambiarEntorno() {
-  _entorno = document.getElementById('selEntorno').value;
-  localStorage.setItem('holistor_entorno', _entorno);
-  actualizarBadgeEntorno();
-  // Limpiar cache de clientes (puede diferir entre entornos)
-  try { sessionStorage.removeItem('holistor_clientes_v2'); } catch(e) {}
-  loadClientes(true);
-  showAlert(`Entorno cambiado a: ${ENTORNOS[_entorno]?.label}`, 'info');
-}
-function actualizarBadgeEntorno() {
-  const badge = document.getElementById('entornoBadge');
-  const sel   = document.getElementById('selEntorno');
-  if (!badge || !sel) return;
-  sel.value = _entorno;
-  const cfg = ENTORNOS[_entorno] || ENTORNOS.produccion;
-  badge.textContent = _entorno === 'demo' ? '⚠ pruebas' : '';
-  badge.style.background = _entorno === 'demo' ? '#fff8e0' : 'transparent';
-  badge.style.color = '#e37400';
-}─
 function escapeHtml(s) {
   if (s === null || s === undefined) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
@@ -301,22 +274,6 @@ function escapeHtml(s) {
 
 // ── Webhooks ──────────────────────────────────────────────────────────────────
 // ── Entornos n8n ─────────────────────────────────────────────────────────────
-const ENTORNOS = {
-  produccion: {
-    label:    'Producción',
-    base:     'https://fede123.app.n8n.cloud/webhook',
-    color:    '#188038',
-  },
-  demo: {
-    label:    'Demo / Test',
-    base:     'https://fede123.app.n8n.cloud/webhook-test',
-    color:    '#e37400',
-  }
-};
-let _entorno = localStorage.getItem('holistor_entorno') || 'produccion';
-
-function getBase() { return ENTORNOS[_entorno]?.base || ENTORNOS.produccion.base; }
-
 const WEBHOOK           = () => getBase() + '/holistor-upload';
 const WEBHOOK_PROCESO   = () => getBase() + '/holistor-procesar';
 const WEBHOOK_VERIFICAR = () => getBase() + '/holistor-verificar';

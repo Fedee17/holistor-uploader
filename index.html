@@ -1158,7 +1158,7 @@ async function sendFlush(){
         cliente_nombre:clienteSeleccionado.nombre || '',
         tiene_registro:registroSubido
       })
-    }, 90000);
+    }, 180000);
 
     if(data.proceso_ya_activo === true){
       showAlert(data.mensaje || 'Ya hay un proceso activo para este cliente/período.', 'warn');
@@ -1171,10 +1171,33 @@ async function sendFlush(){
     iniciarPolling();
 
   }catch(err){
+    const msg = String(err && err.message ? err.message : err);
+
+    if(
+      msg.includes('aborted') ||
+      msg.includes('AbortError') ||
+      msg.includes('signal is aborted') ||
+      err.name === 'AbortError'
+    ){
+      showAlert('n8n tardó en responder, pero el proceso puede estar corriendo. Paso a consultar estado.', 'warn');
+
+      setStep('ia', 'active', 'Consultando estado');
+      setProcess(
+        'Consultando estado',
+        'El webhook inicial tardó demasiado. La página seguirá consultando si el proceso está activo.',
+        64,
+        'Polling activo'
+      );
+
+      addProcessLog('Timeout al iniciar proceso; se activa polling de estado igualmente.');
+      iniciarPolling();
+      return;
+    }
+
     setStep('ia', 'error', 'No inició n8n');
-    setProcess('Error al iniciar', err.message, 62, 'Falló holistor-procesar');
-    addProcessLog('Error iniciando proceso: ' + err.message);
-    showAlert('Error al iniciar procesamiento: ' + err.message, 'error');
+    setProcess('Error al iniciar', msg, 62, 'Falló holistor-procesar');
+    addProcessLog('Error iniciando proceso: ' + msg);
+    showAlert('Error al iniciar procesamiento: ' + msg, 'error');
   }
 }
 

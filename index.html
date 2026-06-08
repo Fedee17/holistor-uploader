@@ -1,169 +1,164 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Holistor — Subir Facturas</title>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Holistor — Subir Facturas v3</title>
 <link rel="preconnect" href="https://unpkg.com" crossorigin>
 <link rel="preconnect" href="https://fede123.app.n8n.cloud" crossorigin>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-<link rel="stylesheet" href="https://unpkg.com/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
-
+<link rel="stylesheet" href="https://unpkg.com/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://unpkg.com/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"></noscript>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh;padding:2rem 1rem}
-.container{max-width:780px;margin:0 auto}
-h1{font-size:21px;font-weight:600;margin-bottom:1.4rem;display:flex;align-items:center;gap:8px}
-.card{background:#fff;border:1px solid #e0e0d8;border-radius:14px;padding:1.25rem;margin-bottom:1rem}
-.card-header{display:flex;align-items:center;gap:8px;margin-bottom:1rem;font-size:15px;font-weight:600}
-.card-header i{font-size:18px;color:#777}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:1rem}
-.stat{background:#fff;border:1px solid #e8e8e0;border-radius:12px;padding:13px}
-.stat-label{font-size:12px;color:#888;margin-bottom:4px}
-.stat-value{font-size:24px;font-weight:600}
-.field-label{font-size:13px;font-weight:600;color:#444;display:block;margin-bottom:6px}
-.form-row{margin-bottom:1rem}
-.divider{border:none;border-top:1px solid #e8e8e0;margin:1rem 0}
-.field-select,.select-standard{border:1px solid #ccc;border-radius:8px;padding:9px 12px;font-size:13px;cursor:pointer;color:#1a1a1a;background:#fff;width:100%}
-.field-select:disabled{opacity:.55;cursor:not-allowed}
-.field-hint,.text-muted{font-size:12px;color:#888;margin-top:4px}
-.field-error{font-size:12px;color:#c5221f;margin-top:4px}
-.alert{padding:10px 14px;border-radius:9px;font-size:13px;margin-bottom:1rem;display:none;align-items:flex-start;gap:8px}
-.alert i{font-size:16px;margin-top:1px;flex-shrink:0}
-.a-success{background:#e6f4ea;color:#188038;border:1px solid #a8d5b5}
-.a-error{background:#fce8e6;color:#c5221f;border:1px solid #f5b8b5}
-.a-info{background:#e8f0fe;color:#1a73e8;border:1px solid #aac4f5}
-.a-warn{background:#fff8e0;color:#92400e;border:1px solid #fcd34d}
-.drop-zone{border:1.5px dashed #ccc;border-radius:12px;padding:2.5rem;text-align:center;cursor:pointer;transition:.15s;background:#fff}
-.drop-zone:hover,.drop-zone.dragover{background:#f5f5f0;border-color:#999}
-.drop-zone i{font-size:34px;color:#aaa;display:block;margin-bottom:8px}
-.drop-zone p{color:#888;font-size:14px;margin-top:4px}
-.drop-zone strong{color:#1a1a1a}
-input[type=file]{display:none}
-.excel-zone{border:1.5px dashed #b0c9b0;border-radius:10px;padding:.9rem 1rem;display:flex;align-items:center;gap:10px;cursor:pointer;transition:.15s;background:#f9fdf9}
-.excel-zone:hover,.excel-zone.dragover{background:#f0faf0;border-color:#188038}
-.excel-zone.loaded{border-style:solid;border-color:#188038;background:#f0faf3;cursor:default}
-.excel-zone.highlight{border-color:#e37400;background:#fff8e0;animation:pulseWarn .9s ease-in-out 3}
-@keyframes pulseWarn{0%,100%{border-color:#e37400}50%{border-color:#fcc}}
-.ez-icon{font-size:21px;color:#4a9a4a;flex-shrink:0}
-.ez-text{flex:1;min-width:0}
-.ez-title{font-size:13px;font-weight:600;color:#2e7d32}
-.excel-zone:not(.loaded) .ez-title{color:#444}
-.ez-sub{font-size:11px;color:#888;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.excel-zone.loaded .ez-sub{color:#4a9a4a}
-.ez-action{font-size:12px;color:#1a73e8;white-space:nowrap;flex-shrink:0}
-.ez-remove{background:none;border:none;cursor:pointer;color:#bbb;font-size:16px;flex-shrink:0;padding:2px;line-height:1}
-.ez-remove:hover{color:#c5221f}
-.registry-warn{background:#fff8e0;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;margin-top:8px;display:none;font-size:13px;color:#92400e}
-.registry-warn-head{display:flex;align-items:center;gap:6px;font-weight:600;margin-bottom:6px}
-.registry-warn-btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
-.rw-btn-a{background:#1a1a1a;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer}
-.rw-btn-b{background:none;border:1px solid #92400e;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;color:#92400e}
-.queue{margin-top:1rem;display:none}
-.queue-label{font-size:12px;color:#888;text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-bottom:8px}
-.file-list{max-height:280px;overflow-y:auto}
-.file-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:#fff;border:1px solid #e8e8e0;border-radius:8px;margin-bottom:6px}
-.file-name{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.file-size{font-size:12px;color:#888;white-space:nowrap}
-.badge{font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;white-space:nowrap}
-.b-pending{background:#f0f0ea;color:#666}
-.b-uploading{background:#e8f0fe;color:#1a73e8}
-.b-done{background:#e6f4ea;color:#188038}
-.b-error{background:#fce8e6;color:#c5221f}
-.b-duplicate{background:#fff3e0;color:#e37400}
-.b-en_cola{background:#f3e8ff;color:#6b21a8}
-.b-procesando{background:#e3f2fd;color:#1565c0;animation:pulseBadge 1.5s infinite}
-.b-al_prn{background:#e6f4ea;color:#137333}
-.b-fallida{background:#fce8e6;color:#a50e0e}
-@keyframes pulseBadge{0%,100%{opacity:1}50%{opacity:.6}}
-.btn-remove{background:none;border:none;cursor:pointer;color:#aaa;font-size:16px;padding:2px;line-height:1}
-.btn-remove:hover{color:#c5221f}
-.btn-row{display:flex;gap:10px;margin-top:1rem;flex-wrap:wrap}
-.btn-primary{background:#1a1a1a;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:600;cursor:pointer}
-.btn-primary:disabled{opacity:.45;cursor:not-allowed}
-.btn-secondary{background:none;border:1px solid #ccc;border-radius:8px;padding:10px 20px;font-size:14px;cursor:pointer;color:#1a1a1a}
-.btn-secondary:disabled{opacity:.45;cursor:not-allowed}
-.btn-reset{background:none;border:1px solid #ccc;border-radius:6px;padding:6px 12px;font-size:12px;color:#888;cursor:pointer}
-.btn-reset:hover{border-color:#999;color:#666}
-.history-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #e8e8e0;font-size:13px}
-.history-item:last-child{border-bottom:none}
-.history-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.history-time{font-size:12px;color:#888;white-space:nowrap}
-.empty{text-align:center;padding:2rem;color:#aaa;font-size:13px}
-.empty i{font-size:28px;display:block;margin-bottom:8px}
-.concil-section{border:1px solid #e8e8e0;border-radius:8px;overflow:hidden;margin-bottom:8px}
-.concil-head{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;user-select:none}
-.concil-head:hover{background:#f9f9f7}
-.concil-icon{font-size:16px;flex-shrink:0}
-.concil-title{flex:1;font-size:13px;font-weight:600}
-.concil-badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px}
-.cb-ok{background:#e6f4ea;color:#188038}
-.cb-warn{background:#fff3e0;color:#e37400}
-.cb-err{background:#fce8e6;color:#c5221f}
-.ci-ok{color:#188038}
-.ci-warn{color:#e37400}
-.ci-err{color:#c5221f}
-.concil-toggle{font-size:14px;color:#aaa;transition:.2s}
-.concil-head.open .concil-toggle{transform:rotate(180deg)}
-.concil-body{display:none;border-top:1px solid #e8e8e0;max-height:220px;overflow-y:auto}
-.concil-body.open{display:block}
-.concil-row{display:flex;align-items:baseline;gap:8px;padding:7px 14px;border-bottom:1px solid #f0f0ea;font-size:12px}
-.concil-row:last-child{border-bottom:none}
-.concil-key{font-family:monospace;font-size:11px;color:#666;flex-shrink:0}
-.concil-denom{flex:1;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.concil-total{color:#888;white-space:nowrap;font-size:11px}
-@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a1a; min-height: 100vh; padding: 2rem 1rem; }
+  .container { max-width: 680px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 500; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px; }
+  .card { background: #fff; border: 0.5px solid #e0e0d8; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+  .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 1rem; font-size: 15px; font-weight: 500; }
+  .card-header i { font-size: 18px; color: #888; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 1rem; }
+  .stat { background: #f5f5f0; border-radius: 8px; padding: 12px; }
+  .stat-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+  .stat-value { font-size: 22px; font-weight: 500; }
+  .field-label { font-size: 13px; font-weight: 500; color: #444; display: block; margin-bottom: 6px; }
+  .form-row { margin-bottom: 1rem; }
+  .divider { border: none; border-top: 0.5px solid #e8e8e0; margin: 1rem 0; }
+  .field-select, .select-standard { border: 0.5px solid #ccc; border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; color: #1a1a1a; background: #fff; width: 100%; }
+  .field-select:disabled { opacity: 0.5; cursor: not-allowed; }
+  .field-hint, .text-muted { font-size: 12px; color: #888; margin-top: 4px; }
+  .field-error { font-size: 12px; color: #c5221f; margin-top: 4px; }
+  .drop-zone { border: 1.5px dashed #ccc; border-radius: 12px; padding: 2.5rem; text-align: center; cursor: pointer; transition: background 0.15s; }
+  .drop-zone:hover, .drop-zone.dragover { background: #f5f5f0; }
+  .drop-zone i { font-size: 32px; color: #aaa; display: block; margin-bottom: 8px; }
+  .drop-zone p { color: #888; font-size: 14px; margin-top: 4px; }
+  .drop-zone strong { color: #1a1a1a; }
+  input[type=file] { display: none; }
+  .excel-zone { border: 1.5px dashed #b0c9b0; border-radius: 10px; padding: 0.85rem 1rem; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: all 0.15s; background: #f9fdf9; }
+  .excel-zone:hover { background: #f0faf0; border-color: #188038; }
+  .excel-zone.dragover { background: #f0faf0; border-color: #188038; }
+  .excel-zone.loaded { border-style: solid; border-color: #188038; background: #f0faf3; cursor: default; }
+  .excel-zone.highlight { border-color: #e37400; background: #fff8e0; animation: pulseWarn 0.9s ease-in-out 3; }
+  .ez-icon { font-size: 20px; color: #4a9a4a; flex-shrink: 0; }
+  .ez-text { flex: 1; min-width: 0; }
+  .ez-title { font-size: 13px; font-weight: 500; color: #2e7d32; }
+  .excel-zone:not(.loaded) .ez-title { color: #444; }
+  .ez-sub { font-size: 11px; color: #888; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .excel-zone.loaded .ez-sub { color: #4a9a4a; }
+  .ez-action { font-size: 12px; color: #1a73e8; white-space: nowrap; flex-shrink: 0; }
+  .ez-remove { background: none; border: none; cursor: pointer; color: #bbb; font-size: 16px; flex-shrink: 0; padding: 2px; line-height: 1; }
+  .ez-remove:hover { color: #c5221f; }
+  @keyframes pulseWarn { 0%,100% { border-color: #e37400; } 50% { border-color: #fcc; } }
+  .registry-warn { background: #fff8e0; border: 0.5px solid #fcd34d; border-radius: 8px; padding: 10px 14px; margin-top: 8px; display: none; font-size: 13px; color: #92400e; }
+  .registry-warn-head { display: flex; align-items: center; gap: 6px; font-weight: 500; margin-bottom: 6px; }
+  .registry-warn-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .rw-btn-a { background: #1a1a1a; color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; cursor: pointer; }
+  .rw-btn-b { background: none; border: 0.5px solid #92400e; border-radius: 6px; padding: 6px 14px; font-size: 12px; cursor: pointer; color: #92400e; }
+  .queue { margin-top: 1rem; display: none; }
+  .queue-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; margin-bottom: 8px; }
+  .file-list { max-height: 260px; overflow-y: auto; }
+  .file-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: #fff; border: 0.5px solid #e8e8e0; border-radius: 8px; margin-bottom: 6px; }
+  .file-name { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-size { font-size: 12px; color: #888; white-space: nowrap; }
+  .badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+  .b-pending { background: #f0f0ea; color: #666; }
+  .b-uploading { background: #e8f0fe; color: #1a73e8; }
+  .b-done { background: #e6f4ea; color: #188038; }
+  .b-error { background: #fce8e6; color: #c5221f; }
+  .b-duplicate { background: #fff3e0; color: #e37400; }
+  .b-en_cola { background: #f3e8ff; color: #6b21a8; }
+  .b-procesando { background: #e3f2fd; color: #1565c0; animation: pulse-badge 1.5s ease-in-out infinite; }
+  .b-al_prn { background: #e6f4ea; color: #137333; font-weight: 600; }
+  .b-fallida { background: #fce8e6; color: #a50e0e; }
+  @keyframes pulse-badge { 0%,100%{opacity:1} 50%{opacity:.6} }
+  .btn-remove { background: none; border: none; cursor: pointer; color: #aaa; font-size: 16px; padding: 2px; line-height: 1; }
+  .btn-remove:hover { color: #c5221f; }
+  .btn-row { display: flex; gap: 10px; margin-top: 1rem; flex-wrap: wrap; }
+  .btn-primary { background: #1a1a1a; color: #fff; border: none; border-radius: 8px; padding: 9px 20px; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-secondary { background: none; border: 0.5px solid #ccc; border-radius: 8px; padding: 9px 20px; font-size: 14px; cursor: pointer; color: #1a1a1a; }
+  .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-reset { background: none; border: 0.5px solid #ccc; border-radius: 6px; padding: 5px 12px; font-size: 12px; color: #888; cursor: pointer; }
+  .btn-reset:hover { border-color: #999; color: #666; }
+  .progress-wrap { height: 3px; background: #e0e0d8; border-radius: 2px; margin-top: 8px; overflow: hidden; display: none; }
+  .progress-bar { height: 100%; background: #1a73e8; border-radius: 2px; transition: width 0.2s; }
+  .alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 1rem; display: none; align-items: flex-start; gap: 8px; }
+  .alert i { font-size: 16px; margin-top: 1px; flex-shrink: 0; }
+  .a-success { background: #e6f4ea; color: #188038; border: 0.5px solid #a8d5b5; }
+  .a-error { background: #fce8e6; color: #c5221f; border: 0.5px solid #f5b8b5; }
+  .a-info { background: #e8f0fe; color: #1a73e8; border: 0.5px solid #aac4f5; }
+  #estadoProceso.a-info { font-size: 14px; padding: 14px 16px; }
+  .a-warn { background: #fff8e0; color: #92400e; border: 0.5px solid #fcd34d; }
+  .history-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 0.5px solid #e8e8e0; font-size: 13px; }
+  .history-item:last-child { border-bottom: none; }
+  .history-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .history-time { font-size: 12px; color: #888; white-space: nowrap; }
+  .empty { text-align: center; padding: 2rem; color: #aaa; font-size: 13px; }
+  .empty i { font-size: 28px; display: block; margin-bottom: 8px; }
+  .concil-section { border: 0.5px solid #e8e8e0; border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
+  .concil-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; user-select: none; }
+  .concil-head:hover { background: #f9f9f7; }
+  .concil-icon { font-size: 16px; flex-shrink: 0; }
+  .concil-title { flex: 1; font-size: 13px; font-weight: 500; }
+  .concil-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; }
+  .cb-ok { background: #e6f4ea; color: #188038; }
+  .cb-warn { background: #fff3e0; color: #e37400; }
+  .cb-err { background: #fce8e6; color: #c5221f; }
+  .ci-ok { color: #188038; }
+  .ci-warn { color: #e37400; }
+  .ci-err { color: #c5221f; }
+  .concil-toggle { font-size: 14px; color: #aaa; transition: transform 0.2s; }
+  .concil-head.open .concil-toggle { transform: rotate(180deg); }
+  .concil-body { display: none; border-top: 0.5px solid #e8e8e0; max-height: 220px; overflow-y: auto; }
+  .concil-body.open { display: block; }
+  .concil-row { display: flex; align-items: baseline; gap: 8px; padding: 7px 14px; border-bottom: 0.5px solid #f0f0ea; font-size: 12px; }
+  .concil-row:last-child { border-bottom: none; }
+  .concil-key { font-family: monospace; font-size: 11px; color: #666; flex-shrink: 0; }
+  .concil-denom { flex: 1; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .concil-total { color: #888; white-space: nowrap; font-size: 11px; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-/* UX proceso */
-.process-card{display:none;border-color:#c7d2fe;background:#fbfcff}
-.process-card.active{display:block}
-.process-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
-.process-title{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
-.process-sub{font-size:12px;color:#666;margin-top:3px}
-.process-pill{font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;background:#e8f0fe;color:#1a73e8;white-space:nowrap}
-.process-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px}
-.pstep{border:1px solid #e0e7ff;border-radius:10px;padding:9px 8px;background:#fff;min-height:72px}
-.pstep-icon{width:23px;height:23px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#f0f0ea;color:#888;font-size:13px;margin-bottom:6px}
-.pstep-label{font-size:12px;font-weight:700;color:#333;line-height:1.2}
-.pstep-detail{font-size:11px;color:#888;margin-top:3px;line-height:1.2}
-.pstep.done{border-color:#bbf7d0;background:#f0faf3}
-.pstep.done .pstep-icon{background:#e6f4ea;color:#188038}
-.pstep.active{border-color:#93c5fd;background:#eff6ff;box-shadow:0 0 0 1px rgba(26,115,232,.08)}
-.pstep.active .pstep-icon{background:#1a73e8;color:#fff;animation:pulseStep 1.3s ease-in-out infinite}
-.pstep.error{border-color:#fecaca;background:#fff5f5}
-.pstep.error .pstep-icon{background:#fce8e6;color:#c5221f}
-@keyframes pulseStep{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
-.process-progress{margin-top:12px}
-.process-progress-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#666;margin-bottom:5px}
-.process-bar-bg{height:7px;border-radius:999px;background:#e5e7eb;overflow:hidden}
-.process-bar-fill{height:100%;width:0%;background:#1a73e8;transition:width .25s ease}
-.process-log{margin-top:10px;max-height:130px;overflow-y:auto;border-top:1px solid #e8e8e0;padding-top:8px}
-.process-log-line{font-size:12px;color:#555;padding:3px 0;display:flex;gap:6px}
-.process-log-time{color:#999;flex-shrink:0;font-variant-numeric:tabular-nums}
-@media(max-width:720px){
-  .stats{grid-template-columns:1fr}
-  .process-steps{grid-template-columns:1fr}
-  .process-top{flex-direction:column}
-}
+  /* UX proceso: tablero de etapas */
+  .process-card { display:none; border-color:#c7d2fe; background:#fbfcff; }
+  .process-card.active { display:block; }
+  .process-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px; }
+  .process-title { font-size:15px; font-weight:600; display:flex; align-items:center; gap:8px; }
+  .process-sub { font-size:12px; color:#666; margin-top:3px; }
+  .process-pill { font-size:12px; font-weight:600; padding:4px 9px; border-radius:999px; background:#e8f0fe; color:#1a73e8; white-space:nowrap; }
+  .process-steps { display:grid; grid-template-columns: repeat(5, 1fr); gap:8px; margin-top:10px; }
+  .pstep { border:0.5px solid #e0e7ff; border-radius:10px; padding:9px 8px; background:#fff; min-height:68px; }
+  .pstep-icon { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#f0f0ea; color:#888; font-size:13px; margin-bottom:6px; }
+  .pstep-label { font-size:12px; font-weight:600; color:#333; line-height:1.2; }
+  .pstep-detail { font-size:11px; color:#888; margin-top:3px; line-height:1.2; }
+  .pstep.done { border-color:#bbf7d0; background:#f0faf3; }
+  .pstep.done .pstep-icon { background:#e6f4ea; color:#188038; }
+  .pstep.active { border-color:#93c5fd; background:#eff6ff; box-shadow:0 0 0 1px rgba(26,115,232,.08); }
+  .pstep.active .pstep-icon { background:#1a73e8; color:#fff; animation:pulse-step 1.3s ease-in-out infinite; }
+  .pstep.error { border-color:#fecaca; background:#fff5f5; }
+  .pstep.error .pstep-icon { background:#fce8e6; color:#c5221f; }
+  @keyframes pulse-step { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+  .process-progress { margin-top:12px; }
+  .process-progress-head { display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#666; margin-bottom:5px; }
+  .process-bar-bg { height:7px; border-radius:999px; background:#e5e7eb; overflow:hidden; }
+  .process-bar-fill { height:100%; width:0%; background:#1a73e8; transition:width .25s ease; }
+  .process-log { margin-top:10px; max-height:120px; overflow-y:auto; border-top:0.5px solid #e8e8e0; padding-top:8px; }
+  .process-log-line { font-size:12px; color:#555; padding:3px 0; display:flex; gap:6px; }
+  .process-log-time { color:#999; flex-shrink:0; font-variant-numeric:tabular-nums; }
+  @media (max-width: 720px) { .process-steps { grid-template-columns:1fr; } .process-top { flex-direction:column; } }
+
 </style>
 </head>
-
 <body>
 <div class="container">
-  <h1><i class="ti ti-file-invoice"></i> Holistor — Subir facturas</h1>
-
+  <h1 style="margin-bottom:1.5rem;"><i class="ti ti-file-invoice"></i> Holistor — Subir facturas</h1>
   <div id="alert" class="alert"></div>
-
   <div class="stats">
     <div class="stat"><div class="stat-label">En cola</div><div class="stat-value" id="statCola">0</div></div>
     <div class="stat"><div class="stat-label">Subidos</div><div class="stat-value" id="statSubidos">0</div></div>
     <div class="stat"><div class="stat-label">Errores</div><div class="stat-value" id="statErrores">0</div></div>
   </div>
-
   <div class="card">
     <div class="card-header"><i class="ti ti-cloud-upload"></i> Subir facturas</div>
-
     <div class="form-row">
       <label class="field-label">Cliente</label>
       <select id="selCliente" class="field-select" onchange="onClienteChange()">
@@ -171,50 +166,31 @@ input[type=file]{display:none}
       </select>
       <div id="clienteHint" class="field-hint"></div>
     </div>
-
     <div class="form-row">
       <label class="field-label">Período de carga</label>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <select id="selMes" onchange="actualizarPeriodo()" class="select-standard">
-          <option value="1">Enero</option>
-          <option value="2">Febrero</option>
-          <option value="3">Marzo</option>
-          <option value="4">Abril</option>
-          <option value="5">Mayo</option>
-          <option value="6">Junio</option>
-          <option value="7">Julio</option>
-          <option value="8">Agosto</option>
-          <option value="9">Septiembre</option>
-          <option value="10">Octubre</option>
-          <option value="11">Noviembre</option>
-          <option value="12">Diciembre</option>
+          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
         </select>
         <select id="selAnio" onchange="actualizarPeriodo()" class="select-standard"></select>
       </div>
       <div id="periodoInfo" class="text-muted"></div>
     </div>
-
     <hr class="divider">
-
-    <div class="form-row" style="margin-bottom:.75rem;">
-      <label class="field-label">
-        <i class="ti ti-file-type-pdf" style="color:#c5221f;font-size:14px;"></i>
-        Facturas PDF
-      </label>
+    <div class="form-row" style="margin-bottom:0.75rem;">
+      <label class="field-label"><i class="ti ti-file-type-pdf" style="color:#c5221f;font-size:14px;"></i> Facturas PDF</label>
       <div class="drop-zone" id="dropZone">
         <i class="ti ti-file-upload"></i>
         <p><strong>Arrastrá los PDFs acá</strong> o hacé clic para seleccionarlos</p>
         <p>Solo archivos PDF · Múltiples archivos permitidos</p>
       </div>
-      <input type="file" id="fileInput" accept=".pdf" multiple>
+      <input type="file" id="fileInput" accept=".pdf" multiple />
     </div>
-
     <div>
-      <label class="field-label">
-        <i class="ti ti-table" style="color:#188038;font-size:14px;"></i>
-        Registro ARCA — Mis Comprobantes Recibidos (.xlsx)
-      </label>
-
+      <label class="field-label"><i class="ti ti-table" style="color:#188038;font-size:14px;"></i> Registro ARCA — Mis Comprobantes Recibidos (.xlsx)</label>
       <div class="excel-zone" id="excelZone">
         <i class="ti ti-file-spreadsheet ez-icon"></i>
         <div class="ez-text">
@@ -223,57 +199,37 @@ input[type=file]{display:none}
         </div>
         <span class="ez-action" id="ezAction">Seleccionar</span>
       </div>
-
-      <input type="file" id="excelInput" accept=".xlsx,.xls">
-
+      <input type="file" id="excelInput" accept=".xlsx,.xls" />
       <div class="registry-warn" id="registryWarn">
-        <div class="registry-warn-head">
-          <i class="ti ti-alert-triangle" style="font-size:14px;"></i>
-          Sin registro de comprobantes
-        </div>
+        <div class="registry-warn-head"><i class="ti ti-alert-triangle" style="font-size:14px;"></i> Sin registro de comprobantes</div>
         Podés procesar igual, pero no se realizará conciliación.
         <div class="registry-warn-btns">
-          <button class="rw-btn-a" onclick="focusExcelZone()">
-            <i class="ti ti-table" style="font-size:11px;"></i> Subir registro primero
-          </button>
+          <button class="rw-btn-a" onclick="focusExcelZone()"><i class="ti ti-table" style="font-size:11px;"></i> Subir registro primero</button>
           <button class="rw-btn-b" onclick="procesarSinRegistro()">Procesar sin registro</button>
         </div>
       </div>
     </div>
-
     <div class="queue" id="queue">
       <div class="queue-label" id="queueLabel">0 archivos</div>
-
-      <div id="loteInfo" style="display:none;font-size:13px;color:#1a73e8;background:#e8f0fe;border-radius:8px;padding:8px 12px;margin-bottom:8px;">
-        <i class="ti ti-stack-2" style="font-size:14px;"></i>
-        <span id="loteInfoText"></span>
+      <div id="loteInfo" style="display:none; font-size:13px; color:#1a73e8; background:#e8f0fe; border-radius:8px; padding:8px 12px; margin-bottom:8px;">
+        <i class="ti ti-stack-2" style="font-size:14px;"></i> <span id="loteInfoText"></span>
       </div>
-
       <div class="file-list" id="fileList"></div>
-
-      <div id="loteResultado" style="display:none;font-size:13px;color:#188038;background:#e6f4ea;border-radius:8px;padding:8px 12px;margin-bottom:8px;">
-        <i class="ti ti-circle-check" style="font-size:14px;"></i>
-        <span id="loteResultadoText"></span>
+      <div id="loteResultado" style="display:none; font-size:13px; color:#188038; background:#e6f4ea; border-radius:8px; padding:8px 12px; margin-bottom:8px;">
+        <i class="ti ti-circle-check" style="font-size:14px;"></i> <span id="loteResultadoText"></span>
       </div>
-
       <div style="display:flex;align-items:center;gap:8px;margin-top:10px;margin-bottom:6px;font-size:13px;color:#666;">
         <input type="checkbox" id="chkForzar" onchange="toggleForzar()" style="width:14px;height:14px;cursor:pointer;accent-color:#c5221f;">
         <label for="chkForzar" style="cursor:pointer;user-select:none;">Forzar reprocesamiento</label>
         <span style="font-size:11px;color:#aaa;">— subir aunque ya existan en Drive</span>
       </div>
-
       <div class="btn-row">
-        <button class="btn-primary" id="btnSubir" onclick="handleSubir()">
-          <i class="ti ti-upload"></i> Subir y procesar
-        </button>
-        <button class="btn-secondary" id="btnProcesar" onclick="sendFlush()" style="display:none;">
-          <i class="ti ti-player-play"></i> Procesar ahora
-        </button>
+        <button class="btn-primary" id="btnSubir" onclick="handleSubir()"><i class="ti ti-upload"></i> Subir y procesar</button>
+        <button class="btn-secondary" id="btnProcesar" onclick="sendFlush()" style="display:none;"><i class="ti ti-player-play"></i> Procesar ahora</button>
         <button class="btn-secondary" onclick="clearPending()">Limpiar pendientes</button>
       </div>
     </div>
   </div>
-
   <div id="estadoProceso" class="alert" style="display:none;"></div>
 
   <div class="card process-card" id="processCard">
@@ -284,85 +240,43 @@ input[type=file]{display:none}
       </div>
       <div class="process-pill" id="processPill">En espera</div>
     </div>
-
     <div class="process-steps" id="processSteps">
-      <div class="pstep" data-step="validacion">
-        <div class="pstep-icon"><i class="ti ti-checkup-list"></i></div>
-        <div class="pstep-label">Validación</div>
-        <div class="pstep-detail" id="step-validacion-detail">Cliente, período y archivos</div>
-      </div>
-      <div class="pstep" data-step="upload">
-        <div class="pstep-icon"><i class="ti ti-cloud-upload"></i></div>
-        <div class="pstep-label">Subida</div>
-        <div class="pstep-detail" id="step-upload-detail">PDFs a Drive</div>
-      </div>
-      <div class="pstep" data-step="registro">
-        <div class="pstep-icon"><i class="ti ti-table"></i></div>
-        <div class="pstep-label">Registro</div>
-        <div class="pstep-detail" id="step-registro-detail">ARCA / conciliación</div>
-      </div>
-      <div class="pstep" data-step="ia">
-        <div class="pstep-icon"><i class="ti ti-sparkles"></i></div>
-        <div class="pstep-label">IA + PRN</div>
-        <div class="pstep-detail" id="step-ia-detail">Gemini y formato Holistor</div>
-      </div>
-      <div class="pstep" data-step="final">
-        <div class="pstep-icon"><i class="ti ti-file-check"></i></div>
-        <div class="pstep-label">Resultado</div>
-        <div class="pstep-detail" id="step-final-detail">PRN, fallidos y conciliación</div>
-      </div>
+      <div class="pstep" data-step="validacion"><div class="pstep-icon"><i class="ti ti-checkup-list"></i></div><div class="pstep-label">Validación</div><div class="pstep-detail" id="step-validacion-detail">Cliente, período y archivos</div></div>
+      <div class="pstep" data-step="upload"><div class="pstep-icon"><i class="ti ti-cloud-upload"></i></div><div class="pstep-label">Subida</div><div class="pstep-detail" id="step-upload-detail">PDFs a Drive</div></div>
+      <div class="pstep" data-step="registro"><div class="pstep-icon"><i class="ti ti-table"></i></div><div class="pstep-label">Registro</div><div class="pstep-detail" id="step-registro-detail">ARCA / conciliación</div></div>
+      <div class="pstep" data-step="ia"><div class="pstep-icon"><i class="ti ti-sparkles"></i></div><div class="pstep-label">IA + PRN</div><div class="pstep-detail" id="step-ia-detail">Gemini y formato Holistor</div></div>
+      <div class="pstep" data-step="final"><div class="pstep-icon"><i class="ti ti-file-check"></i></div><div class="pstep-label">Resultado</div><div class="pstep-detail" id="step-final-detail">PRN, fallidos y conciliación</div></div>
     </div>
-
     <div class="process-progress">
-      <div class="process-progress-head">
-        <span id="processProgressLabel">0%</span>
-        <span id="processProgressText">Sin actividad</span>
-      </div>
+      <div class="process-progress-head"><span id="processProgressLabel">0%</span><span id="processProgressText">Sin actividad</span></div>
       <div class="process-bar-bg"><div class="process-bar-fill" id="processBarFill"></div></div>
     </div>
-
     <div class="process-log" id="processLog"></div>
   </div>
-
-  <div id="resetPanel" style="display:none;margin-bottom:1rem;text-align:right;">
-    <button class="btn-reset" onclick="resetProceso()">
-      <i class="ti ti-refresh" style="font-size:12px;"></i> Liberar proceso
-    </button>
+  <div id="resetPanel" style="display:none; margin-bottom:1rem; text-align:right;">
+    <button class="btn-reset" onclick="resetProceso()"><i class="ti ti-refresh" style="font-size:12px;"></i> Liberar proceso</button>
   </div>
-
-  <div class="card" id="cardFallidos" style="display:none;border-color:#f5b8b5;">
-    <div class="card-header" style="color:#c5221f;">
-      <i class="ti ti-alert-circle"></i> Facturas con error
-    </div>
+  <div class="card" id="cardFallidos" style="display:none; border-color:#f5b8b5;">
+    <div class="card-header" style="color:#c5221f;"><i class="ti ti-alert-circle"></i> Facturas con error</div>
     <div id="listFallidos"></div>
     <div class="btn-row" style="margin-top:1rem;">
-      <button class="btn-primary" style="background:#c5221f;" onclick="reintentar()">
-        <i class="ti ti-refresh"></i> Reintentar fallidas
-      </button>
+      <button class="btn-primary" style="background:#c5221f;" onclick="reintentar()"><i class="ti ti-refresh"></i> Reintentar fallidas</button>
     </div>
   </div>
-
   <div class="card" id="cardConciliacion" style="display:none;">
-    <div class="card-header">
-      <i class="ti ti-report-analytics" style="color:#1a73e8;"></i> Conciliación de comprobantes
-    </div>
+    <div class="card-header"><i class="ti ti-report-analytics" style="color:#1a73e8;"></i> Conciliación de comprobantes</div>
     <div id="concilContent"></div>
   </div>
-
   <div class="card">
     <div class="card-header"><i class="ti ti-history"></i> Historial de esta sesión</div>
-    <div id="historyList">
-      <div class="empty"><i class="ti ti-inbox"></i>Todavía no se subieron archivos</div>
-    </div>
+    <div id="historyList"><div class="empty"><i class="ti ti-inbox"></i>Todavía no se subieron archivos</div></div>
   </div>
 </div>
-
 <script>
-/* ──────────────────────────────────────────────────────────────
-   CONFIG
-────────────────────────────────────────────────────────────── */
+// ──────────────────────────────────────────────────────────────────────────────
+// WEBHOOKS (sin entornos - solo producción)
+// ──────────────────────────────────────────────────────────────────────────────
 const BASE_WEBHOOK = 'https://fede123.app.n8n.cloud/webhook';
-
 const WEBHOOK = {
   upload:    () => BASE_WEBHOOK + '/holistor-upload',
   procesar:  () => BASE_WEBHOOK + '/holistor-procesar',
@@ -373,6 +287,35 @@ const WEBHOOK = {
   reset:     () => BASE_WEBHOOK + '/holistor-reset'
 };
 
+const DRIVE_INDEX_DELAY_MS = 6000;
+const FETCH_TIMEOUT_MS = 90000;
+const POLLING_INTERVAL_MS = 5000;
+const POLLING_TIMEOUT_MS = 15 * 60 * 1000;
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function fetchConTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: ctrl.signal });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function jsonSeguro(res) {
+  try { return await res.json(); } catch(e) { return {}; }
+}
+
+function periodoStr() {
+  return periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// STATE
+// ──────────────────────────────────────────────────────────────────────────────
 let periodo = null;
 let forzarReproceso = false;
 let clienteSeleccionado = null;
@@ -386,587 +329,807 @@ let subidos = 0;
 let errores = 0;
 let pollingInterval = null;
 let pollingTimeoutMax = null;
+const BATCH_FRONTEND_SIZE = 100;
 
-/* ──────────────────────────────────────────────────────────────
-   HELPERS
-────────────────────────────────────────────────────────────── */
-function $(id){ return document.getElementById(id); }
-
-function escapeHtml(s){
-  if(s === null || s === undefined) return '';
+// ──────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ──────────────────────────────────────────────────────────────────────────────
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
   return String(s)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;')
-    .replace(/'/g,'&#039;');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
-function pluralizar(count, singular, plural){
-  return count === 1 ? singular : (plural || singular + 's');
+function pluralizar(count, singular, plural = singular + 's') {
+  return count === 1 ? singular : plural;
 }
 
-function sleep(ms){
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function fetchJson(url, options, timeoutMs){
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs || 45000);
-  try{
-    const res = await fetch(url, { ...(options || {}), signal: ctrl.signal });
-    const text = await res.text();
-    let data = {};
-    try{ data = text ? JSON.parse(text) : {}; }catch(e){ data = { raw: text }; }
-    if(!res.ok){
-      throw new Error(data.mensaje || data.error || ('HTTP ' + res.status));
-    }
-    return data;
-  }finally{
-    clearTimeout(timer);
-  }
-}
-
-function getStats(){
-  const stats = { pending:0, done:0, error:0 };
+function getStats() {
+  const stats = { pending: 0, done: 0, error: 0 };
   files.forEach(f => {
-    if(f.status === 'pending') stats.pending++;
-    else if(f.status === 'done') stats.done++;
-    else if(f.status === 'error') stats.error++;
+    if (f.status === 'pending') stats.pending++;
+    else if (f.status === 'done') stats.done++;
+    else if (f.status === 'error') stats.error++;
   });
   return stats;
 }
 
-function showAlert(msg, type){
-  const el = $('alert');
-  const icons = {
-    success:'circle-check',
-    error:'alert-circle',
-    info:'info-circle',
-    warn:'alert-triangle'
-  };
+function cacheElementos(ids) {
+  const cache = {};
+  ids.forEach(id => {
+    cache[id] = document.getElementById(id);
+  });
+  return cache;
+}
+
+// Cache de elementos usados frecuentemente
+const ezCache = cacheElementos(['ezTitle', 'ezSub', 'ezAction']);
+const statsCache = cacheElementos(['statCola', 'statSubidos', 'statErrores']);
+
+// ──────────────────────────────────────────────────────────────────────────────
+// ALERTS
+// ──────────────────────────────────────────────────────────────────────────────
+function showAlert(msg, type) {
+  const el = document.getElementById('alert');
+  const icons = { success:'circle-check', error:'alert-circle', info:'info-circle', warn:'alert-triangle' };
   el.className = 'alert a-' + type;
-  el.innerHTML = '<i class="ti ti-' + (icons[type] || 'info-circle') + '"></i><span>' + msg + '</span>';
+  el.innerHTML = `<i class="ti ti-${icons[type]||'info-circle'}"></i><span>${msg}</span>`;
   el.style.display = 'flex';
-  if(type !== 'info'){
-    setTimeout(() => { el.style.display = 'none'; }, 6500);
-  }
+  if (type !== 'info') setTimeout(() => el.style.display = 'none', 6000);
 }
 
-/* ──────────────────────────────────────────────────────────────
-   UX PROCESO
-────────────────────────────────────────────────────────────── */
-function ensureProcessVisible(){
-  $('processCard').classList.add('active');
-}
-
-function addProcessLog(msg){
-  ensureProcessVisible();
-  const now = new Date();
-  const hh = String(now.getHours()).padStart(2,'0');
-  const mm = String(now.getMinutes()).padStart(2,'0');
-  const ss = String(now.getSeconds()).padStart(2,'0');
-
-  const line = document.createElement('div');
-  line.className = 'process-log-line';
-  line.innerHTML =
-    '<span class="process-log-time">' + hh + ':' + mm + ':' + ss + '</span>' +
-    '<span>' + escapeHtml(msg) + '</span>';
-
-  const log = $('processLog');
-  log.prepend(line);
-}
-
-function setStep(step, status, detail){
-  ensureProcessVisible();
-
-  document.querySelectorAll('.pstep').forEach(el => {
-    const s = el.dataset.step;
-    if(s === step){
-      el.classList.remove('done','active','error');
-      if(status) el.classList.add(status);
-    }
-  });
-
-  const detailEl = $('step-' + step + '-detail');
-  if(detailEl && detail) detailEl.textContent = detail;
-}
-
-function setProcess(statusText, subtitle, percent, progressText){
-  ensureProcessVisible();
-
-  $('processPill').textContent = statusText || 'En proceso';
-  $('processSubtitle').textContent = subtitle || '';
-  const p = Math.max(0, Math.min(100, Number(percent || 0)));
-  $('processProgressLabel').textContent = p + '%';
-  $('processBarFill').style.width = p + '%';
-  $('processProgressText').textContent = progressText || '';
-}
-
-function resetProcessUI(){
-  $('processCard').classList.remove('active');
-  $('processLog').innerHTML = '';
-  document.querySelectorAll('.pstep').forEach(el => {
-    el.classList.remove('done','active','error');
-  });
-  $('processPill').textContent = 'En espera';
-  $('processSubtitle').textContent = 'Todavía no se inició ningún procesamiento.';
-  $('processProgressLabel').textContent = '0%';
-  $('processBarFill').style.width = '0%';
-  $('processProgressText').textContent = 'Sin actividad';
-}
-
-/* ──────────────────────────────────────────────────────────────
-   CLIENTES
-────────────────────────────────────────────────────────────── */
+// ──────────────────────────────────────────────────────────────────────────────
+// CLIENTES
+// ──────────────────────────────────────────────────────────────────────────────
 const CLIENTES_CACHE_KEY = 'holistor_clientes_v3';
 const CLIENTES_CACHE_TTL = 5 * 60 * 1000;
 
-async function loadClientes(forzar){
-  const sel = $('selCliente');
-  const hint = $('clienteHint');
+async function loadClientes(forzar = false) {
+  const sel = document.getElementById('selCliente');
+  const hint = document.getElementById('clienteHint');
   sel.disabled = true;
 
-  if(!forzar){
-    try{
+  if (!forzar) {
+    try {
       const cached = sessionStorage.getItem(CLIENTES_CACHE_KEY);
-      if(cached){
-        const obj = JSON.parse(cached);
-        if(Date.now() - obj.ts < CLIENTES_CACHE_TTL){
-          poblarSelectClientes(sel, obj.data);
+      if (cached) {
+        const { ts, data } = JSON.parse(cached);
+        if (Date.now() - ts < CLIENTES_CACHE_TTL) {
+          poblarSelectClientes(sel, data);
           sel.disabled = false;
           hint.textContent = '';
           hint.className = 'field-hint';
           return;
         }
       }
-    }catch(e){}
+    } catch(e) {}
   }
 
   sel.innerHTML = '<option value="">— Cargando… —</option>';
-
-  try{
-    const lista = await fetchJson(WEBHOOK.clientes(), {}, 60000);
-
-    if(!Array.isArray(lista) || !lista.length){
-      throw new Error('Lista vacía');
-    }
-
-    const listaValida = lista.filter(c =>
-      c &&
-      String(c.cuit || '').replace(/[^0-9]/g,'').length >= 8 &&
-      String(c.nombre || '').trim()
+  try {
+    const res = await fetchConTimeout(WEBHOOK.clientes(), {}, 30000);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const lista = await res.json();
+    if (!Array.isArray(lista) || !lista.length) throw new Error('Lista vacía');
+    const listaValida = lista.filter(c => 
+      c && String(c.cuit||'').replace(/[^0-9]/g,'').length >= 8 && String(c.nombre||'').trim()
     );
-
-    if(!listaValida.length){
-      throw new Error('Lista sin clientes válidos');
-    }
-
-    try{
-      sessionStorage.setItem(CLIENTES_CACHE_KEY, JSON.stringify({
-        ts: Date.now(),
-        data: listaValida
-      }));
-    }catch(e){}
-
+    if (!listaValida.length) throw new Error('Lista sin clientes válidos');
+    try { sessionStorage.setItem(CLIENTES_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: listaValida })); } catch(e) {}
     poblarSelectClientes(sel, listaValida);
     sel.disabled = false;
     hint.textContent = '';
     hint.className = 'field-hint';
-
-  }catch(e){
+  } catch(e) {
     sel.innerHTML = '<option value="">— Error al cargar —</option>';
     sel.disabled = false;
     hint.className = 'field-error';
-    hint.innerHTML =
-      'No se pudo cargar la lista. ' +
-      '<a href="#" onclick="loadClientes(true);return false;" style="color:inherit;text-decoration:underline;">Reintentar</a>';
-    addProcessLog('No se pudo cargar clientes: ' + e.message);
+    hint.innerHTML = 'No se pudo cargar la lista. <a href="#" onclick="loadClientes(true);return false;" style="color:inherit;text-decoration:underline;">Reintentar</a>';
   }
 }
 
-function poblarSelectClientes(sel, lista){
+function poblarSelectClientes(sel, lista) {
   const frag = document.createDocumentFragment();
-
   const def = document.createElement('option');
   def.value = '';
   def.textContent = '— Seleccionar cliente —';
   frag.appendChild(def);
-
-  lista.forEach(c => {
+  for (const c of lista) {
     const opt = document.createElement('option');
-    opt.value = String(c.cuit || '');
-    opt.dataset.nombre = String(c.nombre || '');
-    opt.textContent = String(c.nombre || '');
+    opt.value = escapeHtml(c.cuit);
+    opt.dataset.nombre = escapeHtml(c.nombre);
+    opt.textContent = escapeHtml(c.nombre);
     frag.appendChild(opt);
-  });
-
+  }
   sel.replaceChildren(frag);
 }
 
-function onClienteChange(){
-  const sel = $('selCliente');
+// ──────────────────────────────────────────────────────────────────────────────
+// CLIENTE CHANGE
+// ──────────────────────────────────────────────────────────────────────────────
+function onClienteChange() {
+  const sel = document.getElementById('selCliente');
   const opt = sel.options[sel.selectedIndex];
   const pdfsEnCola = files.filter(f => f.status === 'pending').length;
-
-  if(pdfsEnCola > 0){
-    const ok = confirm('Hay ' + pdfsEnCola + ' PDF' + (pdfsEnCola !== 1 ? 's' : '') + ' en cola. ¿Limpiar y cambiar?');
-    if(!ok){
-      sel.value = clienteSeleccionado ? clienteSeleccionado.cuit : '';
+  
+  if (pdfsEnCola > 0) {
+    const ok = confirm(`Hay ${pdfsEnCola} PDF${pluralizar(pdfsEnCola, '', 's')} en cola. ¿Limpiar y cambiar?`);
+    if (!ok) {
+      sel.value = clienteSeleccionado?.cuit || '';
       return;
     }
     files = files.filter(f => f.status !== 'pending');
     renderQueue();
   }
-
-  if(sel.value){
-    clienteSeleccionado = {
-      cuit: sel.value,
-      nombre: opt ? opt.dataset.nombre : ''
-    };
-
-    $('clienteHint').textContent = 'CUIT: ' + sel.value;
-    $('clienteHint').className = 'field-hint';
-
-    addProcessLog('Cliente seleccionado: ' + (clienteSeleccionado.nombre || clienteSeleccionado.cuit));
-
-    if(_archivoExcelPendiente){
+  
+  if (sel.value) {
+    clienteSeleccionado = { cuit: sel.value, nombre: opt.dataset.nombre };
+    if (_archivoExcelPendiente) {
       const f = _archivoExcelPendiente;
       _archivoExcelPendiente = null;
       handleExcelFile(f);
     }
-  }else{
+    document.getElementById('clienteHint').textContent = `CUIT: ${sel.value}`;
+    document.getElementById('clienteHint').className = 'field-hint';
+  } else {
     clienteSeleccionado = null;
-    $('clienteHint').textContent = '';
+    document.getElementById('clienteHint').textContent = '';
   }
-
   resetRegistro();
 }
 
-/* ──────────────────────────────────────────────────────────────
-   PERÍODO
-────────────────────────────────────────────────────────────── */
-function actualizarPeriodo(){
-  const mes = parseInt($('selMes').value, 10);
-  const anio = parseInt($('selAnio').value, 10);
-
-  if(mes && anio){
-    periodo = { mes, anio };
-    $('periodoInfo').textContent = String(mes).padStart(2,'0') + '/' + anio;
+// ──────────────────────────────────────────────────────────────────────────────
+// PROCESO Y RESET
+// ──────────────────────────────────────────────────────────────────────────────
+async function resetProceso() {
+  if (!confirm('¿Liberar el proceso bloqueado?')) return;
+  try {
+    const cuit = clienteSeleccionado?.cuit || '';
+    const per = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
+    const res = await fetchConTimeout(WEBHOOK.reset(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cliente_cuit: cuit, periodo: per })
+    }, 30000);
+    const data = await jsonSeguro(res);
+    if (data.ok) {
+      showAlert(`Proceso liberado. Ya podés procesar de nuevo.`, 'success');
+      stopPolling();
+      document.getElementById('estadoProceso').style.display = 'none';
+    }
+  } catch(e) {
+    showAlert('No se pudo conectar con n8n.', 'error');
   }
 }
 
-/* ──────────────────────────────────────────────────────────────
-   REGISTRO ARCA / EXCEL
-────────────────────────────────────────────────────────────── */
-function resetRegistro(){
-  registroSubido = false;
-
-  const zone = $('excelZone');
-  zone.classList.remove('loaded','highlight');
-
-  const xBtn = zone.querySelector('.ez-remove');
-  if(xBtn) xBtn.remove();
-
-  $('ezTitle').textContent = 'Arrastrá el Excel de ARCA o hacé clic';
-  $('ezSub').textContent = 'Necesario para la conciliación de comprobantes';
-  $('ezAction').textContent = 'Seleccionar';
-  $('excelInput').value = '';
-  $('registryWarn').style.display = 'none';
-
-  setStep('registro', '', 'ARCA / conciliación');
+function toggleForzar() {
+  forzarReproceso = document.getElementById('chkForzar').checked;
+  if (forzarReproceso) {
+    showAlert('Modo forzar activo: los archivos serán resubidos y reprocesados.', 'warn');
+  }
 }
 
-function focusExcelZone(){
-  $('registryWarn').style.display = 'none';
-  const zone = $('excelZone');
+// ──────────────────────────────────────────────────────────────────────────────
+// EXCEL / REGISTRO ARCA
+// ──────────────────────────────────────────────────────────────────────────────
+function resetRegistro() {
+  registroSubido = false;
+  const zone = document.getElementById('excelZone');
+  zone.classList.remove('loaded','highlight');
+  const xBtn = zone.querySelector('.ez-remove');
+  if (xBtn) xBtn.remove();
+  ezCache.ezTitle.textContent = 'Arrastrá el Excel de ARCA o hacé clic';
+  ezCache.ezSub.textContent = 'Necesario para la conciliación de comprobantes';
+  ezCache.ezAction.textContent = 'Seleccionar';
+  document.getElementById('excelInput').value = '';
+  document.getElementById('registryWarn').style.display = 'none';
+}
+
+function focusExcelZone() {
+  document.getElementById('registryWarn').style.display = 'none';
+  const zone = document.getElementById('excelZone');
   zone.classList.add('highlight');
   zone.scrollIntoView({ behavior:'smooth', block:'center' });
   setTimeout(() => zone.classList.remove('highlight'), 3000);
-  $('excelInput').click();
+  document.getElementById('excelInput').click();
 }
 
-function procesarSinRegistro(){
-  $('registryWarn').style.display = 'none';
-  registroSubido = false;
-  setStep('registro', 'done', 'Se procesa sin conciliación ARCA');
-  addProcessLog('El usuario decidió procesar sin registro ARCA.');
+function procesarSinRegistro() {
+  document.getElementById('registryWarn').style.display = 'none';
   startUpload();
 }
 
-function validarArchivoExcel(file){
-  if(!file || (!file.name.toLowerCase().endsWith('.xlsx') && !file.name.toLowerCase().endsWith('.xls'))){
-    showAlert('El registro debe ser .xlsx o .xls de ARCA', 'error');
+function validarArchivoExcel(file) {
+  if (!file || (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls'))) {
+    showAlert('El registro debe ser .xlsx de ARCA', 'error');
     return false;
   }
   return true;
 }
 
-function validarPrecondiciones(){
-  if(!clienteSeleccionado){
-    showAlert('Seleccioná el cliente primero.', 'warn');
-    const sel = $('selCliente');
-    if(sel){
-      sel.scrollIntoView({ behavior:'smooth', block:'center' });
-      sel.focus();
-    }
+function validarPrecondiciones() {
+  if (!clienteSeleccionado) {
+    showAlert('Seleccioná el cliente primero', 'warn');
+    const sel = document.getElementById('selCliente');
+    if (sel) { sel.scrollIntoView({ behavior:'smooth', block:'center' }); sel.focus(); }
     return false;
   }
-
-  if(!periodo){
-    showAlert('Seleccioná el período antes.', 'warn');
+  if (!periodo) {
+    showAlert('Seleccioná el período antes', 'warn');
     return false;
   }
-
   return true;
 }
 
-function mostrarCargandoExcel(file){
-  $('ezTitle').textContent = file.name;
-  $('ezSub').textContent = 'Leyendo comprobantes…';
-  $('ezAction').textContent = '';
+function mostrarCargando(zone, file) {
+  ezCache.ezTitle.textContent = escapeHtml(file.name);
+  ezCache.ezSub.textContent = 'Leyendo comprobantes…';
+  ezCache.ezAction.textContent = '';
 }
 
-async function cargarXLSX(){
-  if(typeof XLSX !== 'undefined') return;
-
-  await new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-    s.onload = resolve;
-    s.onerror = () => reject(new Error('No se pudo cargar librería XLSX'));
-    document.head.appendChild(s);
-  });
-}
-
-function parsearRegistroARCA(file){
-  return new Promise((resolve, reject) => {
-    cargarXLSX().then(() => {
-      const reader = new FileReader();
-
-      reader.onload = e => {
-        try{
-          const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
-          const ws = wb.Sheets[wb.SheetNames[0]];
-          const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:null, raw:false });
-
-          if(rows.length < 3){
-            throw new Error('Archivo vacío');
-          }
-
-          const receptoresSet = new Set();
-
-          for(let i = 2; i < rows.length; i++){
-            const r = rows[i];
-            if(!r || r[0] === null) continue;
-
-            const rc = String(r[10] || '').replace(/[^0-9]/g,'').padStart(11,'0');
-            if(rc && rc !== '00000000000') receptoresSet.add(rc);
-          }
-
-          if(receptoresSet.size > 1){
-            reject(new Error('Múltiples receptores: ' + Array.from(receptoresSet).join(', ')));
-            return;
-          }
-
-          const receptorCuit = receptoresSet.size === 1 ? Array.from(receptoresSet)[0] : '00000000000';
-          const registros = [];
-
-          for(let i = 2; i < rows.length; i++){
-            const r = rows[i];
-            if(!r || r[0] === null) continue;
-
-            const tipoCod = String(r[1] || '').split(' - ')[0].trim();
-            const cuitEm = String(r[7] || '').replace(/[^0-9]/g,'').padStart(11,'0');
-            const ptoVta = String(r[2] || '');
-            const numHasta = String(r[4] || '');
-            const clave = cuitEm + '-' + (parseInt(tipoCod,10) || 0) + '-' + (parseInt(ptoVta,10) || 0) + '-' + (parseInt(numHasta,10) || 0);
-
-            registros.push({
-              clave: clave,
-              cuit_emisor: cuitEm,
-              tipo_cod: tipoCod,
-              pto_vta: ptoVta,
-              numero_hasta: numHasta,
-              total: String(r[29] || ''),
-              denominacion_emisor: String(r[8] || ''),
-              fecha: String(r[0] || ''),
-              estado: 'pendiente'
-            });
-          }
-
-          if(!registros.length){
-            throw new Error('Sin comprobantes');
-          }
-
-          resolve({ registros, receptorCuit });
-
-        }catch(err){
-          reject(err);
-        }
-      };
-
-      reader.onerror = () => reject(new Error('No se pudo leer archivo'));
-      reader.readAsArrayBuffer(file);
-
-    }).catch(reject);
-  });
-}
-
-async function guardarRegistroEnN8n(zone, registros){
+async function guardarRegistroEnN8n(zone, registros, receptorCuit) {
   registroSubido = true;
   zone.classList.add('loaded');
-
   const existingBtn = zone.querySelector('.ez-remove');
-  if(!existingBtn){
+  if (!existingBtn) {
     const xBtn = document.createElement('button');
     xBtn.className = 'ez-remove';
     xBtn.innerHTML = '<i class="ti ti-x"></i>';
-    xBtn.onclick = e => {
-      e.stopPropagation();
-      resetRegistro();
-    };
+    xBtn.onclick = (e) => { e.stopPropagation(); resetRegistro(); };
     zone.appendChild(xBtn);
   }
+  ezCache.ezSub.textContent = `${registros.length} comprobantes · Guardando…`;
+  document.getElementById('registryWarn').style.display = 'none';
 
-  $('ezSub').textContent = registros.length + ' comprobantes · Guardando…';
-  $('registryWarn').style.display = 'none';
+  const periodoStr = `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}`;
+  try {
+    const resReg = await fetchConTimeout(WEBHOOK.registro(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cliente_cuit: clienteSeleccionado.cuit, periodo: periodoStr, registros })
+      });
 
-  const periodoStr = periodo.anio + '-' + String(periodo.mes).padStart(2,'0');
-
-  try{
-    setStep('registro', 'active', 'Guardando registro ARCA');
-    setProcess('Guardando registro', 'Se está enviando el Excel ARCA a n8n.', 22, registros.length + ' comprobantes detectados');
-    addProcessLog('Registro ARCA leído: ' + registros.length + ' comprobantes.');
-
-    const data = await fetchJson(WEBHOOK.registro(), {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body:JSON.stringify({
-        cliente_cuit: clienteSeleccionado.cuit,
-        periodo: periodoStr,
-        registros: registros
-      })
-    }, 90000);
-
-    $('ezSub').textContent = registros.length + ' comprobantes · Registro guardado ✓';
-    setStep('registro', 'done', registros.length + ' comprobantes guardados');
-    addProcessLog(data.mensaje || 'Registro ARCA guardado.');
-    showAlert(registros.length + ' comprobantes guardados para conciliación.', 'success');
-
-  }catch(err){
-    registroSubido = false;
-    $('ezSub').textContent = '⚠ Error al guardar';
-    setStep('registro', 'error', 'Error al guardar ARCA');
-    addProcessLog('Error guardando registro ARCA: ' + err.message);
-    showAlert('Error al guardar registro en n8n: ' + err.message, 'error');
+    if (resReg.ok) {
+      const estadoTexto = 'Registro guardado ✓';
+      ezCache.ezSub.textContent = `${registros.length} comprobantes · ${estadoTexto}`;
+      showAlert(`${registros.length} ${pluralizar(registros.length, 'comprobante', 'comprobantes')} guardados.`, 'success');
+      updateProcesoUX('registro', Math.max(procesoActual.pct || 0, 45), 'Registro ARCA cargado', `${registros.length} comprobantes disponibles para conciliación.`, { progressText:'Registro guardado' });
+      setStepDetail('registro', `${registros.length} comprobantes`);
+      logProceso(`Registro ARCA guardado: ${registros.length} comprobantes.`);
+    } else {
+      ezCache.ezSub.textContent = `⚠ Error HTTP ${resReg.status}`;
+      showAlert('Error al guardar en n8n. Intentá de nuevo.', 'warn');
+    }
+  } catch(err) {
+    const esTimeout = err.name === 'AbortError';
+    ezCache.ezSub.textContent = esTimeout ? '⚠ Timeout' : '⚠ Error de red';
+    showAlert(esTimeout ? 'Timeout en n8n' : `Error: ${err.message}`, 'warn');
   }
 }
 
-async function handleExcelFile(file){
-  if(!validarArchivoExcel(file)) return;
-
-  if(!clienteSeleccionado){
+async function handleExcelFile(file) {
+  if (!validarArchivoExcel(file)) return;
+  
+  if (!clienteSeleccionado) {
     _archivoExcelPendiente = file;
-    showAlert('El Excel se guardará automáticamente cuando selecciones cliente.', 'warn');
-    $('excelZone').classList.add('highlight');
-    setTimeout(() => $('excelZone').classList.remove('highlight'), 3000);
+    showAlert('El Excel se guardará automáticamente cuando selecciones cliente', 'warn');
+    document.getElementById('excelZone').classList.add('highlight');
+    setTimeout(() => document.getElementById('excelZone').classList.remove('highlight'), 3000);
     return;
   }
-
-  if(!periodo){
-    showAlert('Seleccioná el período antes.', 'warn');
+  
+  if (!periodo) {
+    showAlert('Seleccioná el período antes', 'warn');
     return;
   }
+  
+  const zone = document.getElementById('excelZone');
+  mostrarCargando(zone, file);
 
-  const zone = $('excelZone');
-  mostrarCargandoExcel(file);
-
-  let parsed;
-  try{
-    parsed = await parsearRegistroARCA(file);
-  }catch(err){
-    $('ezSub').textContent = 'Error: ' + err.message;
-    setStep('registro', 'error', 'Excel inválido');
-    addProcessLog('Error leyendo Excel ARCA: ' + err.message);
+  let registros, receptorCuit;
+  try {
+    ({ registros, receptorCuit } = await parsearRegistroARCA(file));
+  } catch(err) {
+    ezCache.ezSub.textContent = 'Error: ' + err.message;
     showAlert('Error al leer Excel: ' + err.message, 'error');
     return;
   }
 
   const cuitLimpio = clienteSeleccionado.cuit.replace(/[^0-9]/g,'').padStart(11,'0');
-
-  if(parsed.receptorCuit !== cuitLimpio){
-    $('ezSub').textContent = 'CUIT mismatch';
-    setStep('registro', 'error', 'CUIT receptor no coincide');
-    addProcessLog('CUIT del Excel ' + parsed.receptorCuit + ' no coincide con cliente ' + cuitLimpio);
-    showAlert('CUIT del Excel ' + parsed.receptorCuit + ' ≠ cliente ' + clienteSeleccionado.cuit, 'error');
+  if (receptorCuit !== cuitLimpio) {
+    ezCache.ezSub.textContent = `CUIT mismatch`;
+    showAlert(`CUIT ${receptorCuit} ≠ ${clienteSeleccionado.cuit}`, 'error');
     return;
   }
 
-  await guardarRegistroEnN8n(zone, parsed.registros);
+  await guardarRegistroEnN8n(zone, registros, receptorCuit);
 }
 
-/* ──────────────────────────────────────────────────────────────
-   PDFS
-────────────────────────────────────────────────────────────── */
-async function verificarDuplicado(nombre){
-  if(!clienteSeleccionado) return false;
+// ──────────────────────────────────────────────────────────────────────────────
+// XLSX PARSING
+// ──────────────────────────────────────────────────────────────────────────────
+async function cargarXLSX() {
+  if (typeof XLSX !== 'undefined') return Promise.resolve();
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = res;
+    s.onerror = () => rej(new Error('No se pudo cargar XLSX'));
+    document.head.appendChild(s);
+  });
+}
 
-  try{
-    const data = await fetchJson(WEBHOOK.verificar(), {
+function parsearRegistroARCA(file) {
+  return new Promise((resolve, reject) => {
+    cargarXLSX().then(() => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:null, raw:false });
+        
+        if (rows.length < 3) throw new Error('Archivo vacío');
+
+        const headers = (rows[1] || []).map(h => String(h||'').trim().toLowerCase());
+        const receptoresSet = new Set();
+        
+        for (let i = 2; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r || r[0] === null) continue;
+          const rc = String(r[10]||'').replace(/[^0-9]/g,'').padStart(11,'0');
+          if (rc && rc !== '00000000000') receptoresSet.add(rc);
+        }
+        
+        if (receptoresSet.size > 1) {
+          reject(new Error(`Múltiples receptores: ${[...receptoresSet].join(', ')}`));
+          return;
+        }
+        
+        const receptorCuit = receptoresSet.size === 1 ? [...receptoresSet][0] : '00000000000';
+        const registros = [];
+        const periodoMM = String(periodo.mes).padStart(2,'0');
+        const periodoYY = String(periodo.anio);
+        
+        for (let i = 2; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r || r[0] === null) continue;
+
+          const tipoCod = String(r[1]||'').split(' - ')[0].trim();
+          const cuitEm = String(r[7]||'').replace(/[^0-9]/g,'').padStart(11,'0');
+          const ptoVta = String(r[2]||'');
+          const numHasta = String(r[4]||'');
+          const clave = `${cuitEm}-${parseInt(tipoCod)||0}-${parseInt(ptoVta)||0}-${parseInt(numHasta)||0}`;
+
+          registros.push({
+            clave,
+            cuit_emisor: cuitEm,
+            tipo_cod: tipoCod,
+            pto_vta: ptoVta,
+            numero_hasta: numHasta,
+            total: String(r[29]||''),
+            denominacion_emisor: String(r[8]||''),
+            fecha: String(r[0]||''),
+            estado: 'pendiente'
+          });
+        }
+        
+        if (!registros.length) throw new Error('Sin comprobantes');
+        resolve({ registros, receptorCuit });
+      } catch(err) { reject(err); }
+    };
+    reader.onerror = () => reject(new Error('No se pudo leer archivo'));
+    reader.readAsArrayBuffer(file);
+    }).catch(reject);
+  });
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// SUBIR Y PROCESAR
+// ──────────────────────────────────────────────────────────────────────────────
+function handleSubir() {
+  if (!clienteSeleccionado) {
+    showAlert('Seleccioná cliente', 'warn');
+    return;
+  }
+  const pending = files.filter(f => f.status === 'pending');
+  const duplicates = files.filter(f => f.status === 'duplicate');
+  
+  if (!pending.length && !duplicates.length) {
+    showAlert('No hay archivos', 'warn');
+    return;
+  }
+  
+  if (!pending.length && duplicates.length > 0) {
+    duplicates.forEach(f => { f.status = 'pending'; });
+    renderQueue();
+  }
+  
+  if (!registroSubido) {
+    document.getElementById('registryWarn').style.display = 'block';
+    return;
+  }
+  
+  startUpload();
+}
+
+
+// ──────────────────────────────────────────────────────────────────────────────
+// UX DE PROCESO / ETAPAS
+// ──────────────────────────────────────────────────────────────────────────────
+const PROCESS_STEPS = ['validacion','upload','registro','ia','final'];
+const PROCESS_STEP_LABEL = {
+  validacion: 'Validando datos',
+  upload: 'Subiendo PDFs',
+  registro: 'Cargando registro',
+  ia: 'Procesando con IA',
+  final: 'Proceso finalizado'
+};
+let procesoActual = { step:'validacion', pct:0, total:0, procesadas:0 };
+
+function logProceso(msg) {
+  const log = document.getElementById('processLog');
+  if (!log) return;
+  const line = document.createElement('div');
+  line.className = 'process-log-line';
+  const time = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  line.innerHTML = `<span class="process-log-time">${escapeHtml(time)}</span><span>${escapeHtml(msg)}</span>`;
+  log.prepend(line);
+  while (log.children.length > 30) log.removeChild(log.lastChild);
+}
+
+function resetProcesoUX() {
+  procesoActual = { step:'validacion', pct:0, total:0, procesadas:0 };
+  const card = document.getElementById('processCard');
+  if (card) card.classList.remove('active');
+  const log = document.getElementById('processLog');
+  if (log) log.innerHTML = '';
+  updateProcesoUX('validacion', 0, 'En espera', 'Todavía no se inició ningún procesamiento.');
+}
+
+function updateProcesoUX(step, pct, statusText, subtitle, opts = {}) {
+  procesoActual.step = step || procesoActual.step;
+  procesoActual.pct = Math.max(0, Math.min(100, Number(pct ?? procesoActual.pct) || 0));
+  const card = document.getElementById('processCard');
+  if (card) card.classList.add('active');
+  const idx = PROCESS_STEPS.indexOf(procesoActual.step);
+  document.querySelectorAll('.pstep').forEach(el => {
+    const s = el.dataset.step;
+    const sIdx = PROCESS_STEPS.indexOf(s);
+    el.classList.remove('done','active','error');
+    if (opts.error && s === procesoActual.step) el.classList.add('error');
+    else if (sIdx < idx) el.classList.add('done');
+    else if (sIdx === idx) el.classList.add('active');
+  });
+  const pill = document.getElementById('processPill');
+  if (pill) pill.textContent = statusText || PROCESS_STEP_LABEL[procesoActual.step] || 'Procesando';
+  const sub = document.getElementById('processSubtitle');
+  if (sub) sub.textContent = subtitle || '';
+  const fill = document.getElementById('processBarFill');
+  if (fill) fill.style.width = procesoActual.pct + '%';
+  const pctLabel = document.getElementById('processProgressLabel');
+  if (pctLabel) pctLabel.textContent = Math.round(procesoActual.pct) + '%';
+  const txt = document.getElementById('processProgressText');
+  if (txt) txt.textContent = opts.progressText || statusText || '';
+}
+
+function setStepDetail(step, text) {
+  const el = document.getElementById(`step-${step}-detail`);
+  if (el) el.textContent = text;
+}
+
+function progresoPorArchivos() {
+  const total = files.filter(f => ['pending','uploading','done','en_cola','procesando','al_prn','fallida','error'].includes(f.status)).length || files.length || 0;
+  const terminados = files.filter(f => ['done','al_prn','fallida','error'].includes(f.status)).length;
+  return { total, terminados };
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// POLLING
+// ──────────────────────────────────────────────────────────────────────────────
+function stopPolling() {
+  if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+  if (pollingTimeoutMax) { clearTimeout(pollingTimeoutMax); pollingTimeoutMax = null; }
+}
+
+function iniciarPolling() {
+  stopPolling();
+  mostrarEstadoProceso('procesando');
+  updateProcesoUX('ia', 65, 'Procesando en n8n', 'Gemini está leyendo las facturas y generando líneas PRN.', { progressText:'Esperando avance del backend…' });
+  logProceso('Procesamiento iniciado: PDFs en cola para Gemini y PRN.');
+  files.forEach(f => { if (f.status === 'done') f.status = 'en_cola'; });
+  renderQueue();
+  
+  pollingTimeoutMax = setTimeout(() => {
+    if (pollingInterval) {
+      stopPolling();
+      showAlert('Procesamiento tardando demasiado. Recargá si el PRN está en Drive.', 'warn');
+      updateProcesoUX('ia', procesoActual.pct || 70, 'Demorado', 'El proceso sigue sin confirmar finalización. Puede estar bloqueado o n8n puede seguir trabajando.', { error:true, progressText:'Revisar n8n o usar Liberar proceso si quedó zombie.' });
+      logProceso('Advertencia: el procesamiento superó el tiempo esperado.');
+      mostrarEstadoProceso('listo', []);
+    }
+  }, POLLING_TIMEOUT_MS);
+
+  pollingInterval = setInterval(async () => {
+    try {
+      const cuit = clienteSeleccionado?.cuit || '';
+      const per = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
+      const res = await fetchConTimeout(`${WEBHOOK.estado()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`, {}, 30000);
+      if (!res.ok) return;
+      const data = await jsonSeguro(res);
+      if (!data) return;
+      
+      if (data.listo === true) {
+        stopPolling();
+        const nf = data.fallidos && data.fallidos.length > 0;
+        updateProcesoUX('final', 100, nf ? 'Finalizado con errores' : 'PRN listo', nf ? `PRN generado con ${data.fallidos.length} archivo(s) con error.` : 'PRN generado correctamente. Revisá Drive y conciliación.', { progressText: nf ? 'Revisar facturas fallidas.' : 'Proceso completo.' });
+        logProceso(nf ? 'Proceso terminado con facturas fallidas.' : 'Proceso terminado correctamente.');
+        mostrarEstadoProceso('listo', data.fallidos);
+        if (data.fallidos && data.fallidos.length > 0) mostrarFallidos(data.fallidos);
+        if (data.conciliacion) mostrarConciliacion(data.conciliacion);
+        files = files.filter(f => !['done','en_cola','al_prn'].includes(f.status));
+        renderQueue();
+      } else if (data.archivos_estado || data.progreso) {
+        if (data.archivos_estado && Object.keys(data.archivos_estado).length > 0) {
+          aplicarEstadosArchivos(data.archivos_estado);
+        }
+        if (data.progreso) {
+          const { procesadas, total } = data.progreso;
+          actualizarProgresoProceso(procesadas, total);
+        }
+      }
+    } catch(e) { console.warn('Polling error:', e); }
+  }, POLLING_INTERVAL_MS);
+}
+
+function aplicarEstadosArchivos(estados) {
+  let actualizado = false;
+  let counts = { procesando:0, al_prn:0, fallida:0 };
+  files.forEach(f => {
+    const nombreBase = f.name.replace(/^\d{11}__/, '');
+    const nuevoEstado = estados[f.name] || estados[nombreBase];
+    if (nuevoEstado) counts[nuevoEstado] = (counts[nuevoEstado] || 0) + 1;
+    if (nuevoEstado && f.status !== nuevoEstado && !['pending','error'].includes(f.status)) {
+      f.status = nuevoEstado;
+      actualizado = true;
+    }
+  });
+  if (actualizado) {
+    renderQueue();
+    const alPrn = files.filter(f => f.status === 'al_prn').length;
+    const fallidas = files.filter(f => f.status === 'fallida').length;
+    const total = files.filter(f => ['en_cola','procesando','al_prn','fallida'].includes(f.status)).length || files.length;
+    if (total > 0) {
+      const pct = 65 + Math.min(30, ((alPrn + fallidas) / total) * 30);
+      updateProcesoUX('ia', pct, 'Procesando archivos', `${alPrn} al PRN · ${fallidas} fallidas · ${total} total.`, { progressText:`${alPrn + fallidas}/${total} archivos resueltos` });
+      setStepDetail('ia', `${alPrn} OK / ${fallidas} error`);
+    }
+  }
+}
+
+function actualizarProgresoProceso(procesadas, total) {
+  const el = document.getElementById('_epMsg');
+  const p = Number(procesadas) || 0;
+  const t = Number(total) || 0;
+  if (el) {
+    if (t > 0) el.textContent = `${p}/${t} al PRN…`;
+    else if (p > 0) el.textContent = `${p} agregada${p !== 1 ? 's' : ''} al PRN…`;
+  }
+  if (t > 0) {
+    const pct = 65 + Math.min(30, (p / t) * 30);
+    updateProcesoUX('ia', pct, 'Procesando facturas', `Gemini/PRN: ${p} de ${t} facturas procesadas.`, { progressText:`${p}/${t} facturas al PRN` });
+    setStepDetail('ia', `${p}/${t} al PRN`);
+  } else if (p > 0) {
+    updateProcesoUX('ia', Math.max(procesoActual.pct, 70), 'Procesando facturas', `${p} facturas agregadas al PRN.`, { progressText:`${p} facturas al PRN` });
+    setStepDetail('ia', `${p} al PRN`);
+  }
+}
+
+function mostrarEstadoProceso(estado, fallidos) {
+  const el = document.getElementById('estadoProceso');
+  if (!el) return;
+  
+  if (estado === 'procesando') {
+    el.style.display = 'flex';
+    el.className = 'alert a-info';
+    const rp = document.getElementById('resetPanel');
+    if (rp) rp.style.display = 'block';
+    el.innerHTML = '<i class="ti ti-loader" style="font-size:16px;margin-top:1px;flex-shrink:0;animation:spin 1s linear infinite;"></i><span id="_epMsg"></span>';
+    document.getElementById('_epMsg').textContent = 'Procesando…';
+  } else if (estado === 'listo') {
+    el.style.display = 'flex';
+    el.className = 'alert a-success';
+    el.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
+    const rp = document.getElementById('resetPanel');
+    if (rp) rp.style.display = 'none';
+    const nf = fallidos && fallidos.length > 0;
+    document.getElementById('_epMsg').textContent = nf
+      ? `✓ PRN generado. ${fallidos.length} ${pluralizar(fallidos.length, 'error', 'errores')}.`
+      : '✓ PRN listo. Podés importarlo en Holistor.';
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// CONCILIACIÓN
+// ──────────────────────────────────────────────────────────────────────────────
+function mostrarConciliacion(concil) {
+  const card = document.getElementById('cardConciliacion');
+  if (!concil) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  const pr = concil.procesadas_registradas || [];
+  const pnr = concil.procesadas_no_registro || [];
+  const rnp = concil.registro_no_procesadas || [];
+
+  document.getElementById('concilContent').innerHTML = [
+    buildConcilSection('ok', 'circle-check', 'Procesadas y en registro', pr, 'ok'),
+    buildConcilSection('warn', 'alert-triangle', 'Procesadas pero NO en registro', pnr, 'warn'),
+    buildConcilSection('err', 'circle-x', 'En registro pero NO procesadas', rnp, 'err'),
+  ].join('');
+
+  document.querySelectorAll('#concilContent .concil-head').forEach(h => {
+    const body = h.nextElementSibling;
+    const count = parseInt(h.querySelector('.concil-badge')?.textContent || '0');
+    if (count > 0) { h.classList.add('open'); body.classList.add('open'); }
+    h.addEventListener('click', () => { h.classList.toggle('open'); body.classList.toggle('open'); });
+  });
+}
+
+function buildConcilSection(type, icon, title, items, style) {
+  const rows = items.slice(0, 150).map(it => `
+    <div class="concil-row">
+      <span class="concil-key">${escapeHtml(it.clave||'')}</span>
+      <span class="concil-denom">${escapeHtml(it.denominacion||it.denominacion_emisor||'')}</span>
+      <span class="concil-total">${escapeHtml(it.total||'')}</span>
+    </div>`).join('');
+  const extra = items.length > 150
+    ? `<div style="text-align:center;padding:8px;font-size:11px;color:#999;">…y ${items.length-150} más</div>` : '';
+
+  return `
+    <div class="concil-section">
+      <div class="concil-head">
+        <i class="ti ti-${icon} concil-icon ci-${style}"></i>
+        <span class="concil-title">${escapeHtml(title)}</span>
+        <span class="concil-badge cb-${style}">${items.length}</span>
+        <i class="ti ti-chevron-down concil-toggle"></i>
+      </div>
+      <div class="concil-body">${items.length ? rows + extra : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div>
+    </div>`;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// FALLIDOS
+// ──────────────────────────────────────────────────────────────────────────────
+async function reintentar() {
+  if (!archivosFallidos.length) return;
+  document.querySelectorAll('#cardFallidos button').forEach(b => b.disabled = true);
+  showAlert('Reintentando fallidas…', 'info');
+  try {
+    document.getElementById('cardFallidos').style.display = 'none';
+    archivosFallidos = [];
+    await sendFlush();
+  } catch(e) {
+    showAlert('Error al reintentar.', 'error');
+  } finally {
+    document.querySelectorAll('#cardFallidos button').forEach(b => b.disabled = false);
+  }
+}
+
+function mostrarFallidos(fallidos) {
+  if (!fallidos || !fallidos.length) return;
+  archivosFallidos = fallidos;
+  document.getElementById('cardFallidos').style.display = 'block';
+  document.getElementById('listFallidos').innerHTML = fallidos.map(nombre => `
+    <div class="history-item">
+      <i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;"></i>
+      <span class="history-name">${escapeHtml(nombre)}</span>
+      <span class="badge b-error">error</span>
+    </div>`).join('');
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// STATS / QUEUE / HISTORY
+// ──────────────────────────────────────────────────────────────────────────────
+function updateStats() {
+  const stats = getStats();
+  statsCache.statCola.textContent = stats.pending;
+  statsCache.statSubidos.textContent = subidos;
+  statsCache.statErrores.textContent = errores;
+}
+
+function renderQueue() {
+  const q = document.getElementById('queue');
+  if (!files.length) { q.style.display = 'none'; updateStats(); return; }
+  q.style.display = 'block';
+  const pending = files.filter(f => f.status === 'pending').length;
+  document.getElementById('queueLabel').textContent = `${files.length} ${pluralizar(files.length, 'archivo', 'archivos')} — ${pending} pendiente${pending!==1?'s':''}`;
+  
+  if (pending > 0) {
+    const lotes = Math.ceil(pending / BATCH_FRONTEND_SIZE);
+    document.getElementById('loteInfo').style.display = 'block';
+    document.getElementById('loteInfoText').textContent = `${lotes} ${pluralizar(lotes, 'lote', 'lotes')} de ${BATCH_FRONTEND_SIZE} facturas`;
+  } else {
+    document.getElementById('loteInfo').style.display = 'none';
+  }
+  
+  const labels = {
+    pending:'pendiente', uploading:'verificando', done:'listo', error:'error',
+    duplicate:'existe', en_cola:'cola', procesando:'procesando…',
+    al_prn:'al PRN ✓', fallida:'error'
+  };
+  document.getElementById('fileList').innerHTML = files.map((f,i) => `
+    <div class="file-item">
+      <i class="ti ti-file-type-pdf" style="font-size:16px;color:#c5221f;flex-shrink:0;"></i>
+      <span class="file-name">${escapeHtml(f.name)}</span>
+      <span class="file-size">${(f.size/1024).toFixed(0)} KB</span>
+      <span class="badge b-${f.status}">${labels[f.status]}</span>
+      ${['pending','duplicate'].includes(f.status)?`<button class="btn-remove" onclick="removeFile(${i})"><i class="ti ti-x"></i></button>`:''}
+    </div>`).join('');
+  updateStats();
+}
+
+function renderHistory() {
+  const el = document.getElementById('historyList');
+  if (!history.length) {
+    el.innerHTML = '<div class="empty"><i class="ti ti-inbox"></i>Todavía no se subieron archivos</div>';
+    return;
+  }
+  el.innerHTML = history.map(h => `
+    <div class="history-item">
+      <i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;"></i>
+      <span class="history-name">${escapeHtml(h.name)}</span>
+      <span class="history-time">${h.time}</span>
+      <span class="badge ${h.ok?'b-done':'b-error'}">${h.ok?'subido':'error'}</span>
+    </div>`).join('');
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// VERIFICAR DUPLICADO Y AGREGAR ARCHIVOS
+// ──────────────────────────────────────────────────────────────────────────────
+async function verificarDuplicado(nombre) {
+  try {
+    const cuit = clienteSeleccionado?.cuit || '';
+    if (!cuit) return false;
+    const res = await fetchConTimeout(WEBHOOK.verificar(), {
       method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body:JSON.stringify({
-        nombre: nombre,
-        cliente_cuit: clienteSeleccionado.cuit
-      })
-    }, 30000);
-
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre, cliente_cuit: cuit })
+    }, 45000);
+    if (!res.ok) return 'error';
+    const data = await jsonSeguro(res);
     return data.existe === true;
-  }catch(e){
-    return 'error';
-  }
+  } catch(e) { return 'error'; }
 }
 
-async function addFiles(newFiles){
-  const pdfs = Array.from(newFiles || []).filter(f =>
-    f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
-  );
+async function addFiles(newFiles) {
+  const pdfs = Array.from(newFiles).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+  if (!pdfs.length) { showAlert('Solo PDFs', 'error'); return; }
 
-  if(!pdfs.length){
-    showAlert('Solo se permiten PDFs.', 'error');
+  // Si todavía no hay cliente, no se puede verificar duplicado con el prefijo CUIT.
+  // Los agregamos como pendientes y se subirán cuando el usuario elija cliente.
+  if (!clienteSeleccionado || forzarReproceso) {
+    pdfs.forEach(f => files.push({ name: f.name, size: f.size, file: f, status: 'pending' }));
+    renderQueue();
+    if (!clienteSeleccionado) showAlert('Seleccioná cliente antes de subir; la verificación de duplicados se hará al procesar.', 'warn');
     return;
   }
 
-  const tempItems = pdfs.map(f => ({
-    name: f.name,
-    size: f.size,
-    file: f,
-    status: clienteSeleccionado && !forzarReproceso ? 'uploading' : 'pending',
-    _temp: true
-  }));
-
+  const tempItems = pdfs.map(f => ({ name: f.name, size: f.size, file: f, status: 'uploading', _temp: true }));
   tempItems.forEach(t => files.push(t));
   renderQueue();
-  addProcessLog('Se agregaron ' + pdfs.length + ' PDF(s) a la cola.');
 
-  if(!clienteSeleccionado || forzarReproceso){
-    tempItems.forEach(t => {
-      t.status = 'pending';
-      delete t._temp;
-    });
-    renderQueue();
-    return;
-  }
-
-  const CONCURRENCY = 8;
+  const CONCURRENCY_VERIF = 10;
   const resultados = new Array(pdfs.length);
   let nextIdx = 0;
-
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, pdfs.length) }, async () => {
-    while(true){
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY_VERIF, pdfs.length) }, async () => {
+    while (true) {
       const i = nextIdx++;
-      if(i >= pdfs.length) break;
+      if (i >= pdfs.length) break;
       resultados[i] = await verificarDuplicado(pdfs[i].name);
     }
   }));
@@ -976,695 +1139,248 @@ async function addFiles(newFiles){
     item.status = resultados[i] === true ? 'duplicate' : resultados[i] === 'error' ? 'error' : 'pending';
     delete item._temp;
   });
-
   renderQueue();
 }
 
-function removeFile(idx){
+function removeFile(idx) {
   files.splice(idx, 1);
   renderQueue();
 }
 
-function clearPending(){
-  files = files.filter(f => f.status !== 'pending' && f.status !== 'duplicate');
+function clearPending() {
+  files = files.filter(f => f.status !== 'pending');
   renderQueue();
 }
 
-function toggleForzar(){
-  forzarReproceso = $('chkForzar').checked;
-  if(forzarReproceso){
-    showAlert('Modo forzar activo: los archivos serán resubidos y reprocesados.', 'warn');
-    addProcessLog('Modo forzar reprocesamiento activado.');
-  }
+// ──────────────────────────────────────────────────────────────────────────────
+// UPLOAD Y PROCESAMIENTO
+// ──────────────────────────────────────────────────────────────────────────────
+function setUploadControlsDisabled(disabled) {
+  ['btnSubir', 'btnProcesar', 'selCliente', 'selMes', 'selAnio', 'chkForzar'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = disabled;
+  });
 }
 
-/* ──────────────────────────────────────────────────────────────
-   SUBIR Y PROCESAR
-────────────────────────────────────────────────────────────── */
-function handleSubir(){
-  if(!clienteSeleccionado){
-    showAlert('Seleccioná cliente.', 'warn');
-    return;
+async function subirUnPDF(item) {
+  const fd = new FormData();
+  fd.append('file', item.file, item.name);
+  fd.append('cliente_cuit', clienteSeleccionado.cuit);
+  fd.append('cliente_nombre', clienteSeleccionado.nombre || '');
+  fd.append('mes', String(periodo.mes));
+  fd.append('anio', String(periodo.anio));
+  fd.append('periodo', periodoStr());
+
+  const res = await fetchConTimeout(WEBHOOK.upload(), { method: 'POST', body: fd }, FETCH_TIMEOUT_MS);
+  const data = await jsonSeguro(res);
+  if (!res.ok || data.ok === false) {
+    throw new Error(data.mensaje || `HTTP ${res.status}`);
   }
-
-  if(!periodo){
-    showAlert('Seleccioná período.', 'warn');
-    return;
-  }
-
-  const pending = files.filter(f => f.status === 'pending');
-  const duplicates = files.filter(f => f.status === 'duplicate');
-
-  if(!pending.length && !duplicates.length){
-    showAlert('No hay archivos para subir.', 'warn');
-    return;
-  }
-
-  if(!pending.length && duplicates.length > 0){
-    duplicates.forEach(f => { f.status = 'pending'; });
-    renderQueue();
-  }
-
-  if(!registroSubido){
-    $('registryWarn').style.display = 'block';
-    setStep('registro', 'active', 'Esperando registro o confirmación');
-    addProcessLog('Falta registro ARCA. Se pidió confirmación al usuario.');
-    return;
-  }
-
-  startUpload();
+  return data;
 }
 
-async function startUpload(){
-  if(uploading) return;
-  if(!validarPrecondiciones()) return;
+async function startUpload() {
+  if (uploading) return;
+  if (!validarPrecondiciones()) return;
 
+  // Los duplicados se pueden reprocesar si el usuario los deja en cola o activa forzar.
+  files.forEach(f => { if (f.status === 'duplicate' && forzarReproceso) f.status = 'pending'; });
   const pending = files.filter(f => f.status === 'pending');
-
-  if(!pending.length){
+  if (!pending.length) {
     showAlert('No hay PDFs pendientes para subir.', 'warn');
     return;
   }
 
   uploading = true;
-  $('btnSubir').disabled = true;
+  setUploadControlsDisabled(true);
+  updateProcesoUX('validacion', 8, 'Validando', `Cliente: ${clienteSeleccionado.nombre || clienteSeleccionado.cuit} · Período ${periodoStr()}`, { progressText:'Validación inicial completa' });
+  setStepDetail('validacion', 'Datos completos');
+  logProceso('Validación completa: cliente, período y PDFs listos.');
+  updateProcesoUX('upload', 15, 'Subiendo PDFs', `${pending.length} archivo(s) se enviarán a Google Drive.`, { progressText:'Iniciando subida…' });
+  logProceso(`Subiendo ${pending.length} PDF(s) a n8n/Drive.`);
+  showAlert(`Subiendo ${pending.length} ${pluralizar(pending.length, 'PDF', 'PDFs')}…`, 'info');
 
-  ensureProcessVisible();
-  setStep('validacion', 'done', 'Datos mínimos correctos');
-  setStep('upload', 'active', 'Subiendo 0/' + pending.length);
-  setProcess('Subiendo PDFs', 'Los archivos se están enviando a Drive mediante n8n.', 30, '0/' + pending.length + ' subidos');
-  addProcessLog('Inicio de subida de ' + pending.length + ' PDF(s).');
-
-  let okCount = 0;
-  let errorCount = 0;
-
-  try{
-    for(let i = 0; i < pending.length; i++){
-      const item = pending[i];
-
+  for (const item of pending) {
+    try {
       item.status = 'uploading';
       renderQueue();
-
-      setStep('upload', 'active', 'Subiendo ' + (i + 1) + '/' + pending.length);
-      setProcess(
-        'Subiendo PDFs',
-        'Enviando ' + item.name,
-        30 + Math.round(((i) / pending.length) * 25),
-        okCount + '/' + pending.length + ' subidos'
-      );
-
-      const fd = new FormData();
-      fd.append('file', item.file, item.name);
-      fd.append('cliente_cuit', clienteSeleccionado.cuit);
-      fd.append('cliente_nombre', clienteSeleccionado.nombre || '');
-      fd.append('mes', String(periodo.mes));
-      fd.append('anio', String(periodo.anio));
-
-      try{
-        await fetchJson(WEBHOOK.upload(), {
-          method:'POST',
-          body:fd
-        }, 120000);
-
-        item.status = 'done';
-        okCount++;
-        subidos++;
-
-        history.unshift({
-          name:item.name,
-          ok:true,
-          time:new Date().toLocaleTimeString()
-        });
-
-        addProcessLog('Subido: ' + item.name);
-
-      }catch(err){
-        item.status = 'error';
-        errorCount++;
-        errores++;
-
-        history.unshift({
-          name:item.name,
-          ok:false,
-          time:new Date().toLocaleTimeString()
-        });
-
-        addProcessLog('Error subiendo ' + item.name + ': ' + err.message);
-      }
-
-      renderQueue();
-      renderHistory();
-      updateStats();
+      await subirUnPDF(item);
+      item.status = 'done';
+      subidos++;
+      const upOk = pending.filter(f => f.status === 'done').length;
+      const pctUpload = 15 + Math.min(30, (upOk / pending.length) * 30);
+      updateProcesoUX('upload', pctUpload, 'Subiendo PDFs', `${upOk}/${pending.length} PDF(s) subidos a Drive.`, { progressText:`${upOk}/${pending.length} PDFs subidos` });
+      setStepDetail('upload', `${upOk}/${pending.length} subidos`);
+      logProceso(`PDF subido: ${item.name}`);
+      history.unshift({ name: item.name, ok: true, time: new Date().toLocaleTimeString() });
+    } catch (err) {
+      item.status = 'error';
+      errores++;
+      history.unshift({ name: item.name, ok: false, time: new Date().toLocaleTimeString() });
+      const detalle = err.name === 'AbortError' ? 'timeout' : err.message;
+      console.error('Error subiendo PDF', item.name, err);
+      showAlert(`Error subiendo ${escapeHtml(item.name)}: ${escapeHtml(detalle)}`, 'error');
+      logProceso(`Error subiendo ${item.name}: ${detalle}`);
     }
-
-    if(errorCount > 0 && okCount === 0){
-      setStep('upload', 'error', 'No se pudo subir ningún PDF');
-      setProcess('Error de subida', 'No se pudo subir ningún PDF.', 45, '0/' + pending.length + ' subidos');
-      showAlert('No se pudo subir ningún PDF. Revisá conexión o n8n.', 'error');
-      return;
-    }
-
-    setStep('upload', 'done', okCount + '/' + pending.length + ' PDFs subidos');
-    setProcess('Preparando proceso', 'Esperando indexación de Drive antes de procesar.', 58, 'PDFs subidos');
-    addProcessLog('Subida finalizada: ' + okCount + ' correcto(s), ' + errorCount + ' error(es).');
-
-    await sleep(4500);
-
-    await sendFlush();
-
-  }finally{
-    uploading = false;
-    $('btnSubir').disabled = false;
-    updateStats();
-  }
-}
-
-async function sendFlush(){
-  if(!validarPrecondiciones()) return;
-
-  setStep('ia', 'active', 'Iniciando n8n');
-  setProcess('Iniciando procesamiento', 'Se está disparando Gemini + generación PRN.', 62, 'Esperando n8n');
-  addProcessLog('Disparando webhook holistor-procesar.');
-
-  try{
-    const data = await fetchJson(WEBHOOK.procesar(), {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body:JSON.stringify({
-        flush:true,
-        mes:periodo.mes,
-        anio:periodo.anio,
-        cliente_cuit:clienteSeleccionado.cuit,
-        cliente_nombre:clienteSeleccionado.nombre || '',
-        tiene_registro:registroSubido
-      })
-    }, 180000);
-
-    if(data.proceso_ya_activo === true){
-      showAlert(data.mensaje || 'Ya hay un proceso activo para este cliente/período.', 'warn');
-      addProcessLog(data.mensaje || 'Proceso ya activo.');
-    }else{
-      showAlert('Procesamiento iniciado.', 'success');
-      addProcessLog('n8n aceptó el proceso.');
-    }
-
-    iniciarPolling();
-
-  }catch(err){
-    const msg = String(err && err.message ? err.message : err);
-
-    if(
-      msg.includes('aborted') ||
-      msg.includes('AbortError') ||
-      msg.includes('signal is aborted') ||
-      err.name === 'AbortError'
-    ){
-      showAlert('n8n tardó en responder, pero el proceso puede estar corriendo. Paso a consultar estado.', 'warn');
-
-      setStep('ia', 'active', 'Consultando estado');
-      setProcess(
-        'Consultando estado',
-        'El webhook inicial tardó demasiado. La página seguirá consultando si el proceso está activo.',
-        64,
-        'Polling activo'
-      );
-
-      addProcessLog('Timeout al iniciar proceso; se activa polling de estado igualmente.');
-      iniciarPolling();
-      return;
-    }
-
-    setStep('ia', 'error', 'No inició n8n');
-    setProcess('Error al iniciar', msg, 62, 'Falló holistor-procesar');
-    addProcessLog('Error iniciando proceso: ' + msg);
-    showAlert('Error al iniciar procesamiento: ' + msg, 'error');
-  }
-}
-
-/* ──────────────────────────────────────────────────────────────
-   POLLING ESTADO
-────────────────────────────────────────────────────────────── */
-function stopPolling(){
-  if(pollingInterval){
-    clearInterval(pollingInterval);
-    pollingInterval = null;
-  }
-  if(pollingTimeoutMax){
-    clearTimeout(pollingTimeoutMax);
-    pollingTimeoutMax = null;
-  }
-}
-
-function iniciarPolling(){
-  stopPolling();
-
-  mostrarEstadoProceso('procesando');
-  setStep('ia', 'active', 'Gemini leyendo PDFs');
-  setProcess('Procesando en n8n', 'Gemini está leyendo facturas y generando PRN.', 68, 'Esperando avance');
-  addProcessLog('Polling iniciado: consultando estado cada 5 segundos.');
-
-  files.forEach(f => {
-    if(f.status === 'done') f.status = 'en_cola';
-  });
-  renderQueue();
-
-  pollingTimeoutMax = setTimeout(() => {
-    if(pollingInterval){
-      stopPolling();
-      showAlert('El procesamiento está tardando demasiado. Revisá n8n o Drive.', 'warn');
-      setProcess('Demorado', 'El proceso superó el tiempo esperado.', 75, 'Revisar estado en n8n');
-      addProcessLog('Timeout de polling alcanzado.');
-      mostrarEstadoProceso('listo', []);
-    }
-  }, 15 * 60 * 1000);
-
-  pollingInterval = setInterval(async () => {
-    try{
-      const cuit = clienteSeleccionado ? clienteSeleccionado.cuit : '';
-      const per = periodo ? periodo.anio + '-' + String(periodo.mes).padStart(2,'0') : '';
-
-      const data = await fetchJson(
-        WEBHOOK.estado() + '?cliente_cuit=' + encodeURIComponent(cuit) + '&periodo=' + encodeURIComponent(per),
-        {},
-        30000
-      );
-
-      if(!data) return;
-
-      if(data.archivos_estado && Object.keys(data.archivos_estado).length > 0){
-        aplicarEstadosArchivos(data.archivos_estado);
-      }
-
-      if(data.progreso){
-        const procesadas = data.progreso.procesadas || 0;
-        const total = data.progreso.total || 0;
-        actualizarProgresoProceso(procesadas, total);
-      }
-
-      if(data.listo === true){
-        stopPolling();
-
-        const fallidos = data.fallidos || [];
-        const nf = fallidos.length > 0;
-
-        setStep('ia', nf ? 'error' : 'done', nf ? 'Finalizó con errores' : 'PRN generado');
-        setStep('final', nf ? 'error' : 'done', nf ? fallidos.length + ' fallida(s)' : 'PRN listo');
-
-        setProcess(
-          nf ? 'Finalizado con errores' : 'PRN listo',
-          nf ? 'Se generó el proceso, pero hay facturas para revisar.' : 'El archivo PRN fue generado correctamente.',
-          100,
-          nf ? fallidos.length + ' factura(s) con error' : 'Proceso completo'
-        );
-
-        addProcessLog(nf ? 'Proceso terminado con errores.' : 'Proceso terminado correctamente.');
-
-        mostrarEstadoProceso('listo', fallidos);
-
-        if(fallidos.length > 0) mostrarFallidos(fallidos);
-        if(data.conciliacion) mostrarConciliacion(data.conciliacion);
-
-        files = files.filter(f => !['done','en_cola','al_prn'].includes(f.status));
-        renderQueue();
-      }
-
-    }catch(e){
-      console.warn('Polling error:', e);
-    }
-  }, 5000);
-}
-
-function aplicarEstadosArchivos(estados){
-  let actualizado = false;
-
-  files.forEach(f => {
-    const nombreBase = f.name.replace(/^\d{11}__/, '');
-    const nuevoEstado = estados[f.name] || estados[nombreBase];
-
-    if(nuevoEstado && f.status !== nuevoEstado && !['pending','error'].includes(f.status)){
-      f.status = nuevoEstado;
-      actualizado = true;
-    }
-  });
-
-  if(actualizado) renderQueue();
-}
-
-function actualizarProgresoProceso(procesadas, total){
-  const el = $('_epMsg');
-
-  if(total > 0){
-    const pct = Math.min(96, 68 + Math.round((procesadas / total) * 24));
-    setProcess(
-      'Procesando en n8n',
-      'Gemini está leyendo facturas y generando líneas PRN.',
-      pct,
-      procesadas + '/' + total + ' al PRN'
-    );
-    setStep('ia', 'active', procesadas + '/' + total + ' al PRN');
-    if(el) el.textContent = procesadas + '/' + total + ' al PRN…';
-  }else if(procesadas > 0){
-    setProcess(
-      'Procesando en n8n',
-      'Gemini está leyendo facturas y generando líneas PRN.',
-      78,
-      procesadas + ' agregada(s) al PRN'
-    );
-    if(el) el.textContent = procesadas + ' agregada(s) al PRN…';
-  }
-}
-
-function mostrarEstadoProceso(estado, fallidos){
-  const el = $('estadoProceso');
-  if(!el) return;
-
-  if(estado === 'procesando'){
-    el.style.display = 'flex';
-    el.className = 'alert a-info';
-    $('resetPanel').style.display = 'block';
-
-    el.innerHTML =
-      '<i class="ti ti-loader" style="font-size:16px;margin-top:1px;flex-shrink:0;animation:spin 1s linear infinite;"></i>' +
-      '<span id="_epMsg">Procesando…</span>';
-
-  }else if(estado === 'listo'){
-    el.style.display = 'flex';
-    el.className = 'alert a-success';
-    $('resetPanel').style.display = 'none';
-
-    const nf = fallidos && fallidos.length > 0;
-
-    el.innerHTML =
-      '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i>' +
-      '<span id="_epMsg">' +
-      (nf
-        ? '✓ PRN generado. ' + fallidos.length + ' ' + pluralizar(fallidos.length, 'error', 'errores') + '.'
-        : '✓ PRN listo. Podés importarlo en Holistor.'
-      ) +
-      '</span>';
-  }
-}
-
-async function resetProceso(){
-  if(!confirm('¿Liberar el proceso bloqueado?')) return;
-
-  try{
-    const cuit = clienteSeleccionado ? clienteSeleccionado.cuit : '';
-    const per = periodo ? periodo.anio + '-' + String(periodo.mes).padStart(2,'0') : '';
-
-    const data = await fetchJson(WEBHOOK.reset(), {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body:JSON.stringify({
-        cliente_cuit:cuit,
-        periodo:per
-      })
-    }, 30000);
-
-    if(data.ok){
-      showAlert('Proceso liberado. Ya podés procesar de nuevo.', 'success');
-      stopPolling();
-      $('estadoProceso').style.display = 'none';
-      $('resetPanel').style.display = 'none';
-      setProcess('Liberado', 'El proceso fue liberado manualmente.', 0, 'Sin proceso activo');
-      addProcessLog('Proceso liberado manualmente.');
-    }
-
-  }catch(e){
-    showAlert('No se pudo conectar con n8n para liberar proceso.', 'error');
-    addProcessLog('Error liberando proceso: ' + e.message);
-  }
-}
-
-/* ──────────────────────────────────────────────────────────────
-   CONCILIACIÓN
-────────────────────────────────────────────────────────────── */
-function mostrarConciliacion(concil){
-  const card = $('cardConciliacion');
-  if(!concil){
-    card.style.display = 'none';
-    return;
+    renderQueue();
+    renderHistory();
   }
 
-  card.style.display = 'block';
-  card.scrollIntoView({ behavior:'smooth', block:'nearest' });
-
-  const pr = concil.procesadas_registradas || [];
-  const pnr = concil.procesadas_no_registro || [];
-  const rnp = concil.registro_no_procesadas || [];
-
-  $('concilContent').innerHTML = [
-    buildConcilSection('ok', 'circle-check', 'Procesadas y en registro', pr, 'ok'),
-    buildConcilSection('warn', 'alert-triangle', 'Procesadas pero NO en registro', pnr, 'warn'),
-    buildConcilSection('err', 'circle-x', 'En registro pero NO procesadas', rnp, 'err')
-  ].join('');
-
-  document.querySelectorAll('#concilContent .concil-head').forEach(h => {
-    const body = h.nextElementSibling;
-    const count = parseInt(h.querySelector('.concil-badge').textContent || '0', 10);
-
-    if(count > 0){
-      h.classList.add('open');
-      body.classList.add('open');
-    }
-
-    h.addEventListener('click', () => {
-      h.classList.toggle('open');
-      body.classList.toggle('open');
-    });
-  });
-}
-
-function buildConcilSection(type, icon, title, items, style){
-  const rows = items.slice(0,150).map(it =>
-    '<div class="concil-row">' +
-      '<span class="concil-key">' + escapeHtml(it.clave || '') + '</span>' +
-      '<span class="concil-denom">' + escapeHtml(it.denominacion || it.denominacion_emisor || '') + '</span>' +
-      '<span class="concil-total">' + escapeHtml(it.total || '') + '</span>' +
-    '</div>'
-  ).join('');
-
-  const extra = items.length > 150
-    ? '<div style="text-align:center;padding:8px;font-size:11px;color:#999;">…y ' + (items.length - 150) + ' más</div>'
-    : '';
-
-  return (
-    '<div class="concil-section">' +
-      '<div class="concil-head">' +
-        '<i class="ti ti-' + icon + ' concil-icon ci-' + style + '"></i>' +
-        '<span class="concil-title">' + escapeHtml(title) + '</span>' +
-        '<span class="concil-badge cb-' + style + '">' + items.length + '</span>' +
-        '<i class="ti ti-chevron-down concil-toggle"></i>' +
-      '</div>' +
-      '<div class="concil-body">' +
-        (items.length ? rows + extra : '<div class="empty" style="padding:1rem;">Sin elementos</div>') +
-      '</div>' +
-    '</div>'
-  );
-}
-
-/* ──────────────────────────────────────────────────────────────
-   FALLIDOS
-────────────────────────────────────────────────────────────── */
-async function reintentar(){
-  if(!archivosFallidos.length) return;
-
-  document.querySelectorAll('#cardFallidos button').forEach(b => b.disabled = true);
-  showAlert('Reintentando fallidas…', 'info');
-  addProcessLog('Reintento de facturas fallidas solicitado.');
-
-  try{
-    await sendFlush();
-    $('cardFallidos').style.display = 'none';
-    archivosFallidos = [];
-  }catch(e){
-    showAlert('Error al reintentar.', 'error');
-  }
-
-  document.querySelectorAll('#cardFallidos button').forEach(b => b.disabled = false);
-}
-
-function mostrarFallidos(fallidos){
-  if(!fallidos || !fallidos.length) return;
-
-  archivosFallidos = fallidos;
-  $('cardFallidos').style.display = 'block';
-
-  $('listFallidos').innerHTML = fallidos.map(nombre =>
-    '<div class="history-item">' +
-      '<i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;"></i>' +
-      '<span class="history-name">' + escapeHtml(nombre) + '</span>' +
-      '<span class="badge b-error">error</span>' +
-    '</div>'
-  ).join('');
-}
-
-/* ──────────────────────────────────────────────────────────────
-   RENDER
-────────────────────────────────────────────────────────────── */
-function updateStats(){
-  const stats = getStats();
-  $('statCola').textContent = stats.pending;
-  $('statSubidos').textContent = subidos;
-  $('statErrores').textContent = errores;
-}
-
-function renderQueue(){
-  const q = $('queue');
-
-  if(!files.length){
-    q.style.display = 'none';
-    updateStats();
-    return;
-  }
-
-  q.style.display = 'block';
-
-  const pending = files.filter(f => f.status === 'pending').length;
-  $('queueLabel').textContent =
-    files.length + ' ' + pluralizar(files.length, 'archivo', 'archivos') +
-    ' — ' + pending + ' pendiente' + (pending !== 1 ? 's' : '');
-
-  if(pending > 0){
-    const lotes = Math.ceil(pending / 100);
-    $('loteInfo').style.display = 'block';
-    $('loteInfoText').textContent =
-      lotes + ' ' + pluralizar(lotes, 'lote', 'lotes') + ' de hasta 100 facturas';
-  }else{
-    $('loteInfo').style.display = 'none';
-  }
-
-  const labels = {
-    pending:'pendiente',
-    uploading:'verificando',
-    done:'subido',
-    error:'error',
-    duplicate:'existe',
-    en_cola:'cola',
-    procesando:'procesando…',
-    al_prn:'al PRN ✓',
-    fallida:'error'
-  };
-
-  $('fileList').innerHTML = files.map((f, i) =>
-    '<div class="file-item">' +
-      '<i class="ti ti-file-type-pdf" style="font-size:16px;color:#c5221f;flex-shrink:0;"></i>' +
-      '<span class="file-name">' + escapeHtml(f.name) + '</span>' +
-      '<span class="file-size">' + (f.size / 1024).toFixed(0) + ' KB</span>' +
-      '<span class="badge b-' + f.status + '">' + (labels[f.status] || f.status) + '</span>' +
-      (['pending','duplicate'].includes(f.status)
-        ? '<button class="btn-remove" onclick="removeFile(' + i + ')"><i class="ti ti-x"></i></button>'
-        : '') +
-    '</div>'
-  ).join('');
-
+  uploading = false;
+  setUploadControlsDisabled(false);
   updateStats();
-}
 
-function renderHistory(){
-  const el = $('historyList');
-
-  if(!history.length){
-    el.innerHTML = '<div class="empty"><i class="ti ti-inbox"></i>Todavía no se subieron archivos</div>';
+  const subidosOk = files.some(f => f.status === 'done');
+  if (!subidosOk) {
+    showAlert('No se pudo subir ningún PDF. Revisá conexión o n8n.', 'error');
     return;
   }
 
-  el.innerHTML = history.map(h =>
-    '<div class="history-item">' +
-      '<i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;"></i>' +
-      '<span class="history-name">' + escapeHtml(h.name) + '</span>' +
-      '<span class="history-time">' + escapeHtml(h.time) + '</span>' +
-      '<span class="badge ' + (h.ok ? 'b-done' : 'b-error') + '">' + (h.ok ? 'subido' : 'error') + '</span>' +
-    '</div>'
-  ).join('');
+  updateProcesoUX('registro', 50, registroSubido ? 'Registro ARCA cargado' : 'Sin registro ARCA', registroSubido ? 'El registro ARCA quedó disponible para conciliación.' : 'Se procesará sin conciliación completa.', { progressText: registroSubido ? 'Registro listo' : 'Sin registro' });
+  setStepDetail('registro', registroSubido ? 'Cargado' : 'Omitido');
+  logProceso(registroSubido ? 'Registro ARCA disponible para conciliación.' : 'Procesamiento sin registro ARCA.');
+  updateProcesoUX('ia', 58, 'Esperando Drive', 'PDFs subidos. Esperando indexación de Google Drive antes de iniciar Gemini.', { progressText:'Indexando archivos…' });
+  showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
+  await sleep(DRIVE_INDEX_DELAY_MS);
+  await sendFlush();
 }
 
-/* ──────────────────────────────────────────────────────────────
-   INIT
-────────────────────────────────────────────────────────────── */
-function initApp(){
-  try{
-    const selAnio = $('selAnio');
-    const currentYear = new Date().getFullYear();
+async function sendFlush() {
+  if (!validarPrecondiciones()) return;
 
-    for(let y = currentYear - 2; y <= currentYear + 1; y++){
-      const opt = document.createElement('option');
-      opt.value = y;
-      opt.textContent = y;
-      if(y === currentYear) opt.selected = true;
-      selAnio.appendChild(opt);
+  try {
+    updateProcesoUX('ia', 62, 'Iniciando n8n', 'Se envió la orden de procesamiento al workflow.', { progressText:'Disparando holistor-procesar…' });
+    logProceso('Enviando orden a n8n: holistor-procesar.');
+    const res = await fetchConTimeout(WEBHOOK.procesar(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        flush: true,
+        mes: periodo.mes,
+        anio: periodo.anio,
+        periodo: periodoStr(),
+        cliente_cuit: clienteSeleccionado.cuit,
+        cliente_nombre: clienteSeleccionado.nombre || '',
+        tiene_registro: registroSubido
+      })
+    }, FETCH_TIMEOUT_MS);
+    const data = await jsonSeguro(res);
+
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.mensaje || `HTTP ${res.status}`);
     }
 
-    actualizarPeriodo();
-    loadClientes();
-
-    const dropZone = $('dropZone');
-    const fileInput = $('fileInput');
-
-    dropZone.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', e => addFiles(e.target.files));
-
-    ['dragenter','dragover'].forEach(evt => {
-      dropZone.addEventListener(evt, e => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.add('dragover');
-      });
-    });
-
-    ['dragleave','drop'].forEach(evt => {
-      dropZone.addEventListener(evt, e => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.remove('dragover');
-      });
-    });
-
-    dropZone.addEventListener('drop', e => addFiles(e.dataTransfer.files));
-
-    const excelZone = $('excelZone');
-    const excelInput = $('excelInput');
-
-    excelZone.addEventListener('click', e => {
-      if(e.target.closest('.ez-remove')) return;
-      excelInput.click();
-    });
-
-    excelInput.addEventListener('change', e => {
-      const file = e.target.files && e.target.files[0];
-      if(file) handleExcelFile(file);
-    });
-
-    ['dragenter','dragover'].forEach(evt => {
-      excelZone.addEventListener(evt, e => {
-        e.preventDefault();
-        e.stopPropagation();
-        excelZone.classList.add('dragover');
-      });
-    });
-
-    ['dragleave','drop'].forEach(evt => {
-      excelZone.addEventListener(evt, e => {
-        e.preventDefault();
-        e.stopPropagation();
-        excelZone.classList.remove('dragover');
-      });
-    });
-
-    excelZone.addEventListener('drop', e => {
-      const file = e.dataTransfer.files && e.dataTransfer.files[0];
-      if(file) handleExcelFile(file);
-    });
-
-    updateStats();
-
-  }catch(e){
-    console.error(e);
-    showAlert('Error inicializando la página: ' + e.message, 'error');
+    if (data.proceso_ya_activo === true) {
+      showAlert(data.mensaje || 'Ya hay un proceso activo para este cliente y período.', 'warn');
+    } else {
+      showAlert('Procesamiento iniciado en n8n.', 'success');
+      logProceso('n8n confirmó inicio de procesamiento.');
+    }
+    iniciarPolling();
+  } catch (err) {
+    const detalle = err.name === 'AbortError' ? 'timeout al iniciar procesamiento' : err.message;
+    updateProcesoUX('ia', procesoActual.pct || 60, 'Error al iniciar', `No se pudo iniciar n8n: ${detalle}`, { error:true, progressText:'Revisar webhook holistor-procesar' });
+    logProceso(`Error iniciando procesamiento: ${detalle}`);
+    showAlert(`No se pudo iniciar el procesamiento: ${escapeHtml(detalle)}`, 'error');
   }
 }
 
-document.addEventListener('DOMContentLoaded', initApp);
+// ──────────────────────────────────────────────────────────────────────────────
+// EVENTOS Y PERÍODO
+// ──────────────────────────────────────────────────────────────────────────────
+function actualizarPeriodo() {
+  const mes = parseInt(document.getElementById('selMes').value);
+  const anio = parseInt(document.getElementById('selAnio').value);
+  if (mes && anio) {
+    periodo = { mes, anio };
+    document.getElementById('periodoInfo').textContent = `${mes}/${anio}`;
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// INIT
+// ──────────────────────────────────────────────────────────────────────────────
+function initApp() {
+  // Años
+  const selAnio = document.getElementById('selAnio');
+  const currentYear = new Date().getFullYear();
+  for (let y = currentYear - 2; y <= currentYear + 1; y++) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y;
+    if (y === currentYear) opt.selected = true;
+    selAnio.appendChild(opt);
+  }
+
+  loadClientes();
+
+  // Drop zone - PDFs
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  
+  dropZone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => addFiles(e.target.files));
+  
+  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+    dropZone.addEventListener(evt, (e) => e.preventDefault());
+  });
+  dropZone.addEventListener('dragover', () => dropZone.classList.add('dragover'));
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', (e) => {
+    dropZone.classList.remove('dragover');
+    addFiles(e.dataTransfer.files);
+  });
+
+  // Excel zone
+  const excelZone = document.getElementById('excelZone');
+  const excelInput = document.getElementById('excelInput');
+  
+  excelZone.addEventListener('click', () => {
+    if (!registroSubido) excelInput.click();
+  });
+  excelInput.addEventListener('change', (e) => {
+    if (e.target.files[0]) handleExcelFile(e.target.files[0]);
+  });
+  
+  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+    excelZone.addEventListener(evt, (e) => e.preventDefault());
+  });
+  excelZone.addEventListener('dragover', () => excelZone.classList.add('dragover'));
+  excelZone.addEventListener('dragleave', () => excelZone.classList.remove('dragover'));
+  excelZone.addEventListener('drop', (e) => {
+    excelZone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) handleExcelFile(e.dataTransfer.files[0]);
+  });
+
+  // Período
+  const today = new Date();
+  document.getElementById('selMes').value = today.getMonth() + 1;
+  document.getElementById('selAnio').value = today.getFullYear();
+  actualizarPeriodo();
+  resetProcesoUX();
+}
+
+
+// Compatibilidad con handlers inline del HTML estático.
+Object.assign(window, {
+  loadClientes,
+  onClienteChange,
+  actualizarPeriodo,
+  focusExcelZone,
+  procesarSinRegistro,
+  handleSubir,
+  sendFlush,
+  clearPending,
+  toggleForzar,
+  resetProceso,
+  reintentar,
+  removeFile
+});
+
+window.addEventListener('DOMContentLoaded', initApp);
+
+console.log('Holistor uploader inline JS cargado OK');
+
 </script>
 </body>
 </html>

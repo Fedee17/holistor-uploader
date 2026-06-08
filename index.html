@@ -707,7 +707,8 @@ function iniciarPolling() {
     if (pollingInterval) {
       clearInterval(pollingInterval);
       pollingInterval = null;
-      showAlert('El procesamiento está tardando demasiado. Revisá los logs en n8n para ver el estado real.', 'warn');
+      showAlert('El procesamiento está tardando demasiado. Si el PRN ya se generó en Drive, podés recargar la página.', 'warn');
+      mostrarEstadoProceso('listo', []);
     }
   }, 15 * 60 * 1000);
 

@@ -24,19 +24,16 @@
   .field-label { font-size: 13px; font-weight: 500; color: #444; display: block; margin-bottom: 6px; }
   .form-row { margin-bottom: 1rem; }
   .divider { border: none; border-top: 0.5px solid #e8e8e0; margin: 1rem 0; }
-  /* Cliente selector */
-  .field-select { border: 0.5px solid #ccc; border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; color: #1a1a1a; background: #fff; width: 100%; }
+  .field-select, .select-standard { border: 0.5px solid #ccc; border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; color: #1a1a1a; background: #fff; width: 100%; }
   .field-select:disabled { opacity: 0.5; cursor: not-allowed; }
-  .field-hint { font-size: 12px; color: #888; margin-top: 4px; }
+  .field-hint, .text-muted { font-size: 12px; color: #888; margin-top: 4px; }
   .field-error { font-size: 12px; color: #c5221f; margin-top: 4px; }
-  /* Drop zone PDFs */
   .drop-zone { border: 1.5px dashed #ccc; border-radius: 12px; padding: 2.5rem; text-align: center; cursor: pointer; transition: background 0.15s; }
   .drop-zone:hover, .drop-zone.dragover { background: #f5f5f0; }
   .drop-zone i { font-size: 32px; color: #aaa; display: block; margin-bottom: 8px; }
   .drop-zone p { color: #888; font-size: 14px; margin-top: 4px; }
   .drop-zone strong { color: #1a1a1a; }
   input[type=file] { display: none; }
-  /* Excel zone */
   .excel-zone { border: 1.5px dashed #b0c9b0; border-radius: 10px; padding: 0.85rem 1rem; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: all 0.15s; background: #f9fdf9; }
   .excel-zone:hover { background: #f0faf0; border-color: #188038; }
   .excel-zone.dragover { background: #f0faf0; border-color: #188038; }
@@ -52,13 +49,11 @@
   .ez-remove { background: none; border: none; cursor: pointer; color: #bbb; font-size: 16px; flex-shrink: 0; padding: 2px; line-height: 1; }
   .ez-remove:hover { color: #c5221f; }
   @keyframes pulseWarn { 0%,100% { border-color: #e37400; } 50% { border-color: #fcc; } }
-  /* Registry warning */
   .registry-warn { background: #fff8e0; border: 0.5px solid #fcd34d; border-radius: 8px; padding: 10px 14px; margin-top: 8px; display: none; font-size: 13px; color: #92400e; }
   .registry-warn-head { display: flex; align-items: center; gap: 6px; font-weight: 500; margin-bottom: 6px; }
   .registry-warn-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .rw-btn-a { background: #1a1a1a; color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; cursor: pointer; }
   .rw-btn-b { background: none; border: 0.5px solid #92400e; border-radius: 6px; padding: 6px 14px; font-size: 12px; cursor: pointer; color: #92400e; }
-  /* Queue */
   .queue { margin-top: 1rem; display: none; }
   .queue-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; margin-bottom: 8px; }
   .file-list { max-height: 260px; overflow-y: auto; }
@@ -66,15 +61,15 @@
   .file-name { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .file-size { font-size: 12px; color: #888; white-space: nowrap; }
   .badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
-  .b-pending   { background: #f0f0ea; color: #666; }
+  .b-pending { background: #f0f0ea; color: #666; }
   .b-uploading { background: #e8f0fe; color: #1a73e8; }
-  .b-done      { background: #e6f4ea; color: #188038; }
-  .b-error     { background: #fce8e6; color: #c5221f; }
-  .b-duplicate  { background: #fff3e0; color: #e37400; }
-  .b-en_cola    { background: #f3e8ff; color: #6b21a8; }
+  .b-done { background: #e6f4ea; color: #188038; }
+  .b-error { background: #fce8e6; color: #c5221f; }
+  .b-duplicate { background: #fff3e0; color: #e37400; }
+  .b-en_cola { background: #f3e8ff; color: #6b21a8; }
   .b-procesando { background: #e3f2fd; color: #1565c0; animation: pulse-badge 1.5s ease-in-out infinite; }
-  .b-al_prn     { background: #e6f4ea; color: #137333; font-weight: 600; }
-  .b-fallida    { background: #fce8e6; color: #a50e0e; }
+  .b-al_prn { background: #e6f4ea; color: #137333; font-weight: 600; }
+  .b-fallida { background: #fce8e6; color: #a50e0e; }
   @keyframes pulse-badge { 0%,100%{opacity:1} 50%{opacity:.6} }
   .btn-remove { background: none; border: none; cursor: pointer; color: #aaa; font-size: 16px; padding: 2px; line-height: 1; }
   .btn-remove:hover { color: #c5221f; }
@@ -83,67 +78,58 @@
   .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn-secondary { background: none; border: 0.5px solid #ccc; border-radius: 8px; padding: 9px 20px; font-size: 14px; cursor: pointer; color: #1a1a1a; }
   .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-reset { background: none; border: 0.5px solid #ccc; border-radius: 6px; padding: 5px 12px; font-size: 12px; color: #888; cursor: pointer; }
+  .btn-reset:hover { border-color: #999; color: #666; }
   .progress-wrap { height: 3px; background: #e0e0d8; border-radius: 2px; margin-top: 8px; overflow: hidden; display: none; }
-  .progress-bar  { height: 100%; background: #1a73e8; border-radius: 2px; transition: width 0.2s; }
-  /* Alerts */
+  .progress-bar { height: 100%; background: #1a73e8; border-radius: 2px; transition: width 0.2s; }
   .alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 1rem; display: none; align-items: flex-start; gap: 8px; }
   .alert i { font-size: 16px; margin-top: 1px; flex-shrink: 0; }
   .a-success { background: #e6f4ea; color: #188038; border: 0.5px solid #a8d5b5; }
-  .a-error   { background: #fce8e6; color: #c5221f; border: 0.5px solid #f5b8b5; }
-  .a-info    { background: #e8f0fe; color: #1a73e8; border: 0.5px solid #aac4f5; }
+  .a-error { background: #fce8e6; color: #c5221f; border: 0.5px solid #f5b8b5; }
+  .a-info { background: #e8f0fe; color: #1a73e8; border: 0.5px solid #aac4f5; }
   #estadoProceso.a-info { font-size: 14px; padding: 14px 16px; }
-  .a-warn    { background: #fff8e0; color: #92400e; border: 0.5px solid #fcd34d; }
-  /* History */
+  .a-warn { background: #fff8e0; color: #92400e; border: 0.5px solid #fcd34d; }
   .history-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 0.5px solid #e8e8e0; font-size: 13px; }
   .history-item:last-child { border-bottom: none; }
   .history-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .history-time { font-size: 12px; color: #888; white-space: nowrap; }
   .empty { text-align: center; padding: 2rem; color: #aaa; font-size: 13px; }
   .empty i { font-size: 28px; display: block; margin-bottom: 8px; }
-  /* Conciliation panel */
   .concil-section { border: 0.5px solid #e8e8e0; border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
   .concil-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; user-select: none; }
   .concil-head:hover { background: #f9f9f7; }
-  .concil-icon  { font-size: 16px; flex-shrink: 0; }
+  .concil-icon { font-size: 16px; flex-shrink: 0; }
   .concil-title { flex: 1; font-size: 13px; font-weight: 500; }
   .concil-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; }
-  .cb-ok   { background: #e6f4ea; color: #188038; }
+  .cb-ok { background: #e6f4ea; color: #188038; }
   .cb-warn { background: #fff3e0; color: #e37400; }
-  .cb-err  { background: #fce8e6; color: #c5221f; }
-  .ci-ok   { color: #188038; }
+  .cb-err { background: #fce8e6; color: #c5221f; }
+  .ci-ok { color: #188038; }
   .ci-warn { color: #e37400; }
-  .ci-err  { color: #c5221f; }
+  .ci-err { color: #c5221f; }
   .concil-toggle { font-size: 14px; color: #aaa; transition: transform 0.2s; }
   .concil-head.open .concil-toggle { transform: rotate(180deg); }
   .concil-body { display: none; border-top: 0.5px solid #e8e8e0; max-height: 220px; overflow-y: auto; }
   .concil-body.open { display: block; }
   .concil-row { display: flex; align-items: baseline; gap: 8px; padding: 7px 14px; border-bottom: 0.5px solid #f0f0ea; font-size: 12px; }
   .concil-row:last-child { border-bottom: none; }
-  .concil-key   { font-family: monospace; font-size: 11px; color: #666; flex-shrink: 0; }
+  .concil-key { font-family: monospace; font-size: 11px; color: #666; flex-shrink: 0; }
   .concil-denom { flex: 1; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .concil-total { color: #888; white-space: nowrap; font-size: 11px; }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
 </style>
 </head>
 <body>
 <div class="container">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:8px;">
-  <h1 style="margin-bottom:0;"><i class="ti ti-file-invoice"></i> Holistor — Subir facturas</h1>
-</div>
-
+  <h1 style="margin-bottom:1.5rem;"><i class="ti ti-file-invoice"></i> Holistor — Subir facturas</h1>
   <div id="alert" class="alert"></div>
-
   <div class="stats">
     <div class="stat"><div class="stat-label">En cola</div><div class="stat-value" id="statCola">0</div></div>
     <div class="stat"><div class="stat-label">Subidos</div><div class="stat-value" id="statSubidos">0</div></div>
     <div class="stat"><div class="stat-label">Errores</div><div class="stat-value" id="statErrores">0</div></div>
   </div>
-
   <div class="card">
     <div class="card-header"><i class="ti ti-cloud-upload"></i> Subir facturas</div>
-
-    <!-- Cliente -->
     <div class="form-row">
       <label class="field-label">Cliente</label>
       <select id="selCliente" class="field-select" onchange="onClienteChange()">
@@ -151,25 +137,20 @@
       </select>
       <div id="clienteHint" class="field-hint"></div>
     </div>
-
-    <!-- Período -->
     <div class="form-row">
       <label class="field-label">Período de carga</label>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <select id="selMes" onchange="actualizarPeriodo()" style="border:0.5px solid #ccc;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;color:#1a1a1a;background:#fff;">
+        <select id="selMes" onchange="actualizarPeriodo()" class="select-standard">
           <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
           <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
           <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
           <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
         </select>
-        <select id="selAnio" onchange="actualizarPeriodo()" style="border:0.5px solid #ccc;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;color:#1a1a1a;background:#fff;"></select>
+        <select id="selAnio" onchange="actualizarPeriodo()" class="select-standard"></select>
       </div>
-      <div id="periodoInfo" style="font-size:12px;color:#888;margin-top:6px;"></div>
+      <div id="periodoInfo" class="text-muted"></div>
     </div>
-
     <hr class="divider">
-
-    <!-- Drop zone PDFs -->
     <div class="form-row" style="margin-bottom:0.75rem;">
       <label class="field-label"><i class="ti ti-file-type-pdf" style="color:#c5221f;font-size:14px;"></i> Facturas PDF</label>
       <div class="drop-zone" id="dropZone">
@@ -179,8 +160,6 @@
       </div>
       <input type="file" id="fileInput" accept=".pdf" multiple />
     </div>
-
-    <!-- Excel / Registro ARCA -->
     <div>
       <label class="field-label"><i class="ti ti-table" style="color:#188038;font-size:14px;"></i> Registro ARCA — Mis Comprobantes Recibidos (.xlsx)</label>
       <div class="excel-zone" id="excelZone">
@@ -194,1005 +173,54 @@
       <input type="file" id="excelInput" accept=".xlsx,.xls" />
       <div class="registry-warn" id="registryWarn">
         <div class="registry-warn-head"><i class="ti ti-alert-triangle" style="font-size:14px;"></i> Sin registro de comprobantes</div>
-        Podés procesar igual, pero no se realizará conciliación y todas las facturas quedarán sin validar contra ARCA.
+        Podés procesar igual, pero no se realizará conciliación.
         <div class="registry-warn-btns">
           <button class="rw-btn-a" onclick="focusExcelZone()"><i class="ti ti-table" style="font-size:11px;"></i> Subir registro primero</button>
           <button class="rw-btn-b" onclick="procesarSinRegistro()">Procesar sin registro</button>
         </div>
       </div>
     </div>
-
-    <!-- Queue -->
     <div class="queue" id="queue">
       <div class="queue-label" id="queueLabel">0 archivos</div>
       <div id="loteInfo" style="display:none; font-size:13px; color:#1a73e8; background:#e8f0fe; border-radius:8px; padding:8px 12px; margin-bottom:8px;">
         <i class="ti ti-stack-2" style="font-size:14px;"></i> <span id="loteInfoText"></span>
       </div>
       <div class="file-list" id="fileList"></div>
-      <div class="progress-wrap" id="progressWrap">
-        <div class="progress-bar" id="progressBar" style="width:0%"></div>
-      </div>
       <div id="loteResultado" style="display:none; font-size:13px; color:#188038; background:#e6f4ea; border-radius:8px; padding:8px 12px; margin-bottom:8px;">
         <i class="ti ti-circle-check" style="font-size:14px;"></i> <span id="loteResultadoText"></span>
       </div>
-      <!-- Toggle forzar reprocesamiento — dentro de la cola de PDFs -->
       <div style="display:flex;align-items:center;gap:8px;margin-top:10px;margin-bottom:6px;font-size:13px;color:#666;">
-        <input type="checkbox" id="chkForzar" onchange="toggleForzar()" style="width:14px;height:14px;cursor:pointer;accent-color:#c5221f;flex-shrink:0;">
+        <input type="checkbox" id="chkForzar" onchange="toggleForzar()" style="width:14px;height:14px;cursor:pointer;accent-color:#c5221f;">
         <label for="chkForzar" style="cursor:pointer;user-select:none;">Forzar reprocesamiento</label>
         <span style="font-size:11px;color:#aaa;">— subir aunque ya existan en Drive</span>
       </div>
-
       <div class="btn-row">
-        <button class="btn-primary" id="btnSubir" onclick="handleSubir()">
-          <i class="ti ti-upload"></i> Subir y procesar
-        </button>
-        <button class="btn-secondary" id="btnProcesar" onclick="sendFlush()" style="display:none;">
-          <i class="ti ti-player-play"></i> Procesar ahora
-        </button>
+        <button class="btn-primary" id="btnSubir" onclick="handleSubir()"><i class="ti ti-upload"></i> Subir y procesar</button>
+        <button class="btn-secondary" id="btnProcesar" onclick="sendFlush()" style="display:none;"><i class="ti ti-player-play"></i> Procesar ahora</button>
         <button class="btn-secondary" onclick="clearPending()">Limpiar pendientes</button>
       </div>
     </div>
   </div>
-
   <div id="estadoProceso" class="alert" style="display:none;"></div>
   <div id="resetPanel" style="display:none; margin-bottom:1rem; text-align:right;">
-    <button onclick="resetProceso()" style="background:none;border:0.5px solid #ccc;border-radius:6px;padding:5px 12px;font-size:12px;color:#888;cursor:pointer;">
-      <i class="ti ti-refresh" style="font-size:12px;"></i> Liberar proceso bloqueado
-    </button>
+    <button class="btn-reset" onclick="resetProceso()"><i class="ti ti-refresh" style="font-size:12px;"></i> Liberar proceso</button>
   </div>
-
   <div class="card" id="cardFallidos" style="display:none; border-color:#f5b8b5;">
     <div class="card-header" style="color:#c5221f;"><i class="ti ti-alert-circle"></i> Facturas con error</div>
     <div id="listFallidos"></div>
     <div class="btn-row" style="margin-top:1rem;">
-      <button class="btn-primary" style="background:#c5221f;" onclick="reintentar()">
-        <i class="ti ti-refresh"></i> Reintentar fallidas
-      </button>
+      <button class="btn-primary" style="background:#c5221f;" onclick="reintentar()"><i class="ti ti-refresh"></i> Reintentar fallidas</button>
     </div>
   </div>
-
-  <!-- Conciliation panel — visible after process completes -->
   <div class="card" id="cardConciliacion" style="display:none;">
     <div class="card-header"><i class="ti ti-report-analytics" style="color:#1a73e8;"></i> Conciliación de comprobantes</div>
     <div id="concilContent"></div>
   </div>
-
   <div class="card">
     <div class="card-header"><i class="ti ti-history"></i> Historial de esta sesión</div>
-    <div id="historyList">
-      <div class="empty"><i class="ti ti-inbox"></i>Todavía no se subieron archivos</div>
-    </div>
+    <div id="historyList"><div class="empty"><i class="ti ti-inbox"></i>Todavía no se subieron archivos</div></div>
   </div>
 </div>
-
-<script>
-// ── Helpers ──────────────────────────────────────────────────────────────────
-function escapeHtml(s) {
-  if (s === null || s === undefined) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
-}
-
-// ── Webhooks ──────────────────────────────────────────────────────────────────
-// ── Entornos n8n ─────────────────────────────────────────────────────────────
-const WEBHOOK           = () => getBase() + '/holistor-upload';
-const WEBHOOK_PROCESO   = () => getBase() + '/holistor-procesar';
-const WEBHOOK_VERIFICAR = () => getBase() + '/holistor-verificar';
-const WEBHOOK_ESTADO    = () => getBase() + '/holistor-estado';
-const WEBHOOK_CLIENTES  = () => getBase() + '/holistor-clientes';
-const WEBHOOK_REGISTRO  = () => getBase() + '/holistor-registro';
-const WEBHOOK_RESET     = () => getBase() + '/holistor-reset';
-
-// ── State ─────────────────────────────────────────────────────────────────────
-let periodo             = null;
-let forzarReproceso     = false;
-let clienteSeleccionado = null;   // { cuit, nombre }
-let _archivoExcelPendiente = null; // archivo Excel guardado si se subió sin cliente
-let registroSubido      = false;  // Excel was parsed + sent to n8n
-let archivosFallidos    = [];
-let files = [], history = [], uploading = false, subidos = 0, errores = 0;
-let pollingInterval = null;
-
-// ── Alerts ────────────────────────────────────────────────────────────────────
-function showAlert(msg, type) {
-  const el = document.getElementById('alert');
-  const icons = { success:'circle-check', error:'alert-circle', info:'info-circle', warn:'alert-triangle' };
-  el.className = 'alert a-' + type;
-  el.innerHTML = `<i class="ti ti-${icons[type]||'info-circle'}"></i><span>${msg}</span>`;
-  el.style.display = 'flex';
-  if (type !== 'info') setTimeout(() => el.style.display = 'none', 6000);
-}
-
-// ── Clientes ──────────────────────────────────────────────────────────────────
-const CLIENTES_CACHE_KEY = 'holistor_clientes_v2';
-const CLIENTES_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
-
-async function loadClientes(forzar = false) {
-  const sel  = document.getElementById('selCliente');
-  const hint = document.getElementById('clienteHint');
-  sel.disabled = true;
-
-  // Intentar desde cache
-  if (!forzar) {
-    try {
-      const cached = sessionStorage.getItem(CLIENTES_CACHE_KEY);
-      if (cached) {
-        const { ts, data } = JSON.parse(cached);
-        if (Date.now() - ts < CLIENTES_CACHE_TTL) {
-          poblarSelectClientes(sel, data);
-          sel.disabled = false;
-          hint.textContent = '';
-          hint.className = 'field-hint';
-          return;
-        }
-      }
-    } catch(e) {}
-  }
-
-  // Fetch desde backend
-  sel.innerHTML = '<option value="">— Cargando… —</option>';
-  try {
-    const res = await fetch(WEBHOOK_CLIENTES());
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const lista = await res.json();
-    if (!Array.isArray(lista) || !lista.length) throw new Error('Lista vacía');
-    const listaValida = lista.filter(c => c && String(c.cuit||'').replace(/[^0-9]/g,'').length >= 8 && String(c.nombre||'').trim());
-    if (!listaValida.length) throw new Error('Lista sin clientes válidos');
-    // Guardar en cache
-    try { sessionStorage.setItem(CLIENTES_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: listaValida })); } catch(e) {}
-    poblarSelectClientes(sel, listaValida);
-    sel.disabled = false;
-    hint.textContent = '';
-    hint.className = 'field-hint';
-  } catch(e) {
-    sel.innerHTML = '<option value="">— Error al cargar —</option>';
-    sel.disabled = false;
-    hint.className = 'field-error';
-    hint.innerHTML = 'No se pudo cargar la lista. <a href="#" onclick="loadClientes(true);return false;" style="color:inherit;text-decoration:underline;">Reintentar</a>';
-  }
-}
-
-function poblarSelectClientes(sel, lista) {
-  const frag = document.createDocumentFragment();
-  const def = document.createElement('option');
-  def.value = ''; def.textContent = '— Seleccionar cliente —';
-  frag.appendChild(def);
-  for (const c of lista) {
-    const opt = document.createElement('option');
-    opt.value = escapeHtml(c.cuit);
-    opt.dataset.nombre = escapeHtml(c.nombre);
-    opt.textContent = escapeHtml(c.nombre);
-    frag.appendChild(opt);
-  }
-  // Una sola escritura al DOM — sin reflows intermedios
-  sel.replaceChildren(frag);
-}
-
-async function resetProceso() {
-  if (!confirm('¿Liberar el proceso bloqueado? Hacé esto si el sistema quedó atascado (error de Gemini, timeout, etc).')) return;
-  try {
-    const cuit = clienteSeleccionado?.cuit || '';
-    const per  = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
-    const res  = await fetch(WEBHOOK_RESET(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cliente_cuit: cuit, periodo: per })
-    });
-    const data = await res.json();
-    if (data.ok) {
-      showAlert(`Proceso liberado (${data.liberados} proceso${data.liberados!==1?'s':''} reseteado${data.liberados!==1?'s':''}). Ya podés procesar de nuevo.`, 'success');
-      if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
-      if (pollingTimeoutMax) { clearTimeout(pollingTimeoutMax); pollingTimeoutMax = null; }
-      document.getElementById('estadoProceso').style.display = 'none';
-    }
-  } catch(e) {
-    showAlert('No se pudo conectar con n8n para liberar el proceso.', 'error');
-  }
-}
-
-function toggleForzar() {
-  forzarReproceso = document.getElementById('chkForzar').checked;
-  if (forzarReproceso) {
-    showAlert('Modo forzar activo: los archivos existentes en Drive serán resubidos y reprocesados.', 'warn');
-  }
-}
-
-function onClienteChange() {
-  const sel = document.getElementById('selCliente');
-  const opt = sel.options[sel.selectedIndex];
-  // G2: si hay PDFs en cola del cliente anterior, advertir y limpiar
-  const pdfsEnCola = files.filter(f => f.status === 'pending').length;
-  if (pdfsEnCola > 0) {
-    const ok = confirm(`Hay ${pdfsEnCola} PDF${pdfsEnCola!==1?'s':''} en cola del cliente anterior. ¿Limpiar la cola y cambiar de cliente?`);
-    if (!ok) {
-      // Revertir selección
-      sel.value = clienteSeleccionado?.cuit || '';
-      return;
-    }
-    files = files.filter(f => f.status !== 'pending');
-    renderQueue();
-  }
-  if (sel.value) {
-    clienteSeleccionado = { cuit: sel.value, nombre: opt.dataset.nombre };
-    // Si había un Excel pendiente porque no había cliente, procesarlo ahora
-    if (_archivoExcelPendiente) {
-      const f = _archivoExcelPendiente;
-      _archivoExcelPendiente = null;
-      handleExcelFile(f);
-    }
-    document.getElementById('clienteHint').textContent = `CUIT: ${sel.value}`;
-    document.getElementById('clienteHint').className = 'field-hint';
-  } else {
-    clienteSeleccionado = null;
-    document.getElementById('clienteHint').textContent = '';
-  }
-  resetRegistro();
-}
-
-// ── Excel / Registro ARCA ─────────────────────────────────────────────────────
-function triggerExcelPick() {
-  if (registroSubido) return;
-  document.getElementById('excelInput').click();
-}
-
-function resetRegistro() {
-  registroSubido = false;
-  const zone = document.getElementById('excelZone');
-  zone.classList.remove('loaded','highlight');
-  zone.onclick = null;  // el addEventListener del init maneja el click
-  const xBtn = zone.querySelector('.ez-remove');
-  if (xBtn) xBtn.remove();
-  document.getElementById('ezTitle').textContent  = 'Arrastrá el Excel de ARCA o hacé clic';
-  document.getElementById('ezSub').textContent    = 'Necesario para la conciliación de comprobantes';
-  document.getElementById('ezAction').textContent = 'Seleccionar';
-  document.getElementById('excelInput').value = '';
-  document.getElementById('registryWarn').style.display = 'none';
-}
-
-function focusExcelZone() {
-  document.getElementById('registryWarn').style.display = 'none';
-  const zone = document.getElementById('excelZone');
-  zone.classList.add('highlight');
-  zone.scrollIntoView({ behavior:'smooth', block:'center' });
-  setTimeout(() => zone.classList.remove('highlight'), 3000);
-  document.getElementById('excelInput').click();
-}
-
-function procesarSinRegistro() {
-  document.getElementById('registryWarn').style.display = 'none';
-  startUpload();
-}
-
-async function handleExcelFile(file) {
-  if (!file || (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls'))) {
-    showAlert('El registro debe ser un archivo .xlsx exportado desde ARCA', 'error');
-    return;
-  }
-  if (!clienteSeleccionado) {
-    // Guardar el archivo temporalmente — procesarlo cuando el usuario seleccione el cliente
-    _archivoExcelPendiente = file;
-    showAlert('Seleccioná el cliente primero — el Excel quedó guardado y se cargará automáticamente', 'warn');
-    document.getElementById('excelZone').classList.add('highlight');
-    setTimeout(() => document.getElementById('excelZone').classList.remove('highlight'), 3000);
-    // Scroll al selector de cliente
-    const sel = document.getElementById('clienteSelect') || document.getElementById('selCliente');
-    if (sel) { sel.scrollIntoView({ behavior:'smooth', block:'center' }); sel.focus(); }
-    return;
-  }
-  if (!periodo) {
-    showAlert('Seleccioná el período antes de subir el registro', 'warn');
-    return;
-  }
-
-  // Feedback inmediato — mostrar nombre del archivo de una
-  const zone = document.getElementById('excelZone');
-  document.getElementById('ezTitle').textContent  = escapeHtml(file.name);
-  document.getElementById('ezSub').textContent    = 'Leyendo comprobantes…';
-  document.getElementById('ezAction').textContent = '';
-
-  let registros, receptorCuit;
-  try {
-    ({ registros, receptorCuit } = await parsearRegistroARCA(file));
-  } catch(err) {
-    document.getElementById('ezSub').textContent = 'Error al leer el archivo: ' + err.message;
-    showAlert('Error al leer el Excel: ' + err.message, 'error');
-    return;  // NO resetear — dejar que el usuario vea el error
-  }
-
-  // Validar CUIT receptor
-  const cuitLimpio = clienteSeleccionado.cuit.replace(/[^0-9]/g,'').padStart(11,'0');
-  if (receptorCuit !== cuitLimpio) {
-    document.getElementById('ezSub').textContent = `CUIT incorrecto: el archivo es de ${receptorCuit}, no de ${clienteSeleccionado.cuit}`;
-    showAlert(`El registro pertenece al CUIT ${receptorCuit}, pero el cliente seleccionado es ${clienteSeleccionado.cuit}.`, 'error');
-    return;
-  }
-
-  // Parseo OK — marcar zona como cargada ANTES de ir al backend
-  registroSubido = true;
-  zone.classList.add('loaded');
-  zone.onclick = null;
-  const existingBtn = zone.querySelector('.ez-remove');
-  if (!existingBtn) {
-    const xBtn = document.createElement('button');
-    xBtn.className = 'ez-remove';
-    xBtn.innerHTML = '<i class="ti ti-x"></i>';
-    xBtn.onclick = (e) => { e.stopPropagation(); resetRegistro(); };
-    zone.appendChild(xBtn);
-  }
-  document.getElementById('ezSub').textContent = `${registros.length} comprobantes · Guardando en n8n…`;
-  document.getElementById('registryWarn').style.display = 'none';
-
-  // Enviar al backend (no-bloqueante para la UI)
-  const periodoStr = `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}`;
-  try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 90000);
-    let resReg;
-    try {
-      resReg = await fetch(WEBHOOK_REGISTRO(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cliente_cuit: clienteSeleccionado.cuit, periodo: periodoStr, registros }),
-        signal: ctrl.signal
-      });
-    } finally {
-      clearTimeout(timer);
-    }
-
-    let cambiado = true, mensaje = '';
-    if (resReg.ok) {
-      try { const r = await resReg.json(); cambiado = r.cambiado !== false; mensaje = r.mensaje || ''; } catch(e) {}
-      const estadoTexto = cambiado ? 'Registro guardado ✓' : 'Ya estaba guardado ✓';
-      document.getElementById('ezSub').textContent = `${registros.length} comprobantes · ${estadoTexto}`;
-      showAlert(`Registro listo: ${registros.length} comprobante${registros.length!==1?'s':''}. ${cambiado ? 'Actualizado.' : 'Ya estaba al día.'}`, 'success');
-    } else {
-      // Backend falló, pero el archivo SÍ está parseado — zona sigue loaded
-      document.getElementById('ezSub').textContent = `${registros.length} comprobantes · ⚠ No se pudo guardar en n8n (HTTP ${resReg.status})`;
-      showAlert(`El Excel se leyó bien (${registros.length} comprobantes) pero no se pudo guardar en n8n. Intentá de nuevo o verificá el workflow.`, 'warn');
-    }
-  } catch(err) {
-    const esTimeout = err.name === 'AbortError';
-    document.getElementById('ezSub').textContent = `${registros.length} comprobantes · ⚠ ${esTimeout ? 'Timeout — n8n tardó demasiado' : 'Error de red al guardar'}`;
-    showAlert(esTimeout
-      ? `El Excel está listo (${registros.length} comprobantes) pero n8n tardó demasiado. El registro puede haberse guardado igual — verificá la hoja de Sheets.`
-      : `El Excel está listo (${registros.length} comprobantes) pero hubo un error de red: ${err.message}`,
-      'warn');
-  }
-}
-
-async function cargarXLSX() {
-  if (typeof XLSX !== 'undefined') return Promise.resolve();  // ya cargado — retornar Promise resuelto
-  return new Promise((res, rej) => {
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-    s.onload = res;
-    s.onerror = () => rej(new Error('No se pudo cargar la librería Excel'));
-    document.head.appendChild(s);
-  });
-}
-
-function parsearRegistroARCA(file) {
-  return new Promise((resolve, reject) => {
-    cargarXLSX().then(() => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        // raw:false para convertir números a strings limpios
-        const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:null, raw:false });
-        // Fila 0: título, Fila 1: headers, Fila 2+: datos
-        if (rows.length < 3) { reject(new Error('El archivo no contiene datos')); return; }
-
-        // B9 + E6: validar headers Y posiciones esperadas
-        const headers = (rows[1] || []).map(h => String(h||'').trim().toLowerCase());
-        const headerStr = headers.join('|');
-        const checks = ['tipo', 'pto', 'emisor', 'receptor'];
-        const missing = checks.filter(k => !headerStr.includes(k));
-        if (missing.length > 1) {
-          reject(new Error('El archivo no parece ser un registro de ARCA válido (faltan columnas: ' + missing.join(', ') + ')'));
-          return;
-        }
-        // E6: verificar que los headers están en las posiciones esperadas
-        // Col 0=Fecha, 1=Tipo, 2=Pto Vta, 7=CUIT emisor, 10=CUIT receptor, 29=Total
-        const expectedPositions = [
-          [0, ['fecha']],
-          [1, ['tipo']],
-          [10, ['receptor']],
-        ];
-        const posMisalign = expectedPositions.filter(([idx, kws]) =>
-          !kws.some(kw => (headers[idx]||'').includes(kw))
-        );
-        if (posMisalign.length > 1) {
-          reject(new Error('Las columnas del Excel ARCA no están en las posiciones esperadas. Puede ser que ARCA cambió el formato de exportación.'));
-          return;
-        }
-
-        // E8: Receptor CUIT — validar TODOS los comprobantes (puede haber mixed receptors)
-        const receptoresSet = new Set();
-        for (let i = 2; i < rows.length; i++) {
-          const r = rows[i];
-          if (!r || r[0] === null) continue;
-          const rc = String(r[10]||'').replace(/[^0-9]/g,'').padStart(11,'0');
-          if (rc && rc !== '00000000000') receptoresSet.add(rc);
-        }
-        if (receptoresSet.size > 1) {
-          reject(new Error(`El Excel contiene comprobantes de ${receptoresSet.size} receptores distintos: ${[...receptoresSet].join(', ')}. Filtralo por un solo CUIT antes de subir.`));
-          return;
-        }
-        const receptorCuit = receptoresSet.size === 1 ? [...receptoresSet][0] : '00000000000';
-
-        const registros = [];
-        const periodoMM = String(periodo.mes).padStart(2,'0');
-        const periodoYY = String(periodo.anio);
-        let fuera = 0;
-        for (let i = 2; i < rows.length; i++) {
-          const r = rows[i];
-          if (!r || r[0] === null) continue;
-          // B15: contar comprobantes fuera del período seleccionado
-          const f = String(r[0]||'').trim();
-          const m = f.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-          if (m) {
-            const fm = m[2].padStart(2,'0');
-            const fy = m[3].length === 2 ? '20'+m[3] : m[3];
-            if (fm !== periodoMM || fy !== periodoYY) fuera++;
-          }
-
-          // Col 1: Tipo ("1 - Factura A" → código "1")
-          const tipoCod  = String(r[1]||'').split(' - ')[0].trim();
-          // Col 7: CUIT emisor
-          const cuitEm   = String(r[7]||'').replace(/[^0-9]/g,'').padStart(11,'0');
-          // Col 2: Pto venta, Col 4: Número hasta
-          const ptoVta   = String(r[2]||'');
-          const numHasta = String(r[4]||'');
-          // Clave normalizada: cuit_emisor-tipo(int)-pto_vta(int)-numero_hasta(int)
-          const clave = `${cuitEm}-${parseInt(tipoCod)||0}-${parseInt(ptoVta)||0}-${parseInt(numHasta)||0}`;
-
-          registros.push({
-            clave,
-            cuit_emisor:        cuitEm,
-            tipo_cod:           tipoCod,
-            pto_vta:            ptoVta,
-            numero_hasta:       numHasta,
-            total:              String(r[29]||''),   // Col 29: Imp. Total
-            denominacion_emisor:String(r[8]||''),    // Col 8: Denominación Emisor
-            fecha:              String(r[0]||''),
-            estado:             'pendiente'
-          });
-        }
-        if (!registros.length) { reject(new Error('No se encontraron comprobantes')); return; }
-        if (fuera > 0) {
-          // No bloquea, solo informa
-          setTimeout(() => showAlert(`Atención: ${fuera} comprobante${fuera!==1?'s':''} del Excel ${fuera!==1?'tienen fecha fuera':'tiene fecha fuera'} del período ${periodoMM}/${periodoYY}`, 'warn'), 50);
-        }
-        resolve({ registros, receptorCuit });
-      } catch(err) { reject(err); }
-    };
-    reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
-    reader.readAsArrayBuffer(file);
-    }).catch(reject);
-  });
-}
-
-// ── Subir y procesar ──────────────────────────────────────────────────────────
-function handleSubir() {
-  if (!clienteSeleccionado) {
-    showAlert('Seleccioná un cliente antes de subir', 'warn');
-    return;
-  }
-  const pending = files.filter(f => f.status === 'pending');
-  const duplicates = files.filter(f => f.status === 'duplicate');
-  if (!pending.length && !duplicates.length) {
-    showAlert('No hay facturas en cola. Arrastrá los PDFs primero.', 'warn');
-    return;
-  }
-  // Si hay solo duplicados, activar forzar reprocesamiento automáticamente y continuar
-  if (!pending.length && duplicates.length > 0) {
-    duplicates.forEach(f => { f.status = 'pending'; });
-    renderQueue();
-  }
-  // duplicates already converted to pending above
-  if (duplicates.length > 0 && !forzarReproceso) {
-    if (!confirm(`Hay ${duplicates.length} archivo${duplicates.length!==1?'s':''} marcados como "ya existe" que NO se van a subir. ¿Continuar con los ${pending.length} pendientes?`)) {
-      return;
-    }
-  }
-  if (!registroSubido) {
-    document.getElementById('registryWarn').style.display = 'block';
-    return;
-  }
-  startUpload();
-}
-
-// ── Polling ───────────────────────────────────────────────────────────────────
-let pollingTimeoutMax = null;
-
-function iniciarPolling() {
-  if (pollingInterval) clearInterval(pollingInterval);
-  if (pollingTimeoutMax) clearTimeout(pollingTimeoutMax);
-  mostrarEstadoProceso('procesando');
-  // Cambiar todos los archivos 'done' (subidos) a 'en_cola' mientras se procesan
-  // para que sea claro que el proceso n8n aún no los tocó
-  files.forEach(f => { if (f.status === 'done') f.status = 'en_cola'; });
-  renderQueue();
-  
-  // Timeout máximo absoluto: 15 minutos. Si pasa eso, paramos el polling.
-  pollingTimeoutMax = setTimeout(() => {
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-      pollingInterval = null;
-      showAlert('El procesamiento está tardando demasiado. Si el PRN ya se generó en Drive, podés recargar la página.', 'warn');
-      mostrarEstadoProceso('listo', []);
-    }
-  }, 15 * 60 * 1000);
-
-  // Polling cada 10s (antes era 5s — reducimos carga al backend a la mitad)
-  pollingInterval = setInterval(async () => {
-    try {
-      const cuit = clienteSeleccionado?.cuit || '';
-      const per  = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
-      const res = await fetch(`${WEBHOOK_ESTADO()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`);
-      if (!res.ok) return;
-      let data;
-      try { data = await res.json(); } catch(e) { return; }
-      if (!data) return;
-      if (data.listo === true) {
-        // Limpieza completa: timers
-        clearInterval(pollingInterval);
-        pollingInterval = null;
-        if (pollingTimeoutMax) { clearTimeout(pollingTimeoutMax); pollingTimeoutMax = null; }
-        mostrarEstadoProceso('listo', data.fallidos);
-        if (data.fallidos && data.fallidos.length > 0) mostrarFallidos(data.fallidos);
-        if (data.conciliacion) mostrarConciliacion(data.conciliacion);
-        // G1: limpiar archivos procesados de la cola para próximo uso
-        files = files.filter(f => f.status !== 'done' && f.status !== 'en_cola' && f.status !== 'al_prn');
-        renderQueue();
-      } else if (data.archivos_estado || data.progreso) {
-        // Actualizar estado por archivo en la lista de PDFs
-        if (data.archivos_estado && Object.keys(data.archivos_estado).length > 0) {
-          aplicarEstadosArchivos(data.archivos_estado);
-        }
-        // Actualizar contador de progreso en el banner
-        if (data.progreso) {
-          const { procesadas, total } = data.progreso;
-          actualizarProgresoProceso(procesadas, total);
-        }
-      }
-    } catch(e) { console.warn('Polling error:', e); }
-    }, 5000);
-}
-
-function aplicarEstadosArchivos(estados) {
-  let actualizado = false;
-  let procesandoActual = null;
-  files.forEach(f => {
-    const nombreBase = f.name.replace(/^\d{11}__/, '');
-    const nuevoEstado = estados[f.name] || estados[nombreBase];
-    if (nuevoEstado && f.status !== nuevoEstado && f.status !== 'pending' && f.status !== 'error') {
-      f.status = nuevoEstado;
-      actualizado = true;
-      if (nuevoEstado === 'procesando') procesandoActual = nombreBase || f.name;
-    }
-  });
-  if (actualizado) {
-    renderQueue();
-    // Actualizar banner con qué factura se está procesando ahora
-    const epMsg = document.getElementById('_epMsg');
-    if (epMsg && procesandoActual) {
-      const alPrn = files.filter(f => f.status === 'al_prn').length;
-      const fallida = files.filter(f => f.status === 'fallida').length;
-      const total   = files.filter(f => ['al_prn','fallida','procesando'].includes(f.status)).length;
-      let msg = `Procesando: ${procesandoActual}`;
-      if (alPrn > 0 || fallida > 0) {
-        msg += ` — ${alPrn} al PRN${fallida > 0 ? ', '+fallida+' fallida'+(fallida!==1?'s':'') : ''}`;
-      }
-      epMsg.textContent = msg;
-    }
-  }
-}
-
-function actualizarProgresoProceso(procesadas, total) {
-  const el = document.getElementById('_epMsg');
-  if (!el) return;
-  if (total > 0) {
-    el.textContent = `n8n está procesando las facturas — ${procesadas} de ${total} agregadas al PRN…`;
-  } else if (procesadas > 0) {
-    el.textContent = `n8n está procesando las facturas — ${procesadas} agregada${procesadas !== 1 ? 's' : ''} al PRN…`;
-  }
-}
-
-function mostrarEstadoProceso(estado, fallidos) {
-  const el = document.getElementById('estadoProceso');
-  if (!el) return;
-  if (estado === 'procesando') {
-    el.style.display = 'flex';
-    el.className = 'alert a-info';
-    const rp = document.getElementById('resetPanel');
-    if (rp) rp.style.display = 'block';
-    el.innerHTML = '<i class="ti ti-loader" style="font-size:16px;margin-top:1px;flex-shrink:0;animation:spin 1s linear infinite;"></i><span id="_epMsg"></span>';
-    document.getElementById('_epMsg').textContent = 'n8n está procesando las facturas…';
-  } else if (estado === 'listo') {
-    el.style.display = 'flex';
-    el.className = 'alert a-success';
-    el.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
-    const rp = document.getElementById('resetPanel');
-    if (rp) rp.style.display = 'none';
-    const nf = fallidos && fallidos.length > 0;
-    const btn = document.getElementById('btnProcesar');
-    if (btn) { btn.disabled = false; btn.style.display = 'inline-block'; }
-    document.getElementById('_epMsg').textContent = nf
-      ? `✓ PRN generado. ${fallidos.length} factura${fallidos.length!==1?'s':''} con error — podés volver a procesar las fallidas.`
-      : '✓ PRN generado correctamente. Ya podés importarlo en Holistor.';
-  }
-}
-
-// ── Conciliación ──────────────────────────────────────────────────────────────
-function mostrarConciliacion(concil) {
-  const card = document.getElementById('cardConciliacion');
-  if (!concil) { card.style.display = 'none'; return; }
-  card.style.display = 'block';
-  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-  const pr  = concil.procesadas_registradas    || [];
-  const pnr = concil.procesadas_no_registro     || [];
-  const rnp = concil.registro_no_procesadas     || [];
-
-  document.getElementById('concilContent').innerHTML = [
-    buildConcilSection('ok',   'circle-check',  'Procesadas y en el registro',             pr,  'ok'),
-    buildConcilSection('warn', 'alert-triangle','Procesadas pero NO en el registro',        pnr, 'warn'),
-    buildConcilSection('err',  'circle-x',      'En el registro pero NO procesadas (faltan)', rnp, 'err'),
-  ].join('');
-
-  // Auto-expandir secciones con items
-  document.querySelectorAll('#concilContent .concil-head').forEach(h => {
-    const body = h.nextElementSibling;
-    const count = parseInt(h.querySelector('.concil-badge')?.textContent || '0');
-    if (count > 0) { h.classList.add('open'); body.classList.add('open'); }
-    h.addEventListener('click', () => { h.classList.toggle('open'); body.classList.toggle('open'); });
-  });
-}
-
-function buildConcilSection(type, icon, title, items, style) {
-  const rows = items.slice(0, 150).map(it => `
-    <div class="concil-row">
-      <span class="concil-key">${escapeHtml(it.clave||'')}</span>
-      <span class="concil-denom">${escapeHtml(it.denominacion||it.denominacion_emisor||'')}</span>
-      <span class="concil-total">${escapeHtml(it.total||'')}</span>
-    </div>`).join('');
-  const extra = items.length > 150
-    ? `<div style="text-align:center;padding:8px;font-size:11px;color:#999;">…y ${items.length-150} más</div>` : '';
-  const emptyMsg = `<div class="empty" style="padding:1rem;"><i class="ti ti-check" style="font-size:20px;display:block;margin-bottom:4px;"></i>Sin elementos</div>`;
-
-  return `
-    <div class="concil-section">
-      <div class="concil-head">
-        <i class="ti ti-${icon} concil-icon ci-${style}"></i>
-        <span class="concil-title">${escapeHtml(title)}</span>
-        <span class="concil-badge cb-${style}">${items.length}</span>
-        <i class="ti ti-chevron-down concil-toggle"></i>
-      </div>
-      <div class="concil-body">${items.length ? rows + extra : emptyMsg}</div>
-    </div>`;
-}
-
-// ── Fallidos ──────────────────────────────────────────────────────────────────
-async function reintentar() {
-  if (!archivosFallidos.length) return;
-  document.querySelectorAll('#cardFallidos button').forEach(b => b.disabled = true);
-  showAlert(`Reintentando ${archivosFallidos.length} archivo${archivosFallidos.length!==1?'s':''}…`, 'info');
-  try {
-    const res = await fetch(WEBHOOK_PROCESO(), {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ flush:true, mes:periodo?.mes, anio:periodo?.anio,
-        cliente_cuit: clienteSeleccionado?.cuit||'', cliente_nombre: clienteSeleccionado?.nombre||'', tiene_registro: registroSubido })
-    });
-    const data = await res.json();
-    document.getElementById('cardFallidos').style.display = 'none';
-    archivosFallidos = [];
-    iniciarPolling();
-    if (data.fallidos && data.fallidos.length > 0) {
-      mostrarFallidos(data.fallidos);
-      showAlert(`${data.fallidos.length} archivo${data.fallidos.length!==1?'s aún con':' aún con'} error.`, 'error');
-    } else {
-      showAlert('Reintento completado. Todas las facturas procesadas.', 'success');
-    }
-  } catch(e) {
-    showAlert('No se pudo reintentar. Intentá de nuevo.', 'error');
-  }
-  document.querySelectorAll('#cardFallidos button').forEach(b => b.disabled = false);
-}
-
-function mostrarFallidos(fallidos) {
-  if (!fallidos || !fallidos.length) return;
-  archivosFallidos = fallidos;
-  document.getElementById('cardFallidos').style.display = 'block';
-  document.getElementById('listFallidos').innerHTML = fallidos.map(nombre => `
-    <div class="history-item">
-      <i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;"></i>
-      <span class="history-name">${escapeHtml(nombre)}</span>
-      <span class="badge b-error">error</span>
-    </div>`).join('');
-}
-
-// ── Stats / Queue / History ───────────────────────────────────────────────────
-function updateStats() {
-  document.getElementById('statCola').textContent    = files.filter(f => f.status==='pending').length;
-  document.getElementById('statSubidos').textContent = subidos;
-  document.getElementById('statErrores').textContent = errores;
-}
-
-function renderQueue() {
-  const q = document.getElementById('queue');
-  if (!files.length) { q.style.display='none'; updateStats(); return; }
-  q.style.display = 'block';
-  const pending = files.filter(f => f.status==='pending').length;
-  document.getElementById('queueLabel').textContent = `${files.length} archivo${files.length!==1?'s':''} — ${pending} pendiente${pending!==1?'s':''}`;
-  if (pending > 0) {
-    const lotes = Math.ceil(pending/50);
-    document.getElementById('loteInfo').style.display = 'block';
-    document.getElementById('loteInfoText').textContent = `Se van a generar ${lotes} lote${lotes!==1?'s':''} de hasta 50 facturas cada uno`;
-    document.getElementById('loteResultado').style.display = 'none';
-  } else {
-    document.getElementById('loteInfo').style.display = 'none';
-  }
-  const labels = { pending:'pendiente', uploading:'verificando', done:'listo', error:'error', duplicate:'ya existe', en_cola:'en cola n8n', procesando:'procesando…', al_prn:'en PRN ✓', fallida:'fallida ✗' };
-  document.getElementById('fileList').innerHTML = files.map((f,i) => `
-    <div class="file-item">
-      <i class="ti ti-file-type-pdf" style="font-size:16px;color:#c5221f;flex-shrink:0;"></i>
-      <span class="file-name">${escapeHtml(f.name)}</span>
-      <span class="file-size">${(f.size/1024).toFixed(0)} KB</span>
-      <span class="badge b-${f.status}">${labels[f.status]}</span>
-      ${(f.status==='pending'||f.status==='duplicate')?`<button class="btn-remove" onclick="removeFile(${i})"><i class="ti ti-x"></i></button>`:''}
-    </div>`).join('');
-  updateStats();
-}
-
-function renderHistory() {
-  const el = document.getElementById('historyList');
-  if (!history.length) { el.innerHTML='<div class="empty"><i class="ti ti-inbox"></i>Todavía no se subieron archivos</div>'; return; }
-  el.innerHTML = history.map(h => `
-    <div class="history-item">
-      <i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;"></i>
-      <span class="history-name">${escapeHtml(h.name)}</span>
-      <span class="history-time">${h.time}</span>
-      <span class="badge ${h.ok?'b-done':'b-error'}">${h.ok?'subido':'error'}</span>
-    </div>`).join('');
-}
-
-// ── Verificar duplicado ───────────────────────────────────────────────────────
-async function verificarDuplicado(nombre) {
-  try {
-    const cuit = clienteSeleccionado?.cuit || '';
-    const res = await fetch(WEBHOOK_VERIFICAR(), { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ nombre, cliente_cuit: cuit }) });
-    if (!res.ok) return 'error';
-    return (await res.json()).existe === true;
-  } catch(e) { return 'error'; }
-}
-
-async function addFiles(newFiles) {
-  const pdfs = Array.from(newFiles).filter(f => f.type==='application/pdf' || f.name.endsWith('.pdf'));
-  if (!pdfs.length) { showAlert('Solo se aceptan archivos PDF en esta zona', 'error'); return; }
-
-  // Agregar archivos INMEDIATAMENTE como "verificando" para que el usuario vea feedback
-  const tempItems = pdfs.map(f => ({ name:f.name, size:f.size, file:f, status:'uploading', _temp:true }));
-  tempItems.forEach(t => files.push(t));
-  renderQueue();  // ← feedback visual inmediato
-
-  // Si está en modo forzar, confirmar como pendientes directo
-  if (forzarReproceso) {
-    tempItems.forEach(t => { t.status = 'pending'; delete t._temp; });
-    renderQueue();
-    return;
-  }
-
-  // Verificar duplicados en paralelo
-  const CONCURRENCY_VERIF = 10;
-  const resultados = new Array(pdfs.length);
-  let nextIdx = 0;
-  await Promise.all(Array.from({length: Math.min(CONCURRENCY_VERIF, pdfs.length)}, async () => {
-    while (true) {
-      const i = nextIdx++;
-      if (i >= pdfs.length) break;
-      resultados[i] = await verificarDuplicado(pdfs[i].name);
-    }
-  }));
-
-  const duplicados = [], erroresVerif = [];
-  pdfs.forEach((f, i) => {
-    const item = tempItems[i];
-    const r = resultados[i];
-    if (r === true) {
-      // Duplicado: NO removemos, marcamos con status especial para que el usuario decida
-      if (item) { item.status = 'duplicate'; delete item._temp; }
-      duplicados.push(f.name);
-    } else {
-      // OK o error de verificación → dejar pasar como pendiente
-      if (item) { item.status = 'pending'; delete item._temp; }
-      if (r === 'error') erroresVerif.push(f.name);
-    }
-  });
-
-  if (duplicados.length) {
-    showAlert(`${duplicados.length} archivo${duplicados.length!==1?'s ya estaban':' ya estaba'} en Drive (en la cola están marcados como "ya existe"). Quitalos manualmente o activá "Forzar reprocesamiento" antes de subir.`, 'warn');
-  }
-  if (erroresVerif.length) showAlert(`No se pudo verificar duplicados de ${erroresVerif.length} archivo${erroresVerif.length!==1?'s':''}. Se van a subir igual.`, 'warn');
-  renderQueue();
-}
-
-function removeFile(i) { files.splice(i,1); renderQueue(); }
-function clearPending() { files = files.filter(f => f.status!=='pending'); renderQueue(); }
-
-// ── Upload ────────────────────────────────────────────────────────────────────
-async function startUpload() {
-  if (uploading) return;
-  if (pollingInterval) { showAlert('Ya hay un proceso en ejecución. Esperá a que termine.', 'error'); return; }
-  const pending = files.filter(f => f.status==='pending');
-  if (!pending.length) return;
-  uploading = true;
-  document.getElementById('btnSubir').disabled = true;
-  document.getElementById('progressWrap').style.display = 'block';
-  let done = 0, total = pending.length;
-  // Si forzar está tildado, convertir duplicates en pending para procesarlos
-  if (forzarReproceso) {
-    files.forEach(f => { if (f.status === 'duplicate') f.status = 'pending'; });
-    renderQueue();
-  }
-  const indices = files.map((_,i)=>i).filter(i => files[i].status==='pending' && !files[i]._temp);
-
-  // O1: subir en paralelo con concurrencia limitada
-  const CONCURRENCY = 5;
-  const cuit = clienteSeleccionado?.cuit || '';
-  async function subirUno(i) {
-    files[i].status = 'uploading'; renderQueue();
-    try {
-      const fd = new FormData();
-      fd.append('file', files[i].file, files[i].name);
-      fd.append('cliente_cuit', cuit);  // B12
-      const res = await fetch(WEBHOOK(), { method:'POST', body:fd });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      files[i].status = 'done'; subidos++;
-      history.unshift({ name:files[i].name, time:new Date().toLocaleTimeString('es-AR'), ok:true });
-    } catch(e) {
-      files[i].status = 'error'; errores++;
-      history.unshift({ name:files[i].name, time:new Date().toLocaleTimeString('es-AR'), ok:false });
-    }
-    done++;
-    document.getElementById('progressBar').style.width = Math.round(done/total*100) + '%';
-    renderQueue(); renderHistory();
-  }
-
-  // Worker pool simple — N workers que consumen de la cola
-  const queue = indices.slice();
-  await Promise.all(Array.from({length: Math.min(CONCURRENCY, queue.length)}, async () => {
-    while (queue.length) {
-      const idx = queue.shift();
-      if (idx !== undefined) await subirUno(idx);
-    }
-  }));
-
-  uploading = false;
-  document.getElementById('btnSubir').disabled = false;
-  document.getElementById('progressWrap').style.display = 'none'; // ocultar barra tras upload
-  const ok  = files.filter(f => f.status==='done').length;
-  const err = files.filter(f => f.status==='error').length;
-
-  if (ok > 0) {
-    // B2: esperar 5s para que Drive indexe los archivos recién subidos (3s era apurado en redes lentas)
-    await new Promise(r => setTimeout(r, 5000));
-    try {
-      const respProceso = await fetch(WEBHOOK_PROCESO(), {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          flush:         true,
-          mes:           periodo?.mes,
-          anio:          periodo?.anio,
-          cliente_cuit:  clienteSeleccionado?.cuit || '',
-          cliente_nombre: clienteSeleccionado?.nombre || '',
-          tiene_registro: registroSubido
-        })
-      });
-      try {
-        const dp = await respProceso.json();
-        if (dp.proceso_ya_activo === true) { showAlert(dp.mensaje||'Ya hay un proceso activo.', 'error'); return; }
-        if (dp.fallidos && dp.fallidos.length > 0) mostrarFallidos(dp.fallidos);
-      } catch(e) {}
-      iniciarPolling();
-      // Desplazar al banner de proceso para que el usuario vea que está corriendo
-      setTimeout(() => {
-        const ep = document.getElementById('estadoProceso');
-        if (ep) ep.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 300);
-      const lotesEjecutados = Math.ceil(ok/50);
-      document.getElementById('loteResultado').style.display = 'block';
-      document.getElementById('loteResultadoText').textContent = `${ok} archivo${ok!==1?'s':''} subido${ok!==1?'s':''} — ${lotesEjecutados} lote${lotesEjecutados!==1?'s':''} en proceso`;
-      document.getElementById('loteInfo').style.display = 'none';
-      showAlert(`${ok} archivo${ok!==1?'s':''} subido${ok!==1?'s':''}${err?' · '+err+' con error':''}.  n8n está procesando.`, 'success');
-    } catch(e) {
-      showAlert(`${ok} archivo${ok!==1?'s':''} subido${ok!==1?'s':''}. No se pudo iniciar el proceso — usá "Procesar ahora".`, 'error');
-      document.getElementById('btnProcesar').style.display = 'inline-block';
-    }
-  } else {
-    showAlert('No se pudo subir ningún archivo.', 'error');
-  }
-}
-
-async function sendFlush() {
-  if (!clienteSeleccionado) { showAlert('Seleccioná un cliente antes de procesar', 'warn'); return; }
-  try {
-    document.getElementById('btnProcesar').disabled = true;
-    await fetch(WEBHOOK_PROCESO(), {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ flush:true, mes:periodo?.mes, anio:periodo?.anio,
-        cliente_cuit: clienteSeleccionado?.cuit||'', cliente_nombre: clienteSeleccionado?.nombre||'', tiene_registro: registroSubido })
-    });
-    iniciarPolling();  // mostrar cartelito + arrancar polling de resultado
-  } catch(e) {
-    showAlert('No se pudo enviar la señal', 'error');
-    document.getElementById('btnProcesar').disabled = false;
-  }
-}
-
-// ── Período ───────────────────────────────────────────────────────────────────
-const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio',
-                   'julio','agosto','septiembre','octubre','noviembre','diciembre'];
-
-function actualizarPeriodo() {
-  const mes  = parseInt(document.getElementById('selMes').value);
-  const anio = parseInt(document.getElementById('selAnio').value);
-  periodo = { mes, anio };
-  const ultimoDia = new Date(anio, mes, 0).getDate();
-  const mesNombre = MESES_ES[mes - 1];
-  document.getElementById('periodoInfo').textContent = `Fecha de recepción: ${String(ultimoDia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${anio} (último día de ${mesNombre} ${anio})`;
-}
-
-function inicializarSelectores() {
-  const hoy = new Date(), anioActual = hoy.getFullYear();
-  const selAnio = document.getElementById('selAnio');
-  // Construir opciones de año de una sola vez con fragment (evita reflows por cada appendChild)
-  const frag = document.createDocumentFragment();
-  for (let a = anioActual-3; a <= anioActual; a++) {
-    const opt = document.createElement('option');
-    opt.value = a; opt.textContent = a;
-    if (a === anioActual) opt.selected = true;
-    frag.appendChild(opt);
-  }
-  selAnio.appendChild(frag);
-  const mesPorDefecto  = hoy.getMonth() === 0 ? 12 : hoy.getMonth();
-  const anioPorDefecto = hoy.getMonth() === 0 ? anioActual-1 : anioActual;
-  document.getElementById('selMes').value = mesPorDefecto;
-  selAnio.value = anioPorDefecto;
-  actualizarPeriodo();
-}
-
-// ── Init ──────────────────────────────────────────────────────────────────────
-inicializarSelectores();
-loadClientes();
-actualizarBadgeEntorno();
-
-const dz = document.getElementById('dropZone');
-const fi = document.getElementById('fileInput');
-dz.addEventListener('click',    () => fi.click());
-dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
-dz.addEventListener('dragleave',() => dz.classList.remove('dragover'));
-dz.addEventListener('drop',     e => { e.preventDefault(); dz.classList.remove('dragover'); addFiles(e.dataTransfer.files); });
-fi.addEventListener('change',   e => { addFiles(e.target.files); fi.value=''; });
-
-const ez = document.getElementById('excelZone');
-const ei = document.getElementById('excelInput');
-(() => {
-  let _excelPicking = false;
-  ez.addEventListener('click', () => {
-    if (registroSubido || _excelPicking) return;
-    _excelPicking = true;
-    ei.click();
-    // reset después de 1s — absorbe el "echo click" que el browser dispara
-    // cuando el foco vuelve a la zona al cerrar el diálogo
-    setTimeout(() => { _excelPicking = false; }, 1000);
-  });
-})();
-ez.addEventListener('dragover', e => { e.preventDefault(); if (!registroSubido) ez.classList.add('dragover'); });
-ez.addEventListener('dragleave',() => ez.classList.remove('dragover'));
-ez.addEventListener('drop',     e => { e.preventDefault(); ez.classList.remove('dragover'); if (!registroSubido && e.dataTransfer.files[0]) handleExcelFile(e.dataTransfer.files[0]); });
-ei.addEventListener('change',   e => { if (e.target.files[0]) { handleExcelFile(e.target.files[0]); ei.value=''; } });
-</script>
+<script src="https://cdn.jsdelivr.net/npm/app.js" type="module"></script>
 </body>
 </html>

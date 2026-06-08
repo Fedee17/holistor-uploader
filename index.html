@@ -128,7 +128,17 @@
 </head>
 <body>
 <div class="container">
-  <h1><i class="ti ti-file-invoice"></i> Holistor — Subir facturas</h1>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:8px;">
+  <h1 style="margin-bottom:0;"><i class="ti ti-file-invoice"></i> Holistor — Subir facturas</h1>
+  <div id="entornoWrap" style="display:flex;align-items:center;gap:8px;">
+    <span style="font-size:12px;color:#888;">Entorno:</span>
+    <select id="selEntorno" onchange="cambiarEntorno()" style="border:0.5px solid #ccc;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;background:#fff;">
+      <option value="produccion">🟢 Producción</option>
+      <option value="demo">🟡 Demo / Test</option>
+    </select>
+    <span id="entornoBadge" style="font-size:11px;padding:2px 8px;border-radius:4px;font-weight:500;"></span>
+  </div>
+</div>
 
   <div id="alert" class="alert"></div>
 
@@ -264,20 +274,56 @@
 </div>
 
 <script>
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function cambiarEntorno() {
+  _entorno = document.getElementById('selEntorno').value;
+  localStorage.setItem('holistor_entorno', _entorno);
+  actualizarBadgeEntorno();
+  // Limpiar cache de clientes (puede diferir entre entornos)
+  try { sessionStorage.removeItem('holistor_clientes_v2'); } catch(e) {}
+  loadClientes(true);
+  showAlert(`Entorno cambiado a: ${ENTORNOS[_entorno]?.label}`, 'info');
+}
+function actualizarBadgeEntorno() {
+  const badge = document.getElementById('entornoBadge');
+  const sel   = document.getElementById('selEntorno');
+  if (!badge || !sel) return;
+  sel.value = _entorno;
+  const cfg = ENTORNOS[_entorno] || ENTORNOS.produccion;
+  badge.textContent = _entorno === 'demo' ? '⚠ pruebas' : '';
+  badge.style.background = _entorno === 'demo' ? '#fff8e0' : 'transparent';
+  badge.style.color = '#e37400';
+}─
 function escapeHtml(s) {
   if (s === null || s === undefined) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 }
 
 // ── Webhooks ──────────────────────────────────────────────────────────────────
-const WEBHOOK           = 'https://fede123.app.n8n.cloud/webhook/holistor-upload';
-const WEBHOOK_PROCESO   = 'https://fede123.app.n8n.cloud/webhook/holistor-procesar';
-const WEBHOOK_VERIFICAR = 'https://fede123.app.n8n.cloud/webhook/holistor-verificar';
-const WEBHOOK_ESTADO    = 'https://fede123.app.n8n.cloud/webhook/holistor-estado';
-const WEBHOOK_CLIENTES  = 'https://fede123.app.n8n.cloud/webhook/holistor-clientes';
-const WEBHOOK_REGISTRO  = 'https://fede123.app.n8n.cloud/webhook/holistor-registro';
-const WEBHOOK_RESET     = 'https://fede123.app.n8n.cloud/webhook/holistor-reset';
+// ── Entornos n8n ─────────────────────────────────────────────────────────────
+const ENTORNOS = {
+  produccion: {
+    label:    'Producción',
+    base:     'https://fede123.app.n8n.cloud/webhook',
+    color:    '#188038',
+  },
+  demo: {
+    label:    'Demo / Test',
+    base:     'https://fede123.app.n8n.cloud/webhook-test',
+    color:    '#e37400',
+  }
+};
+let _entorno = localStorage.getItem('holistor_entorno') || 'produccion';
+
+function getBase() { return ENTORNOS[_entorno]?.base || ENTORNOS.produccion.base; }
+
+const WEBHOOK           = () => getBase() + '/holistor-upload';
+const WEBHOOK_PROCESO   = () => getBase() + '/holistor-procesar';
+const WEBHOOK_VERIFICAR = () => getBase() + '/holistor-verificar';
+const WEBHOOK_ESTADO    = () => getBase() + '/holistor-estado';
+const WEBHOOK_CLIENTES  = () => getBase() + '/holistor-clientes';
+const WEBHOOK_REGISTRO  = () => getBase() + '/holistor-registro';
+const WEBHOOK_RESET     = () => getBase() + '/holistor-reset';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let periodo             = null;
@@ -328,7 +374,7 @@ async function loadClientes(forzar = false) {
   // Fetch desde backend
   sel.innerHTML = '<option value="">— Cargando… —</option>';
   try {
-    const res = await fetch(WEBHOOK_CLIENTES);
+    const res = await fetch(WEBHOOK_CLIENTES());
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const lista = await res.json();
     if (!Array.isArray(lista) || !lista.length) throw new Error('Lista vacía');
@@ -369,7 +415,7 @@ async function resetProceso() {
   try {
     const cuit = clienteSeleccionado?.cuit || '';
     const per  = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
-    const res  = await fetch(WEBHOOK_RESET, {
+    const res  = await fetch(WEBHOOK_RESET(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cliente_cuit: cuit, periodo: per })
@@ -525,7 +571,7 @@ async function handleExcelFile(file) {
     const timer = setTimeout(() => ctrl.abort(), 90000);
     let resReg;
     try {
-      resReg = await fetch(WEBHOOK_REGISTRO, {
+      resReg = await fetch(WEBHOOK_REGISTRO(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cliente_cuit: clienteSeleccionado.cuit, periodo: periodoStr, registros }),
@@ -727,7 +773,7 @@ function iniciarPolling() {
     try {
       const cuit = clienteSeleccionado?.cuit || '';
       const per  = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
-      const res = await fetch(`${WEBHOOK_ESTADO}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`);
+      const res = await fetch(`${WEBHOOK_ESTADO()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`);
       if (!res.ok) return;
       let data;
       try { data = await res.json(); } catch(e) { return; }
@@ -877,7 +923,7 @@ async function reintentar() {
   document.querySelectorAll('#cardFallidos button').forEach(b => b.disabled = true);
   showAlert(`Reintentando ${archivosFallidos.length} archivo${archivosFallidos.length!==1?'s':''}…`, 'info');
   try {
-    const res = await fetch(WEBHOOK_PROCESO, {
+    const res = await fetch(WEBHOOK_PROCESO(), {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ flush:true, mes:periodo?.mes, anio:periodo?.anio,
         cliente_cuit: clienteSeleccionado?.cuit||'', cliente_nombre: clienteSeleccionado?.nombre||'', tiene_registro: registroSubido })
@@ -959,7 +1005,7 @@ function renderHistory() {
 async function verificarDuplicado(nombre) {
   try {
     const cuit = clienteSeleccionado?.cuit || '';
-    const res = await fetch(WEBHOOK_VERIFICAR, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ nombre, cliente_cuit: cuit }) });
+    const res = await fetch(WEBHOOK_VERIFICAR(), { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ nombre, cliente_cuit: cuit }) });
     if (!res.ok) return 'error';
     return (await res.json()).existe === true;
   } catch(e) { return 'error'; }
@@ -1044,7 +1090,7 @@ async function startUpload() {
       const fd = new FormData();
       fd.append('file', files[i].file, files[i].name);
       fd.append('cliente_cuit', cuit);  // B12
-      const res = await fetch(WEBHOOK, { method:'POST', body:fd });
+      const res = await fetch(WEBHOOK(), { method:'POST', body:fd });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       files[i].status = 'done'; subidos++;
       history.unshift({ name:files[i].name, time:new Date().toLocaleTimeString('es-AR'), ok:true });
@@ -1076,7 +1122,7 @@ async function startUpload() {
     // B2: esperar 5s para que Drive indexe los archivos recién subidos (3s era apurado en redes lentas)
     await new Promise(r => setTimeout(r, 5000));
     try {
-      const respProceso = await fetch(WEBHOOK_PROCESO, {
+      const respProceso = await fetch(WEBHOOK_PROCESO(), {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           flush:         true,
@@ -1116,7 +1162,7 @@ async function sendFlush() {
   if (!clienteSeleccionado) { showAlert('Seleccioná un cliente antes de procesar', 'warn'); return; }
   try {
     document.getElementById('btnProcesar').disabled = true;
-    await fetch(WEBHOOK_PROCESO, {
+    await fetch(WEBHOOK_PROCESO(), {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ flush:true, mes:periodo?.mes, anio:periodo?.anio,
         cliente_cuit: clienteSeleccionado?.cuit||'', cliente_nombre: clienteSeleccionado?.nombre||'', tiene_registro: registroSubido })
@@ -1163,6 +1209,7 @@ function inicializarSelectores() {
 // ── Init ──────────────────────────────────────────────────────────────────────
 inicializarSelectores();
 loadClientes();
+actualizarBadgeEntorno();
 
 const dz = document.getElementById('dropZone');
 const fi = document.getElementById('fileInput');

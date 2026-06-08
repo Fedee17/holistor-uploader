@@ -733,9 +733,23 @@ function iniciarPolling() {
         // G1: limpiar archivos procesados de la cola para próximo uso
         files = files.filter(f => f.status !== 'done');
         renderQueue();
+      } else if (data.progreso) {
+        // Mostrar progreso factura a factura mientras procesa
+        const { procesadas, total } = data.progreso;
+        actualizarProgresoProceso(procesadas, total);
       }
     } catch(e) { console.warn('Polling error:', e); }
   }, 10000);
+}
+
+function actualizarProgresoProceso(procesadas, total) {
+  const el = document.getElementById('_epMsg');
+  if (!el) return;
+  if (total > 0) {
+    el.textContent = `n8n está procesando las facturas — ${procesadas} de ${total} agregadas al PRN…`;
+  } else if (procesadas > 0) {
+    el.textContent = `n8n está procesando las facturas — ${procesadas} agregada${procesadas !== 1 ? 's' : ''} al PRN…`;
+  }
 }
 
 function mostrarEstadoProceso(estado, fallidos) {

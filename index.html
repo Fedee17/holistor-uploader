@@ -70,7 +70,11 @@
   .b-uploading { background: #e8f0fe; color: #1a73e8; }
   .b-done      { background: #e6f4ea; color: #188038; }
   .b-error     { background: #fce8e6; color: #c5221f; }
-  .b-duplicate { background: #fff3e0; color: #e37400; }
+  .b-duplicate  { background: #fff3e0; color: #e37400; }
+  .b-procesando { background: #e3f2fd; color: #1565c0; animation: pulse-badge 1.5s ease-in-out infinite; }
+  .b-al_prn     { background: #e6f4ea; color: #137333; font-weight: 600; }
+  .b-fallida    { background: #fce8e6; color: #a50e0e; }
+  @keyframes pulse-badge { 0%,100%{opacity:1} 50%{opacity:.6} }
   .btn-remove { background: none; border: none; cursor: pointer; color: #aaa; font-size: 16px; padding: 2px; line-height: 1; }
   .btn-remove:hover { color: #c5221f; }
   .btn-row { display: flex; gap: 10px; margin-top: 1rem; flex-wrap: wrap; }
@@ -701,6 +705,8 @@ function iniciarPolling() {
   if (pollingInterval) clearInterval(pollingInterval);
   if (pollingTimeoutMax) clearTimeout(pollingTimeoutMax);
   mostrarEstadoProceso('procesando');
+  // Marcar todos los archivos 'done' (subidos) como listos para procesar
+  // El backend irá actualizando a 'procesando' → 'al_prn'/'fallida'
   
   // Timeout máximo absoluto: 15 minutos. Si pasa eso, paramos el polling.
   pollingTimeoutMax = setTimeout(() => {
@@ -733,13 +739,33 @@ function iniciarPolling() {
         // G1: limpiar archivos procesados de la cola para próximo uso
         files = files.filter(f => f.status !== 'done');
         renderQueue();
-      } else if (data.progreso) {
-        // Mostrar progreso factura a factura mientras procesa
-        const { procesadas, total } = data.progreso;
-        actualizarProgresoProceso(procesadas, total);
+      } else if (data.archivos_estado || data.progreso) {
+        // Actualizar estado por archivo en la lista de PDFs
+        if (data.archivos_estado && Object.keys(data.archivos_estado).length > 0) {
+          aplicarEstadosArchivos(data.archivos_estado);
+        }
+        // Actualizar contador de progreso en el banner
+        if (data.progreso) {
+          const { procesadas, total } = data.progreso;
+          actualizarProgresoProceso(procesadas, total);
+        }
       }
     } catch(e) { console.warn('Polling error:', e); }
   }, 10000);
+}
+
+function aplicarEstadosArchivos(estados) {
+  // Actualiza el status de cada archivo en la lista según el backend
+  let actualizado = false;
+  files.forEach(f => {
+    const nombreBase = f.name.replace(/^\d{11}__/, '');
+    const nuevoEstado = estados[f.name] || estados[nombreBase];
+    if (nuevoEstado && f.status !== nuevoEstado && f.status !== 'pending' && f.status !== 'error') {
+      f.status = nuevoEstado;
+      actualizado = true;
+    }
+  });
+  if (actualizado) renderQueue();
 }
 
 function actualizarProgresoProceso(procesadas, total) {
@@ -886,7 +912,7 @@ function renderQueue() {
   } else {
     document.getElementById('loteInfo').style.display = 'none';
   }
-  const labels = { pending:'pendiente', uploading:'verificando', done:'listo', error:'error', duplicate:'ya existe' };
+  const labels = { pending:'pendiente', uploading:'verificando', done:'listo', error:'error', duplicate:'ya existe', procesando:'procesando…', al_prn:'en PRN ✓', fallida:'fallida ✗' };
   document.getElementById('fileList').innerHTML = files.map((f,i) => `
     <div class="file-item">
       <i class="ti ti-file-type-pdf" style="font-size:16px;color:#c5221f;flex-shrink:0;"></i>

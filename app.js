@@ -771,17 +771,172 @@ function clearPending() {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// UPLOAD Y PROCESAMIENTO (TODO - stubs)
+// UPLOAD - IMPLEMENTACIÓN COMPLETA
 // ──────────────────────────────────────────────────────────────────────────────
 async function startUpload() {
-  // TODO: implementar lógica de upload a n8n
-  showAlert('TODO: implementar upload', 'info');
-  iniciarPolling();
+  if (uploading) {
+    showAlert('Ya hay un upload en progreso', 'warn');
+    return;
+  }
+
+  const pendingFiles = files.filter(f => f.status === 'pending');
+  if (!pendingFiles.length) {
+    showAlert('No hay archivos para subir', 'warn');
+    return;
+  }
+
+  uploading = true;
+  const btnSubir = document.getElementById('btnSubir');
+  if (btnSubir) btnSubir.disabled = true;
+
+  try {
+    // Procesar en lotes de 50 archivos
+    const LOTE_SIZE = 50;
+    const totalLotes = Math.ceil(pendingFiles.length / LOTE_SIZE);
+    let processedInThisBatch = 0;
+
+    for (let loteIdx = 0; loteIdx < totalLotes; loteIdx++) {
+      const inicio = loteIdx * LOTE_SIZE;
+      const fin = Math.min(inicio + LOTE_SIZE, pendingFiles.length);
+      const lotePdfs = pendingFiles.slice(inicio, fin);
+
+      showAlert(`Subiendo lote ${loteIdx + 1} de ${totalLotes}...`, 'info');
+
+      // Preparar FormData con los archivos del lote
+      const formData = new FormData();
+      formData.append('cliente_cuit', clienteSeleccionado.cuit);
+      formData.append('cliente_nombre', clienteSeleccionado.nombre);
+      formData.append('periodo_mes', periodo.mes);
+      formData.append('periodo_anio', periodo.anio);
+      formData.append('forzar_reproceso', forzarReproceso);
+      formData.append('tiene_registro', registroSubido);
+
+      // Agregar archivos del lote
+      lotePdfs.forEach((f, idx) => {
+        if (f.file) {
+          formData.append(`files`, f.file);
+          formData.append(`file_names`, f.name);
+        }
+      });
+
+      try {
+        // Upload con timeout de 5 minutos por lote
+        const ctrl = new AbortController();
+        const uploadTimeout = setTimeout(() => ctrl.abort(), 5 * 60 * 1000);
+
+        const res = await fetch(WEBHOOK.upload(), {
+          method: 'POST',
+          body: formData,
+          signal: ctrl.signal
+        });
+
+        clearTimeout(uploadTimeout);
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+
+        // Actualizar estado de los archivos del lote
+        if (data.uploaded && Array.isArray(data.uploaded)) {
+          data.uploaded.forEach(nombre => {
+            const file = files.find(f => f.name === nombre);
+            if (file) {
+              file.status = 'done';
+              processedInThisBatch++;
+              subidos++;
+            }
+          });
+        }
+
+        if (data.errors && Array.isArray(data.errors)) {
+          data.errors.forEach(nombre => {
+            const file = files.find(f => f.name === nombre);
+            if (file) {
+              file.status = 'error';
+              errores++;
+            }
+          });
+        }
+
+        renderQueue();
+        updateStats();
+
+      } catch(err) {
+        const esTimeout = err.name === 'AbortError';
+        const msgError = esTimeout 
+          ? 'Timeout al subir. El lote está tardando demasiado.'
+          : `Error: ${err.message}`;
+        
+        showAlert(msgError, 'error');
+
+        // Marcar archivos del lote como error
+        lotePdfs.forEach(f => {
+          const file = files.find(x => x.name === f.name);
+          if (file) {
+            file.status = 'error';
+            errores++;
+          }
+        });
+        renderQueue();
+        updateStats();
+
+        // Continuar con siguiente lote a pesar del error
+        continue;
+      }
+    }
+
+    // Todos los lotes completados - iniciar procesamiento
+    if (subidos > 0) {
+      showAlert(`✓ Subidos ${subidos} ${pluralizar(subidos, 'archivo', 'archivos')}. Iniciando procesamiento…`, 'success');
+      
+      // Esperar un poco antes de enviar a procesar
+      await new Promise(r => setTimeout(r, 2000));
+      
+      await sendFlush();
+    }
+
+  } finally {
+    uploading = false;
+    if (btnSubir) btnSubir.disabled = false;
+  }
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// PROCESAR / FLUSH - IMPLEMENTACIÓN COMPLETA
+// ──────────────────────────────────────────────────────────────────────────────
 async function sendFlush() {
-  // TODO: implementar flush
-  showAlert('TODO: implementar flush', 'info');
+  try {
+    const res = await fetch(WEBHOOK.procesar(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        flush: true,
+        mes: periodo.mes,
+        anio: periodo.anio,
+        cliente_cuit: clienteSeleccionado.cuit,
+        cliente_nombre: clienteSeleccionado.nombre,
+        tiene_registro: registroSubido
+      })
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    if (data.ok || data.iniciado) {
+      showAlert('Procesamiento iniciado en n8n', 'success');
+      iniciarPolling();
+    } else {
+      showAlert('Error al iniciar procesamiento', 'error');
+    }
+
+  } catch(err) {
+    showAlert(`Error: ${err.message}`, 'error');
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

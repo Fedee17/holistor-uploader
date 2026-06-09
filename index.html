@@ -322,7 +322,6 @@ let registroSubido      = false;
 let archivosFallidos    = [];
 let files = [], history = [], uploading = false, subidos = 0, errores = 0;
 let pollingInterval = null, pollingTimeoutMax = null;
-let pollingSince = 0;  // FIX: timestamp para evitar falso "listo" de corrida anterior
 
 const BATCH_FRONTEND_SIZE = 100;
 
@@ -643,9 +642,6 @@ function stopPolling() {
 
 function iniciarPolling() {
   stopPolling();
-  // FIX: guardar timestamp de inicio para que el backend ignore el estado de corridas anteriores
-  pollingSince = Date.now();
-
   mostrarEstadoProceso('procesando');
   updateProcesoUX('ia', 65, 'Procesando en n8n', 'Gemini está leyendo las facturas y generando líneas PRN.', { progressText:'Esperando avance del backend…' });
   logProceso('Procesamiento iniciado: PDFs en cola para Gemini y PRN.');
@@ -671,7 +667,7 @@ function iniciarPolling() {
       const per  = periodoStr();
       // FIX: pasar &desde= para que el backend distinga esta corrida de la anterior
       const res  = await fetchConTimeout(
-        `${WEBHOOK.estado()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}&desde=${pollingSince}`,
+        `${WEBHOOK.estado()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`,
         {}, 30000
       );
       if (!res.ok) return;

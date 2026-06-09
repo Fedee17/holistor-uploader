@@ -1319,7 +1319,7 @@ function initApp() {
   const fileInput = document.getElementById('fileInput');
   
   dropZone.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', (e) => addFiles(e.target.files));
+  fileInput.addEventListener('change', (e) => { addFiles(e.target.files); e.target.value = ''; });('change', (e) => addFiles(e.target.files));
   
   ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
     dropZone.addEventListener(evt, (e) => e.preventDefault());

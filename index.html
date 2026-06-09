@@ -594,11 +594,20 @@ function logProceso(msg) {
 
 function resetProcesoUX() {
   procesoActual = { step:'validacion', pct:0 };
-  const card = document.getElementById('processCard');
-  if (card) card.classList.remove('active');
   const log = document.getElementById('processLog');
   if (log) log.innerHTML = '';
-  updateProcesoUX('validacion', 0, 'En espera', 'Todavía no se inició ningún procesamiento.');
+  // Limpiar los steps sin activar el card
+  document.querySelectorAll('.pstep').forEach(el => el.classList.remove('done','active','error'));
+  const pill = document.getElementById('processPill');  if (pill) pill.textContent = 'En espera';
+  const sub  = document.getElementById('processSubtitle'); if (sub) sub.textContent = 'Todavía no se inició ningún procesamiento.';
+  const fill = document.getElementById('processBarFill');  if (fill) fill.style.width = '0%';
+  const pctL = document.getElementById('processProgressLabel'); if (pctL) pctL.textContent = '0%';
+  const txt  = document.getElementById('processProgressText');  if (txt)  txt.textContent = '';
+  // Ocultar el card — NO lo mostramos hasta que realmente arranque un proceso
+  const card = document.getElementById('processCard');
+  if (card) card.classList.remove('active');
+  const lb = document.getElementById('btnLiberarWrap');
+  if (lb) lb.style.display = 'none';
 }
 
 function updateProcesoUX(step, pct, statusText, subtitle, opts = {}) {

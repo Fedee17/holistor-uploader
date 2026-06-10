@@ -206,6 +206,8 @@
           <button class="rw-btn-b" onclick="procesarSinRegistro()">Procesar sin registro</button>
         </div>
       </div>
+      <!-- v6: aviso de proveedores no cargados en PROVEEDORES -->
+      <div class="registry-warn" id="provFaltantes" style="display:none;"></div>
     </div>
     <div class="queue" id="queue">
       <div class="queue-label" id="queueLabel">0 archivos</div>
@@ -288,13 +290,14 @@ const WEBHOOK = {
   estado:    () => BASE_WEBHOOK + '/holistor-estado',
   clientes:  () => BASE_WEBHOOK + '/holistor-clientes',
   registro:  () => BASE_WEBHOOK + '/holistor-registro',
-  reset:     () => BASE_WEBHOOK + '/holistor-reset'
+  reset:     () => BASE_WEBHOOK + '/holistor-reset',
+  proveedores: () => BASE_WEBHOOK + '/holistor-proveedores'
 };
 
 const DRIVE_INDEX_DELAY_MS = 6000;
 const FETCH_TIMEOUT_MS     = 90000;
 const POLLING_INTERVAL_MS  = 5000;
-const POLLING_TIMEOUT_MS   = 15 * 60 * 1000;
+const POLLING_TIMEOUT_MS    = 15 * 60 * 1000;
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -400,6 +403,37 @@ function poblarSelectClientes(sel, lista) {
   sel.replaceChildren(frag);
 }
 
+// ── Proveedores (v6): lista de CUITs para avisar los que faltan cargar ──────────
+const PROVEEDORES_CACHE_KEY = 'holistor_proveedores_v3';
+const PROVEEDORES_CACHE_TTL = 5 * 60 * 1000;
+
+async function getProveedoresCuits() {
+  try {
+    const c = sessionStorage.getItem(PROVEEDORES_CACHE_KEY);
+    if (c) { const { ts, data } = JSON.parse(c); if (Date.now() - ts < PROVEEDORES_CACHE_TTL) return new Set(data); }
+  } catch(e) {}
+  try {
+    const res = await fetchConTimeout(WEBHOOK.proveedores(), {}, 20000);
+    if (!res.ok) return null;
+    const lista = await res.json();
+    const cuits = (Array.isArray(lista) ? lista : []).map(p => String(p.cuit||'').replace(/[^0-9]/g,'')).filter(c => c.length === 11);
+    try { sessionStorage.setItem(PROVEEDORES_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: cuits })); } catch(e) {}
+    return new Set(cuits);
+  } catch(e) { return null; }
+}
+
+function mostrarProveedoresFaltantes(faltantes, registros) {
+  const box = document.getElementById('provFaltantes');
+  if (!box) return;
+  if (!faltantes.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const nombre = c => { const r = registros.find(x => String(x.cuit_emisor||'').replace(/[^0-9]/g,'') === c); return r ? (r.denominacion_emisor||'') : ''; };
+  box.innerHTML = `<div class="registry-warn-head"><i class="ti ti-user-question" style="font-size:14px;"></i> ${faltantes.length} proveedor${faltantes.length!==1?'es':''} sin cargar en PROVEEDORES</div>`
+    + `Se procesan igual (Gemini los extrae), pero cargalos en el sheet para máxima precisión:`
+    + `<div style="margin-top:6px;font-family:monospace;font-size:11px;line-height:1.5;">`
+    + faltantes.map(c => `${c} — ${escapeHtml(nombre(c))}`).join('<br>') + `</div>`;
+  box.style.display = 'block';
+}
+
 function onClienteChange() {
   const sel = document.getElementById('selCliente');
   const opt = sel.options[sel.selectedIndex];
@@ -454,6 +488,9 @@ function resetRegistro() {
   ezCache.ezAction.textContent = 'Seleccionar';
   document.getElementById('excelInput').value = '';
   document.getElementById('registryWarn').style.display = 'none';
+  // v6: limpiar el aviso de proveedores faltantes
+  const pf = document.getElementById('provFaltantes');
+  if (pf) { pf.style.display = 'none'; pf.innerHTML = ''; }
 }
 
 function focusExcelZone() {
@@ -525,6 +562,15 @@ async function handleExcelFile(file) {
   } catch(err) {
     ezCache.ezSub.textContent = `${registros.length} comprobantes · ⚠ ${err.name==='AbortError'?'Timeout':'Error de red'}`;
   }
+
+  // v6: avisar proveedores no cargados en PROVEEDORES (no bloqueante)
+  try {
+    const provSet = await getProveedoresCuits();
+    if (provSet) {
+      const emisores = [...new Set(registros.map(r => String(r.cuit_emisor||'').replace(/[^0-9]/g,'')).filter(c => c.length === 11))];
+      mostrarProveedoresFaltantes(emisores.filter(c => !provSet.has(c)), registros);
+    }
+  } catch(e) {}
 }
 
 async function cargarXLSX() {
@@ -676,6 +722,9 @@ function iniciarPolling() {
   const lb = document.getElementById('btnLiberarWrap');
   if (lb) lb.style.display = 'flex';
 
+  // Timeout ADAPTATIVO alineado con el backend: 6s/factura + 2min, mínimo 15min.
+  const _enProceso = files.filter(f => ['en_cola','done','procesando','al_prn'].includes(f.status)).length || files.length || 1;
+  const _adaptiveTimeout = Math.max(POLLING_TIMEOUT_MS, _enProceso * 6000 + 120000);
   pollingTimeoutMax = setTimeout(() => {
     if (pollingInterval) {
       stopPolling();
@@ -683,13 +732,13 @@ function iniciarPolling() {
       updateProcesoUX('ia', procesoActual.pct || 70, 'Demorado', 'El proceso sigue sin confirmar finalización.', { error:true });
       mostrarEstadoProceso('listo', []);
     }
-  }, POLLING_TIMEOUT_MS);
+  }, _adaptiveTimeout);
 
   pollingInterval = setInterval(async () => {
     try {
       const cuit = clienteSeleccionado?.cuit || '';
       const per  = periodoStr();
-      // FIX: pasar &desde= para que el backend distinga esta corrida de la anterior
+      // El backend usa read-and-reset en Preparar Respuesta Estado: no hace falta &desde=.
       const res  = await fetchConTimeout(
         `${WEBHOOK.estado()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`,
         {}, 30000

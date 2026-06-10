@@ -223,6 +223,7 @@
       </div>
       <div class="btn-row">
         <button class="btn-primary" id="btnSubir" onclick="handleSubir()"><i class="ti ti-upload"></i> Subir y procesar</button>
+        <!-- btnProcesar: fallback manual si el procesamiento automático falla post-upload -->
         <button class="btn-secondary" id="btnProcesar" onclick="sendFlush()" style="display:none;"><i class="ti ti-player-play"></i> Procesar ahora</button>
         <button class="btn-secondary" onclick="clearPending()">Limpiar pendientes</button>
       </div>
@@ -320,6 +321,8 @@ let clienteSeleccionado = null;
 let _archivoExcelPendiente = null;
 let registroSubido      = false;
 let archivosFallidos    = [];
+let _reintentoCliente   = null;  // F5: cliente al momento de mostrar fallidos
+let _reintentoPeriodo   = null;  // F5: período al momento de mostrar fallidos
 let files = [], history = [], uploading = false, subidos = 0, errores = 0;
 let pollingInterval = null, pollingTimeoutMax = null;
 
@@ -344,7 +347,7 @@ function showAlert(msg, type) {
   const el = document.getElementById('alert');
   const icons = { success:'circle-check', error:'alert-circle', info:'info-circle', warn:'alert-triangle' };
   el.className = 'alert a-' + type;
-  el.innerHTML = `<i class="ti ti-${icons[type]||'info-circle'}"></i><span>${msg}</span>`;
+  el.innerHTML = `<i class="ti ti-${icons[type]||'info-circle'}"></i><span>${escapeHtml(msg)}</span>`;
   el.style.display = 'flex';
   if (type !== 'info') setTimeout(() => el.style.display = 'none', 6000);
 }
@@ -482,7 +485,16 @@ async function handleExcelFile(file) {
   let registros, receptorCuit;
   try {
     ({ registros, receptorCuit } = await parsearRegistroARCA(file));
-  } catch(err) { ezCache.ezSub.textContent = 'Error: ' + err.message; showAlert('Error al leer Excel: ' + err.message, 'error'); return; }
+  } catch(err) {
+    // F8: limpiar la zona al fallar para que no quede en estado inconsistente
+    const zoneErr = document.getElementById('excelZone');
+    if (zoneErr) zoneErr.classList.remove('loaded');
+    document.getElementById('excelInput').value = '';
+    ezCache.ezSub.textContent = 'Error: no se pudo leer el archivo';
+    ezCache.ezAction.textContent = 'Seleccionar';
+    showAlert('Error al leer el Excel: ' + escapeHtml(err.message), 'error');
+    return;
+  }
   const cuitLimpio = clienteSeleccionado.cuit.replace(/[^0-9]/g,'').padStart(11,'0');
   if (receptorCuit !== cuitLimpio) { ezCache.ezSub.textContent = 'CUIT mismatch'; showAlert(`CUIT ${receptorCuit} ≠ ${clienteSeleccionado.cuit}`, 'error'); return; }
 
@@ -608,6 +620,9 @@ function resetProcesoUX() {
   if (card) card.classList.remove('active');
   const lb = document.getElementById('btnLiberarWrap');
   if (lb) lb.style.display = 'none';
+  // F6: limpiar el banner de estado para que no muestre el proceso anterior
+  const ep = document.getElementById('estadoProceso');
+  if (ep) ep.style.display = 'none';
 }
 
 function updateProcesoUX(step, pct, statusText, subtitle, opts = {}) {
@@ -783,6 +798,9 @@ function buildConcilSection(icon, title, items, style) {
 // ── Fallidos ──────────────────────────────────────────────────────────────────
 async function reintentar() {
   if (!archivosFallidos.length) return;
+  // F5: restaurar cliente/período al momento en que se generaron los fallidos
+  if (_reintentoCliente) clienteSeleccionado = _reintentoCliente;
+  if (_reintentoPeriodo) { periodo = _reintentoPeriodo; }
   document.querySelectorAll('#cardFallidos button').forEach(b => b.disabled = true);
   showAlert('Reintentando fallidas…', 'info');
   try {
@@ -796,6 +814,8 @@ async function reintentar() {
 function mostrarFallidos(fallidos) {
   if (!fallidos?.length) return;
   archivosFallidos = fallidos;
+  _reintentoCliente = clienteSeleccionado;   // F5: guardar contexto
+  _reintentoPeriodo = periodo;               // F5: guardar contexto
   document.getElementById('cardFallidos').style.display = 'block';
   document.getElementById('listFallidos').innerHTML = fallidos.map(n => `
     <div class="history-item"><i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;"></i><span class="history-name">${escapeHtml(n)}</span><span class="badge b-error">error</span></div>`).join('');
@@ -817,7 +837,7 @@ function renderQueue() {
   document.getElementById('queueLabel').textContent = `${files.length} ${pluralizar(files.length,'archivo','archivos')} — ${pending} pendiente${pending!==1?'s':''}`;
   if (pending > 0) {
     document.getElementById('loteInfo').style.display = 'block';
-    document.getElementById('loteInfoText').textContent = `${Math.ceil(pending/BATCH_FRONTEND_SIZE)} lote${Math.ceil(pending/BATCH_FRONTEND_SIZE)!==1?'s':''} de ${BATCH_FRONTEND_SIZE} facturas`;
+    document.getElementById('loteInfoText').textContent = `${pending} archivo${pending!==1?'s':''} pendiente${pending!==1?'s':''}  — se suben uno por uno`;
   } else { document.getElementById('loteInfo').style.display = 'none'; }
   const labels = { pending:'pendiente',uploading:'verificando',done:'listo',error:'error',duplicate:'existe',en_cola:'cola',procesando:'procesando…',al_prn:'al PRN ✓',fallida:'error' };
   document.getElementById('fileList').innerHTML = files.map((f,i) => `
@@ -947,12 +967,28 @@ async function sendFlush() {
     const data = await jsonSeguro(res);
     if (!res.ok || data.ok===false) throw new Error(data.mensaje || `HTTP ${res.status}`);
     if (data.proceso_ya_activo === true) {
-      showAlert(data.mensaje || 'Ya hay un proceso activo.', 'warn');
+      // Proceso ya activo: mostrar estado actual y opción de liberar
+      // NO iniciar polling automáticamente — dejar que el usuario decida
+      const segundos = data.mensaje?.match(/\d+s/)?.[0] || '';
+      const cliente  = clienteSeleccionado?.nombre || clienteSeleccionado?.cuit || '';
+      updateProcesoUX('ia', 70, 'Proceso ya activo',
+        `${cliente} · ${periodoStr()} lleva ${segundos} procesando. ¿Está bloqueado?`,
+        { progressText: 'Proceso previo activo' });
+      logProceso(`Proceso ya activo para ${cliente} ${periodoStr()} (${segundos})`);
+      // Mostrar el botón liberar de forma prominente
+      const lb = document.getElementById('btnLiberarWrap');
+      if (lb) lb.style.display = 'flex';
+      showAlert(
+        `Proceso en curso desde hace ${segundos}. Si está bloqueado, usá "Liberar proceso".`,
+        'warn'
+      );
+      // Iniciar polling igual para mostrar el estado actual
+      iniciarPolling();
     } else {
       showAlert('Procesamiento iniciado en n8n.', 'success');
       logProceso('n8n confirmó inicio de procesamiento.');
+      iniciarPolling();
     }
-    iniciarPolling();
   } catch(err) {
     const det = err.name==='AbortError' ? 'timeout' : err.message;
     updateProcesoUX('ia', procesoActual.pct||60, 'Error al iniciar', `No se pudo iniciar n8n: ${det}`, { error:true });

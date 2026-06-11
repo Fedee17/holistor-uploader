@@ -756,7 +756,7 @@ function iniciarPolling() {
         logProceso(nf ? 'Proceso terminado con facturas fallidas.' : 'Proceso terminado correctamente.');
         mostrarEstadoProceso('listo', data.fallidos);
         if (data.fallidos && data.fallidos.length > 0) mostrarFallidos(data.fallidos);
-        if (data.conciliacion) mostrarConciliacion(data.conciliacion);
+        if (data.conciliacion || (data.no_en_arca && data.no_en_arca.length) || (data.ya_procesadas && data.ya_procesadas.length)) mostrarConciliacion(data.conciliacion, data.no_en_arca, data.ya_procesadas);
         files = files.filter(f => !['done','en_cola','al_prn'].includes(f.status));
         renderQueue();
       } else if (data.archivos_estado || data.progreso) {
@@ -817,18 +817,28 @@ function mostrarEstadoProceso(estado, fallidos) {
 }
 
 // ── Conciliación ──────────────────────────────────────────────────────────────
-function mostrarConciliacion(concil) {
+function mostrarConciliacion(concil, noEnArca, yaProcesadas) {
   const card = document.getElementById('cardConciliacion');
-  if (!concil) { card.style.display = 'none'; return; }
+  noEnArca = noEnArca || [];
+  yaProcesadas = yaProcesadas || [];
+  if (!concil && !noEnArca.length && !yaProcesadas.length) { card.style.display = 'none'; return; }
   card.style.display = 'block';
   card.scrollIntoView({ behavior:'smooth', block:'nearest' });
-  const pr  = concil.procesadas_registradas    || [];
-  const pnr = concil.procesadas_no_registro     || [];
-  const rnp = concil.registro_no_procesadas     || [];
+  const pr  = (concil && concil.procesadas_registradas) || [];
+  const pnr = (concil && concil.procesadas_no_registro) || [];
+  const rnp = (concil && concil.registro_no_procesadas) || [];
+  // No procesadas porque no están en Mis Comprobantes de ARCA (no es error: se reintentan)
+  const naRows = noEnArca.slice(0,150).map(it => `<div class="concil-row"><span class="concil-key">${escapeHtml(it.pdf||'')}</span><span class="concil-denom">${escapeHtml(it.emisor||'')}</span><span class="concil-total">${escapeHtml(it.total||'')}</span></div>`).join('');
+  const naSection = `<div class="concil-section"><div class="concil-head"><i class="ti ti-clock-pause concil-icon ci-warn"></i><span class="concil-title">No procesadas — no están en ARCA (se reintentan)</span><span class="concil-badge cb-warn">${noEnArca.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${noEnArca.length ? naRows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
+  // Ya procesadas en una corrida anterior — no se regeneraron (tildá "Forzar reprocesamiento" para rehacerlas)
+  const ypRows = yaProcesadas.slice(0,150).map(it => `<div class="concil-row"><span class="concil-key">${escapeHtml(it.emisor||it.pdf||'')}</span><span class="concil-denom">procesada el ${escapeHtml(it.procesada_en||'')}</span><span class="concil-total">${escapeHtml(it.total||'')}</span></div>`).join('');
+  const ypSection = `<div class="concil-section"><div class="concil-head"><i class="ti ti-history concil-icon ci-ok"></i><span class="concil-title">Ya procesadas antes — no regeneradas (Forzar para rehacer)</span><span class="concil-badge cb-ok">${yaProcesadas.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${yaProcesadas.length ? ypRows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
   document.getElementById('concilContent').innerHTML = [
     buildConcilSection('circle-check','Procesadas y en registro',          pr,  'ok'),
     buildConcilSection('alert-triangle','Procesadas pero NO en registro',  pnr, 'warn'),
     buildConcilSection('circle-x','En registro pero NO procesadas',        rnp, 'err'),
+    naSection,
+    ypSection,
   ].join('');
   document.querySelectorAll('#concilContent .concil-head').forEach(h => {
     const body = h.nextElementSibling;
@@ -888,7 +898,7 @@ function renderQueue() {
     document.getElementById('loteInfo').style.display = 'block';
     document.getElementById('loteInfoText').textContent = `${pending} archivo${pending!==1?'s':''} pendiente${pending!==1?'s':''}  — se suben uno por uno`;
   } else { document.getElementById('loteInfo').style.display = 'none'; }
-  const labels = { pending:'pendiente',uploading:'verificando',done:'listo',error:'error',duplicate:'existe',en_cola:'cola',procesando:'procesando…',al_prn:'al PRN ✓',fallida:'error' };
+  const labels = { pending:'pendiente',uploading:'verificando',done:'listo',error:'error',duplicate:'existe',en_cola:'cola',procesando:'procesando…',al_prn:'al PRN ✓',fallida:'error',no_en_arca:'fuera de ARCA',ya_procesada:'ya procesada' };
   document.getElementById('fileList').innerHTML = files.map((f,i) => `
     <div class="file-item">
       <i class="ti ti-file-type-pdf" style="font-size:16px;color:#c5221f;flex-shrink:0;"></i>
@@ -1011,7 +1021,7 @@ async function sendFlush() {
     const res  = await fetchConTimeout(WEBHOOK.procesar(), {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ flush:true, mes:periodo.mes, anio:periodo.anio, periodo:periodoStr(),
-        cliente_cuit:clienteSeleccionado.cuit, cliente_nombre:clienteSeleccionado.nombre||'', tiene_registro:registroSubido })
+        cliente_cuit:clienteSeleccionado.cuit, cliente_nombre:clienteSeleccionado.nombre||'', tiene_registro:registroSubido, forzar:forzarReproceso })
     }, FETCH_TIMEOUT_MS);
     const data = await jsonSeguro(res);
     if (!res.ok || data.ok===false) throw new Error(data.mensaje || `HTTP ${res.status}`);

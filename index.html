@@ -336,6 +336,7 @@ let subidos = 0;
 let errores = 0;
 let pollingInterval = null;
 let pollingTimeoutMax = null;
+let _resultadoYaMostrado = false;
 const BATCH_FRONTEND_SIZE = 100;
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -643,7 +644,8 @@ async function guardarRegistroEnN8n(zone, registros, receptorCuit) {
         body: JSON.stringify({ cliente_cuit: clienteSeleccionado.cuit, periodo: periodoStr, registros })
       });
 
-    if (resReg.ok) {
+    const dataReg = await jsonSeguro(resReg);
+    if (resReg.ok && dataReg.ok !== false) {
       const estadoTexto = 'Registro guardado ✓';
       ezCache.ezSub.textContent = `${registros.length} comprobantes · ${estadoTexto}`;
       showAlert(`${registros.length} ${pluralizar(registros.length, 'comprobante', 'comprobantes')} guardados.`, 'success');
@@ -651,8 +653,12 @@ async function guardarRegistroEnN8n(zone, registros, receptorCuit) {
       setStepDetail('registro', `${registros.length} comprobantes`);
       logProceso(`Registro ARCA guardado: ${registros.length} comprobantes.`);
     } else {
-      ezCache.ezSub.textContent = `⚠ Error HTTP ${resReg.status}`;
-      showAlert('Error al guardar en n8n. Intentá de nuevo.', 'warn');
+      // F2: el webhook puede responder ok:false cuando falla la lectura/escritura en Sheets.
+      registroSubido = false;
+      const msgErr = dataReg.mensaje || `Error HTTP ${resReg.status}`;
+      ezCache.ezSub.textContent = `⚠ ${msgErr}`;
+      showAlert('No se pudo guardar el registro: ' + msgErr, 'error');
+      logProceso('Error al guardar registro ARCA: ' + msgErr);
     }
   } catch(err) {
     const esTimeout = err.name === 'AbortError';
@@ -897,6 +903,7 @@ function stopPolling() {
 
 function iniciarPolling() {
   stopPolling();
+  _resultadoYaMostrado = false;
   mostrarEstadoProceso('procesando');
   updateProcesoUX('ia', 65, 'Procesando en n8n', 'Gemini está leyendo las facturas y generando líneas PRN.', { progressText:'Esperando avance del backend…' });
   logProceso('Procesamiento iniciado: PDFs en cola para Gemini y PRN.');
@@ -923,11 +930,15 @@ function iniciarPolling() {
       if (!data) return;
       
       if (data.listo === true) {
+        // F4: si el resultado viene de caché y ya lo mostramos en esta corrida, no re-renderizar.
+        if (data.desde_cache && _resultadoYaMostrado) { stopPolling(); return; }
+        _resultadoYaMostrado = true;
         stopPolling();
         const nf = data.fallidos && data.fallidos.length > 0;
         updateProcesoUX('final', 100, nf ? 'Finalizado con errores' : 'PRN listo', nf ? `PRN generado con ${data.fallidos.length} archivo(s) con error.` : 'PRN generado correctamente. Revisá Drive y conciliación.', { progressText: nf ? 'Revisar facturas fallidas.' : 'Proceso completo.' });
         logProceso(nf ? 'Proceso terminado con facturas fallidas.' : 'Proceso terminado correctamente.');
         mostrarEstadoProceso('listo', data.fallidos);
+        mostrarDiagnostico(data);
         if (data.fallidos && data.fallidos.length > 0) mostrarFallidos(data.fallidos);
         if (data.verificacion || data.conciliacion || (data.no_en_arca && data.no_en_arca.length) || (data.ya_procesadas && data.ya_procesadas.length)) mostrarConciliacion(data.verificacion, data.conciliacion, data.no_en_arca, data.ya_procesadas);
         files = files.filter(f => !['done','en_cola','al_prn'].includes(f.status));
@@ -986,6 +997,29 @@ function actualizarProgresoProceso(procesadas, total) {
     updateProcesoUX('ia', Math.max(procesoActual.pct, 70), 'Procesando facturas', `${p} facturas agregadas al PRN.`, { progressText:`${p} facturas al PRN` });
     setStepDetail('ia', `${p} al PRN`);
   }
+}
+
+function mostrarDiagnostico(data) {
+  // F1/F3/F6/F7: muestra error_critico, advertencias y PRN incompleto en el banner superior.
+  const adv = Array.isArray(data.advertencias) ? data.advertencias.filter(Boolean) : [];
+  const err = String(data.error_critico || '').trim();
+  const incompleto = data.prn_lineas_incompleto === true;
+  if (!err && !adv.length && !incompleto) return;
+  let html = '';
+  if (err) {
+    html += `<div style="font-weight:600;margin-bottom:4px;">${escapeHtml(err)}</div>`;
+  } else if (incompleto) {
+    html += `<div style="font-weight:600;margin-bottom:4px;">El PRN puede estar incompleto: faltan líneas en PRN_LINEAS. Revisá antes de importar en Holistor.</div>`;
+  }
+  if (adv.length) {
+    html += `<div style="font-size:12px;line-height:1.5;">` + adv.map(a => '• ' + escapeHtml(a)).join('<br>') + `</div>`;
+  }
+  const el = document.getElementById('alert');
+  const tipo = err ? 'a-error' : 'a-warn';
+  const icon = err ? 'alert-circle' : 'alert-triangle';
+  el.className = 'alert ' + tipo;
+  el.innerHTML = `<i class="ti ti-${icon}"></i><span>${html}</span>`;
+  el.style.display = 'flex';
 }
 
 function mostrarEstadoProceso(estado, fallidos) {

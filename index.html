@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Holistor — Subir Facturas v3</title>
+<title>Holistor — Subir Facturas v4</title>
 <link rel="preconnect" href="https://unpkg.com" crossorigin>
 <link rel="preconnect" href="https://fede123.app.n8n.cloud" crossorigin>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -93,6 +93,7 @@
   .history-time { font-size: 12px; color: #888; white-space: nowrap; }
   .empty { text-align: center; padding: 2rem; color: #aaa; font-size: 13px; }
   .empty i { font-size: 28px; display: block; margin-bottom: 8px; }
+  .concil-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; font-size: 12px; }
   .concil-section { border: 0.5px solid #e8e8e0; border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
   .concil-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; user-select: none; }
   .concil-head:hover { background: #f9f9f7; }
@@ -756,7 +757,7 @@ function iniciarPolling() {
         logProceso(nf ? 'Proceso terminado con facturas fallidas.' : 'Proceso terminado correctamente.');
         mostrarEstadoProceso('listo', data.fallidos);
         if (data.fallidos && data.fallidos.length > 0) mostrarFallidos(data.fallidos);
-        if (data.conciliacion || (data.no_en_arca && data.no_en_arca.length) || (data.ya_procesadas && data.ya_procesadas.length)) mostrarConciliacion(data.conciliacion, data.no_en_arca, data.ya_procesadas);
+        if (data.verificacion || data.conciliacion || (data.no_en_arca && data.no_en_arca.length) || (data.ya_procesadas && data.ya_procesadas.length)) mostrarConciliacion(data.verificacion, data.conciliacion, data.no_en_arca, data.ya_procesadas);
         files = files.filter(f => !['done','en_cola','al_prn'].includes(f.status));
         renderQueue();
       } else if (data.archivos_estado || data.progreso) {
@@ -816,33 +817,51 @@ function mostrarEstadoProceso(estado, fallidos) {
   }
 }
 
-// ── Conciliación ──────────────────────────────────────────────────────────────
-function mostrarConciliacion(concil, noEnArca, yaProcesadas) {
+// ── Conciliación / Verificación PRN_LINEAS ────────────────────────────────────
+// v4: muestra las 4 categorías de la verificación nueva (PRN_LINEAS vs REGISTRO),
+// con fallback al formato anterior (conciliacion.{pr,pnr,rnp}) si el backend aún
+// no envía `verificacion`. Conserva los bloques de runtime (no_en_arca, ya_procesadas).
+function mostrarConciliacion(verif, concil, noEnArca, yaProcesadas) {
   const card = document.getElementById('cardConciliacion');
-  noEnArca = noEnArca || [];
+  noEnArca     = noEnArca || [];
   yaProcesadas = yaProcesadas || [];
-  if (!concil && !noEnArca.length && !yaProcesadas.length) { card.style.display = 'none'; return; }
+  const hayVerif = !!(verif && verif.resumen);
+  if (!hayVerif && !concil && !noEnArca.length && !yaProcesadas.length) { card.style.display = 'none'; return; }
   card.style.display = 'block';
   card.scrollIntoView({ behavior:'smooth', block:'nearest' });
-  const pr  = (concil && concil.procesadas_registradas) || [];
-  const pnr = (concil && concil.procesadas_no_registro) || [];
-  const rnp = (concil && concil.registro_no_procesadas) || [];
-  // No procesadas porque no están en Mis Comprobantes de ARCA (no es error: se reintentan)
-  const naRows = noEnArca.slice(0,150).map(it => `<div class="concil-row"><span class="concil-key">${escapeHtml(it.pdf||'')}</span><span class="concil-denom">${escapeHtml(it.emisor||'')}</span><span class="concil-total">${escapeHtml(it.total||'')}</span></div>`).join('');
-  const naSection = `<div class="concil-section"><div class="concil-head"><i class="ti ti-clock-pause concil-icon ci-warn"></i><span class="concil-title">No procesadas — no están en ARCA (se reintentan)</span><span class="concil-badge cb-warn">${noEnArca.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${noEnArca.length ? naRows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
-  // Ya procesadas en una corrida anterior — no se regeneraron (tildá "Forzar reprocesamiento" para rehacerlas)
-  const ypRows = yaProcesadas.slice(0,150).map(it => `<div class="concil-row"><span class="concil-key">${escapeHtml(it.emisor||it.pdf||'')}</span><span class="concil-denom">procesada el ${escapeHtml(it.procesada_en||'')}</span><span class="concil-total">${escapeHtml(it.total||'')}</span></div>`).join('');
-  const ypSection = `<div class="concil-section"><div class="concil-head"><i class="ti ti-history concil-icon ci-ok"></i><span class="concil-title">Ya procesadas antes — no regeneradas (Forzar para rehacer)</span><span class="concil-badge cb-ok">${yaProcesadas.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${yaProcesadas.length ? ypRows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
-  document.getElementById('concilContent').innerHTML = [
-    buildConcilSection('circle-check','Procesadas y en registro',          pr,  'ok'),
-    buildConcilSection('alert-triangle','Procesadas pero NO en registro',  pnr, 'warn'),
-    buildConcilSection('circle-x','En registro pero NO procesadas',        rnp, 'err'),
-    naSection,
-    ypSection,
-  ].join('');
+
+  let html = '';
+
+  if (hayVerif) {
+    const r = verif.resumen || {};
+    html += `<div class="concil-summary">`
+      + `<span class="concil-badge cb-ok">✓ ${r.conciliadas||0} conciliadas</span>`
+      + `<span class="concil-badge cb-warn">⚠ ${r.total_a_revisar||0} a revisar</span>`
+      + `<span class="concil-badge cb-err">✗ ${r.falta_procesar||0} falta procesar</span>`
+      + `<span class="concil-badge cb-warn">↗ ${r.fuera_de_arca||0} fuera de ARCA</span>`
+      + `</div>`;
+    html += buildConcilSection('circle-check', 'Conciliadas — clave y total OK',
+              (verif.conciliadas || []).map(x => ({ clave:x.clave, total:x.total })), 'ok');
+    html += buildRevisarSection(verif.total_a_revisar || []);
+    html += buildConcilSection('circle-x', 'Falta procesar — en ARCA, no en el PRN',
+              (verif.falta_procesar || []).map(x => ({ clave:x.clave, denominacion:x.denominacion, total:x.total_registro })), 'err');
+    html += buildConcilSection('arrow-up-right', 'Fuera de ARCA / carga manual — en el PRN, no en ARCA',
+              (verif.fuera_de_arca || []).map(x => ({ clave:x.clave, denominacion:x.denominacion, total:x.total_extraido })), 'warn');
+  } else if (concil) {
+    // Compat: formato anterior (sin verificación nueva)
+    html += buildConcilSection('circle-check', 'Procesadas y en registro',        concil.procesadas_registradas || [], 'ok');
+    html += buildConcilSection('alert-triangle', 'Procesadas pero NO en registro', concil.procesadas_no_registro || [], 'warn');
+    html += buildConcilSection('circle-x', 'En registro pero NO procesadas',       concil.registro_no_procesadas || [], 'err');
+  }
+
+  // Bloques de runtime (independientes de la verificación)
+  html += buildNaSection(noEnArca);
+  html += buildYpSection(yaProcesadas);
+
+  document.getElementById('concilContent').innerHTML = html;
   document.querySelectorAll('#concilContent .concil-head').forEach(h => {
-    const body = h.nextElementSibling;
-    const count = parseInt(h.querySelector('.concil-badge')?.textContent || '0');
+    const body  = h.nextElementSibling;
+    const count = parseInt((h.querySelector('.concil-badge')?.textContent || '0').replace(/[^0-9]/g,'')) || 0;
     if (count > 0) { h.classList.add('open'); body.classList.add('open'); }
     h.addEventListener('click', () => { h.classList.toggle('open'); body.classList.toggle('open'); });
   });
@@ -852,6 +871,25 @@ function buildConcilSection(icon, title, items, style) {
   const rows  = items.slice(0,150).map(it => `<div class="concil-row"><span class="concil-key">${escapeHtml(it.clave||'')}</span><span class="concil-denom">${escapeHtml(it.denominacion||it.denominacion_emisor||'')}</span><span class="concil-total">${escapeHtml(it.total||'')}</span></div>`).join('');
   const extra = items.length > 150 ? `<div style="text-align:center;padding:8px;font-size:11px;color:#999;">…y ${items.length-150} más</div>` : '';
   return `<div class="concil-section"><div class="concil-head"><i class="ti ti-${icon} concil-icon ci-${style}"></i><span class="concil-title">${escapeHtml(title)}</span><span class="concil-badge cb-${style}">${items.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${items.length ? rows+extra : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
+}
+
+// Total a revisar: muestra AMBOS importes (registro vs PRN) para detectar carga errónea
+function buildRevisarSection(items) {
+  const rows  = items.slice(0,150).map(it => `<div class="concil-row"><span class="concil-key">${escapeHtml(it.clave||'')}</span><span class="concil-denom">${escapeHtml(it.denominacion||'')}</span><span class="concil-total" style="color:#e37400;">reg ${escapeHtml(it.total_registro||'—')} · prn ${escapeHtml(it.total_extraido||'—')}</span></div>`).join('');
+  const extra = items.length > 150 ? `<div style="text-align:center;padding:8px;font-size:11px;color:#999;">…y ${items.length-150} más</div>` : '';
+  return `<div class="concil-section"><div class="concil-head"><i class="ti ti-alert-octagon concil-icon ci-warn"></i><span class="concil-title">Total a revisar — clave OK, importe difiere</span><span class="concil-badge cb-warn">${items.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${items.length ? rows+extra : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
+}
+
+// No procesadas porque no están en Mis Comprobantes de ARCA (no es error: se reintentan)
+function buildNaSection(noEnArca) {
+  const rows = noEnArca.slice(0,150).map(it => `<div class="concil-row"><span class="concil-key">${escapeHtml(it.pdf||'')}</span><span class="concil-denom">${escapeHtml(it.emisor||'')}</span><span class="concil-total">${escapeHtml(it.total||'')}</span></div>`).join('');
+  return `<div class="concil-section"><div class="concil-head"><i class="ti ti-clock-pause concil-icon ci-warn"></i><span class="concil-title">No procesadas — no están en ARCA (se reintentan)</span><span class="concil-badge cb-warn">${noEnArca.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${noEnArca.length ? rows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
+}
+
+// Ya procesadas en una corrida anterior — no se regeneraron (tildá "Forzar" para rehacerlas)
+function buildYpSection(yaProcesadas) {
+  const rows = yaProcesadas.slice(0,150).map(it => `<div class="concil-row"><span class="concil-key">${escapeHtml(it.emisor||it.pdf||'')}</span><span class="concil-denom">procesada el ${escapeHtml(it.procesada_en||'')}</span><span class="concil-total">${escapeHtml(it.total||'')}</span></div>`).join('');
+  return `<div class="concil-section"><div class="concil-head"><i class="ti ti-history concil-icon ci-ok"></i><span class="concil-title">Ya procesadas antes — no regeneradas (Forzar para rehacer)</span><span class="concil-badge cb-ok">${yaProcesadas.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${yaProcesadas.length ? rows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
 }
 
 // ── Fallidos ──────────────────────────────────────────────────────────────────

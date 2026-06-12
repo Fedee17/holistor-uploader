@@ -935,9 +935,15 @@ function iniciarPolling() {
         _resultadoYaMostrado = true;
         stopPolling();
         const nf = data.fallidos && data.fallidos.length > 0;
-        updateProcesoUX('final', 100, nf ? 'Finalizado con errores' : 'PRN listo', nf ? `PRN generado con ${data.fallidos.length} archivo(s) con error.` : 'PRN generado correctamente. Revisá Drive y conciliación.', { progressText: nf ? 'Revisar facturas fallidas.' : 'Proceso completo.' });
-        logProceso(nf ? 'Proceso terminado con facturas fallidas.' : 'Proceso terminado correctamente.');
-        mostrarEstadoProceso('listo', data.fallidos);
+        const naCount = Array.isArray(data.no_en_arca) ? data.no_en_arca.length : 0;
+        const prnReal = data.prn_guardado === true && (data.lineas_finales_generadas || 0) > 0;
+        if (!prnReal) {
+          updateProcesoUX('final', 100, 'Sin PRN generado', naCount ? `${naCount} factura(s) no están en el registro ARCA cargado — no se generó PRN.` : 'No se generó ninguna línea de PRN en esta corrida.', { error:true, progressText:'No se generó PRN.' });
+        } else {
+          updateProcesoUX('final', 100, nf ? 'Finalizado con errores' : 'PRN listo', nf ? `PRN generado con ${data.fallidos.length} archivo(s) con error.` : 'PRN generado correctamente. Revisá Drive y conciliación.', { progressText: nf ? 'Revisar facturas fallidas.' : 'Proceso completo.' });
+        }
+        logProceso(!prnReal ? 'Proceso terminado SIN generar PRN.' : (nf ? 'Proceso terminado con facturas fallidas.' : 'Proceso terminado correctamente.'));
+        mostrarEstadoProceso('listo', data.fallidos, prnReal, naCount);
         mostrarDiagnostico(data);
         if (data.fallidos && data.fallidos.length > 0) mostrarFallidos(data.fallidos);
         if (data.verificacion || data.conciliacion || (data.no_en_arca && data.no_en_arca.length) || (data.ya_procesadas && data.ya_procesadas.length)) mostrarConciliacion(data.verificacion, data.conciliacion, data.no_en_arca, data.ya_procesadas);
@@ -1022,7 +1028,7 @@ function mostrarDiagnostico(data) {
   el.style.display = 'flex';
 }
 
-function mostrarEstadoProceso(estado, fallidos) {
+function mostrarEstadoProceso(estado, fallidos, prnReal, naCount) {
   const el = document.getElementById('estadoProceso');
   if (!el) return;
   
@@ -1035,14 +1041,23 @@ function mostrarEstadoProceso(estado, fallidos) {
     document.getElementById('_epMsg').textContent = 'Procesando…';
   } else if (estado === 'listo') {
     el.style.display = 'flex';
-    el.className = 'alert a-success';
-    el.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
     const rp = document.getElementById('resetPanel');
     if (rp) rp.style.display = 'none';
     const nf = fallidos && fallidos.length > 0;
-    document.getElementById('_epMsg').textContent = nf
-      ? `✓ PRN generado. ${fallidos.length} ${pluralizar(fallidos.length, 'error', 'errores')}.`
-      : '✓ PRN listo. Podés importarlo en Holistor.';
+    if (prnReal === false) {
+      // No se generó PRN real (0 líneas / todas no_en_arca): NO decir "PRN listo".
+      el.className = 'alert a-warn';
+      el.innerHTML = '<i class="ti ti-alert-triangle" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
+      document.getElementById('_epMsg').textContent = (naCount && naCount > 0)
+        ? `No se generó PRN: ${naCount} factura(s) no están en el registro ARCA cargado. Cargá el Excel de ARCA y reprocesá.`
+        : 'No se generó ningún PRN en esta corrida (0 líneas). Revisá el detalle.';
+    } else {
+      el.className = 'alert a-success';
+      el.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
+      document.getElementById('_epMsg').textContent = nf
+        ? `✓ PRN generado. ${fallidos.length} ${pluralizar(fallidos.length, 'error', 'errores')}.`
+        : '✓ PRN listo. Podés importarlo en Holistor.';
+    }
   }
 }
 

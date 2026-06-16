@@ -623,7 +623,7 @@ function mostrarCargando(zone, file) {
 }
 
 async function guardarRegistroEnN8n(zone, registros, receptorCuit) {
-  registroSubido = true;
+  registroSubido = false;  // v12: solo true cuando el guardado se CONFIRMA (evita estricto contra fila vieja en timeout/error)
   zone.classList.add('loaded');
   const existingBtn = zone.querySelector('.ez-remove');
   if (!existingBtn) {
@@ -646,6 +646,7 @@ async function guardarRegistroEnN8n(zone, registros, receptorCuit) {
 
     const dataReg = await jsonSeguro(resReg);
     if (resReg.ok && dataReg.ok !== false) {
+      registroSubido = true;  // v12: guardado confirmado
       const estadoTexto = 'Registro guardado ✓';
       ezCache.ezSub.textContent = `${registros.length} comprobantes · ${estadoTexto}`;
       showAlert(`${registros.length} ${pluralizar(registros.length, 'comprobante', 'comprobantes')} guardados.`, 'success');
@@ -661,6 +662,7 @@ async function guardarRegistroEnN8n(zone, registros, receptorCuit) {
       logProceso('Error al guardar registro ARCA: ' + msgErr);
     }
   } catch(err) {
+    registroSubido = false;  // v12: timeout/error de red NO debe dejar el sistema creyendo que ARCA está cargado
     const esTimeout = err.name === 'AbortError';
     ezCache.ezSub.textContent = esTimeout ? '⚠ Timeout' : '⚠ Error de red';
     showAlert(esTimeout ? 'Timeout en n8n' : `Error: ${err.message}`, 'warn');
@@ -936,7 +938,8 @@ function iniciarPolling() {
         stopPolling();
         const nf = data.fallidos && data.fallidos.length > 0;
         const naCount = Array.isArray(data.no_en_arca) ? data.no_en_arca.length : 0;
-        const prnReal = data.prn_guardado === true && (data.lineas_finales_generadas || 0) > 0;
+        // v13: si prn_guardado=true el PRN tiene al menos 1 línea (el workflow no lo guarda vacío)
+        const prnReal = data.prn_guardado === true;
         if (!prnReal) {
           updateProcesoUX('final', 100, 'Sin PRN generado', naCount ? `${naCount} factura(s) no están en el registro ARCA cargado — no se generó PRN.` : 'No se generó ninguna línea de PRN en esta corrida.', { error:true, progressText:'No se generó PRN.' });
         } else {
@@ -1050,7 +1053,7 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount) {
       el.innerHTML = '<i class="ti ti-alert-triangle" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
       document.getElementById('_epMsg').textContent = (naCount && naCount > 0)
         ? `No se generó PRN: ${naCount} factura(s) no están en el registro ARCA cargado. Cargá el Excel de ARCA y reprocesá.`
-        : 'No se generó ningún PRN en esta corrida (0 líneas). Revisá el detalle.';
+        : 'No se generó ningún PRN en esta corrida. Revisá el detalle o Drive.';
     } else {
       el.className = 'alert a-success';
       el.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';

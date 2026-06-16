@@ -938,8 +938,10 @@ function iniciarPolling() {
         stopPolling();
         const nf = data.fallidos && data.fallidos.length > 0;
         const naCount = Array.isArray(data.no_en_arca) ? data.no_en_arca.length : 0;
-        // v13: si prn_guardado=true el PRN tiene al menos 1 línea (el workflow no lo guarda vacío)
-        const prnReal = data.prn_guardado === true;
+        // v13/v14: si lineas_finales_generadas está reportado, usarlo; si no viene, confiar en prn_guardado
+        // Esto evita mostrar "PRN listo" cuando prn_guardado viene cacheado de una corrida anterior
+        const _lineas = data.lineas_finales_generadas;
+        const prnReal = data.prn_guardado === true && (_lineas == null || Number(_lineas) > 0);
         if (!prnReal) {
           updateProcesoUX('final', 100, 'Sin PRN generado', naCount ? `${naCount} factura(s) no están en el registro ARCA cargado — no se generó PRN.` : 'No se generó ninguna línea de PRN en esta corrida.', { error:true, progressText:'No se generó PRN.' });
         } else {
@@ -1059,7 +1061,7 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount) {
       el.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
       document.getElementById('_epMsg').textContent = nf
         ? `✓ PRN generado. ${fallidos.length} ${pluralizar(fallidos.length, 'error', 'errores')}.`
-        : '✓ PRN listo. Podés importarlo en Holistor.';
+        : '✓ PRN listo. Si no aparece en Drive todavía, esperá unos segundos y recargá.';
     }
   }
 }

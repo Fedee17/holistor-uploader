@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Holistor — Subir Facturas v3</title>
+<title>Holistor — Subir facturas</title>
 <link rel="preconnect" href="https://unpkg.com" crossorigin>
 <link rel="preconnect" href="https://fede123.app.n8n.cloud" crossorigin>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -948,7 +948,7 @@ function iniciarPolling() {
           updateProcesoUX('final', 100, nf ? 'Finalizado con errores' : 'PRN listo', nf ? `PRN generado con ${data.fallidos.length} archivo(s) con error.` : 'PRN generado correctamente. Revisá Drive y conciliación.', { progressText: nf ? 'Revisar facturas fallidas.' : 'Proceso completo.' });
         }
         logProceso(!prnReal ? 'Proceso terminado SIN generar PRN.' : (nf ? 'Proceso terminado con facturas fallidas.' : 'Proceso terminado correctamente.'));
-        mostrarEstadoProceso('listo', data.fallidos, prnReal, naCount);
+        mostrarEstadoProceso('listo', data.fallidos, prnReal, naCount, data.prn_file_id, data.prn_file_name, data.lineas_finales_generadas);
         mostrarDiagnostico(data);
         if (data.fallidos && data.fallidos.length > 0) mostrarFallidos(data.fallidos);
         if (data.verificacion || data.conciliacion || (data.no_en_arca && data.no_en_arca.length) || (data.ya_procesadas && data.ya_procesadas.length)) mostrarConciliacion(data.verificacion, data.conciliacion, data.no_en_arca, data.ya_procesadas);
@@ -1033,7 +1033,7 @@ function mostrarDiagnostico(data) {
   el.style.display = 'flex';
 }
 
-function mostrarEstadoProceso(estado, fallidos, prnReal, naCount) {
+function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prnFileName, lineasCount) {
   const el = document.getElementById('estadoProceso');
   if (!el) return;
   
@@ -1058,10 +1058,14 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount) {
         : 'No se generó ningún PRN en esta corrida. Revisá el detalle o Drive.';
     } else {
       el.className = 'alert a-success';
-      el.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
+      const _lineasTxt = (lineasCount && Number(lineasCount) > 0) ? ` · ${lineasCount} ${pluralizar(Number(lineasCount),'línea','líneas')}` : '';
+      const _driveLinkHtml = prnFileId
+        ? ` <a href="https://drive.google.com/file/d/${escapeHtml(prnFileId)}/view" target="_blank" rel="noopener" style="color:#1a6e38;font-weight:600;margin-left:6px;text-decoration:underline;"><i class="ti ti-download" style="font-size:13px;"></i> Ver en Drive</a>`
+        : '';
+      el.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>' + _driveLinkHtml;
       document.getElementById('_epMsg').textContent = nf
-        ? `✓ PRN generado. ${fallidos.length} ${pluralizar(fallidos.length, 'error', 'errores')}.`
-        : '✓ PRN listo. Si no aparece en Drive todavía, esperá unos segundos y recargá.';
+        ? `✓ PRN generado${_lineasTxt}. ${fallidos.length} ${pluralizar(fallidos.length, 'error', 'errores')}.`
+        : `✓ PRN listo${_lineasTxt}.`;
     }
   }
 }
@@ -1089,7 +1093,9 @@ function mostrarConciliacion(verif, concil, noEnArca, yaProcesadas) {
       + `</div>`;
     html += buildConcilSection('circle-check', 'Conciliadas — clave y total OK', (verif.conciliadas || []).map(x => ({ clave:x.clave, total:x.total })), 'ok');
     html += buildRevisarSection(verif.total_a_revisar || []);
-    html += buildConcilSection('circle-x', 'Falta procesar — en ARCA, no en el PRN', (verif.falta_procesar || []).map(x => ({ clave:x.clave, denominacion:x.denominacion, total:x.total_registro })), 'err');
+    const _faltaCount = (verif.falta_procesar || []).length;
+    const _faltaLabel = 'Falta procesar — en ARCA, no en el PRN' + (_faltaCount > 0 ? ' <span style="font-size:11px;font-weight:400;color:#666;">(PDFs no subidos en esta corrida o con error)</span>' : '');
+    html += buildConcilSection('circle-x', _faltaLabel, (verif.falta_procesar || []).map(x => ({ clave:x.clave, denominacion:x.denominacion, total:x.total_registro })), 'err');
     html += buildConcilSection('arrow-up-right', 'Fuera de ARCA / carga manual — en el PRN, no en ARCA', (verif.fuera_de_arca || []).map(x => ({ clave:x.clave, denominacion:x.denominacion, total:x.total_extraido })), 'warn');
   } else if (concil) {
     html += buildConcilSection('circle-check', 'Procesadas y en registro', concil.procesadas_registradas || [], 'ok');

@@ -752,12 +752,21 @@ function parsearRegistroARCA(file) {
           if (rc && rc !== '00000000000') receptoresSet.add(rc);
         }
         
-        if (receptoresSet.size > 1) {
-          reject(new Error(`Múltiples receptores: ${[...receptoresSet].join(', ')}`));
+        // CUITs argentinos válidos nunca empiezan con '0'.
+        // ARCA a veces exporta el CUIT truncado (ej: '22423064' en vez de '20224230649')
+        // que al padear a 11 dígitos queda '00022423064'. Los filtramos.
+        const validReceptores = new Set([...receptoresSet].filter(rc => !rc.startsWith('0')));
+        const filasCorregidas = [...receptoresSet].filter(rc => rc.startsWith('0')).length;
+        
+        if (validReceptores.size > 1) {
+          reject(new Error(`Múltiples receptores: ${[...validReceptores].join(', ')}`));
           return;
         }
         
-        const receptorCuit = receptoresSet.size === 1 ? [...receptoresSet][0] : '00000000000';
+        const receptorCuit = validReceptores.size === 1 ? [...validReceptores][0] : '00000000000';
+        if (filasCorregidas > 0) {
+          console.warn(`ARCA exportó ${filasCorregidas} filas con CUIT receptor truncado — corregido a ${receptorCuit}`);
+        }
         const registros = [];
         const periodoMM = String(periodo.mes).padStart(2,'0');
         const periodoYY = String(periodo.anio);

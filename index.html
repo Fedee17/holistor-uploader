@@ -289,6 +289,7 @@ const WEBHOOK = {
   clientes:  () => BASE_WEBHOOK + '/holistor-clientes',
   registro:  () => BASE_WEBHOOK + '/holistor-registro',
   reset:     () => BASE_WEBHOOK + '/holistor-reset',
+  syncProv:  () => BASE_WEBHOOK + '/holistor-sync-proveedores-pendientes'
   proveedores: () => BASE_WEBHOOK + '/holistor-proveedores'
 };
 
@@ -945,6 +946,8 @@ function iniciarPolling() {
         if (data.desde_cache && _resultadoYaMostrado) { stopPolling(); return; }
         _resultadoYaMostrado = true;
         stopPolling();
+        // Auto-sincronizar proveedores nuevos a PROVEEDORES (no bloquea el flujo)
+        autoSyncProveedores();
         const nf = data.fallidos && data.fallidos.length > 0;
         const naCount = Array.isArray(data.no_en_arca) ? data.no_en_arca.length : 0;
         // v13/v14: si lineas_finales_generadas está reportado, usarlo; si no viene, confiar en prn_guardado
@@ -1389,6 +1392,22 @@ async function startUpload() {
   showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
   await sleep(DRIVE_INDEX_DELAY_MS);
   await sendFlush();
+}
+
+async function autoSyncProveedores() {
+  // Llama silenciosamente al sync de proveedores pendientes.
+  // Si falla, no importa — los proveedores quedan en la cola para el próximo run.
+  try {
+    const cuit = clienteSeleccionado?.cuit || '';
+    const per  = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
+    await fetchConTimeout(WEBHOOK.syncProv(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cliente_cuit: cuit, periodo: per, auto: true })
+    }, 30000);
+  } catch(e) {
+    console.warn('Auto-sync proveedores falló (no crítico):', e.message);
+  }
 }
 
 async function sendFlush() {

@@ -73,6 +73,11 @@
   .b-no_en_arca { background: #fff8e0; color: #92400e; }
   .b-ya_procesada { background: #e6f4ea; color: #188038; }
   .b-duplicada { background: #fff3e0; color: #e37400; }
+  .b-otro_cliente { background: #eef2ff; color: #3730a3; }
+  .b-cargar_manual { background: #fff8e0; color: #92400e; font-weight:600; }
+  .b-gemini_json_invalido { background: #fce8e6; color: #a50e0e; }
+  .manual-note { font-size:12px; color:#92400e; margin-top:3px; line-height:1.35; }
+  .other-note { font-size:12px; color:#3730a3; margin-top:3px; line-height:1.35; }
   @keyframes pulse-badge { 0%,100%{opacity:1} 50%{opacity:.6} }
   .btn-remove { background: none; border: none; cursor: pointer; color: #aaa; font-size: 16px; padding: 2px; line-height: 1; }
   .btn-remove:hover { color: #c5221f; }
@@ -266,6 +271,14 @@
     <div class="btn-row" style="margin-top:1rem;">
       <button class="btn-primary" style="background:#c5221f;" onclick="reintentar()"><i class="ti ti-refresh"></i> Reintentar fallidas</button>
     </div>
+  </div>
+  <div class="card" id="cardManual" style="display:none; border-color:#fcd34d; background:#fffdf5;">
+    <div class="card-header" style="color:#92400e;"><i class="ti ti-hand-click"></i> Facturas que requieren carga manual</div>
+    <div id="listManual"></div>
+  </div>
+  <div class="card" id="cardOtroCliente" style="display:none; border-color:#c7d2fe; background:#fbfcff;">
+    <div class="card-header" style="color:#3730a3;"><i class="ti ti-user-exclamation"></i> Facturas omitidas por posible otro cliente</div>
+    <div id="listOtroCliente"></div>
   </div>
   <div class="card" id="cardConciliacion" style="display:none;">
     <div class="card-header"><i class="ti ti-report-analytics" style="color:#1a73e8;"></i> Conciliación de comprobantes</div>
@@ -648,12 +661,20 @@ async function guardarRegistroEnN8n(zone, registros, receptorCuit) {
     const dataReg = await jsonSeguro(resReg);
     if (resReg.ok && dataReg.ok !== false) {
       registroSubido = true;  // v12: guardado confirmado
+      const recibidoBackend = Number(dataReg.total_arca_recibido_backend ?? dataReg.total_recibido ?? dataReg.recibidos ?? registros.length);
+      const deduplicadoBackend = Number(dataReg.total_arca_deduplicado ?? dataReg.total_deduplicado ?? dataReg.insertados ?? recibidoBackend);
       const estadoTexto = 'Registro guardado ✓';
-      ezCache.ezSub.textContent = `${registros.length} comprobantes · ${estadoTexto}`;
-      showAlert(`${registros.length} ${pluralizar(registros.length, 'comprobante', 'comprobantes')} guardados.`, 'success');
-      updateProcesoUX('registro', Math.max(procesoActual.pct || 0, 45), 'Registro ARCA cargado', `${registros.length} comprobantes disponibles para conciliación.`, { progressText:'Registro guardado' });
-      setStepDetail('registro', `${registros.length} comprobantes`);
-      logProceso(`Registro ARCA guardado: ${registros.length} comprobantes.`);
+      const diagRegistro = `local ${registros.length} · backend ${recibidoBackend} · dedup ${deduplicadoBackend}`;
+      ezCache.ezSub.textContent = `${registros.length} comprobantes · ${estadoTexto} · ${diagRegistro}`;
+      if (recibidoBackend > 0 && recibidoBackend < Math.max(2, registros.length * 0.9)) {
+        showAlert(`Atención: el Excel tenía ${registros.length} comprobantes, pero n8n informó recibir ${recibidoBackend}. Revisar holistor-registro antes de procesar.`, 'warn');
+        logProceso(`Advertencia registro ARCA: local ${registros.length}, backend ${recibidoBackend}.`);
+      } else {
+        showAlert(`${registros.length} ${pluralizar(registros.length, 'comprobante', 'comprobantes')} guardados.`, 'success');
+      }
+      updateProcesoUX('registro', Math.max(procesoActual.pct || 0, 45), 'Registro ARCA cargado', `${registros.length} comprobantes disponibles para conciliación. (${diagRegistro})`, { progressText:'Registro guardado' });
+      setStepDetail('registro', `${deduplicadoBackend || registros.length} comprobantes`);
+      logProceso(`Registro ARCA guardado: ${diagRegistro}.`);
     } else {
       // F2: el webhook puede responder ok:false cuando falla la lectura/escritura en Sheets.
       registroSubido = false;
@@ -900,9 +921,73 @@ function setStepDetail(step, text) {
 }
 
 function progresoPorArchivos() {
-  const total = files.filter(f => ['pending','uploading','done','en_cola','procesando','al_prn','fallida','error'].includes(f.status)).length || files.length || 0;
-  const terminados = files.filter(f => ['done','al_prn','fallida','error'].includes(f.status)).length;
+  const total = files.filter(f => ['pending','uploading','done','en_cola','procesando','al_prn','fallida','cargar_manual','otro_cliente','error'].includes(f.status)).length || files.length || 0;
+  const terminados = files.filter(f => ['done','al_prn','fallida','cargar_manual','otro_cliente','error'].includes(f.status)).length;
   return { total, terminados };
+}
+
+
+// ──────────────────────────────────────────────────────────────────────────────
+// NORMALIZACIÓN DE RESULTADOS BACKEND v49
+// ──────────────────────────────────────────────────────────────────────────────
+function splitNombreMotivo(v) {
+  if (v === null || v === undefined) return { pdf_nombre:'', motivo:'' };
+  if (typeof v === 'string') {
+    const parts = v.split(/\s+--\s+/);
+    return { pdf_nombre: parts[0] || v, motivo: parts.slice(1).join(' -- ') || '' };
+  }
+  return {
+    pdf_nombre: v.pdf_nombre || v.pdf || v.nombre || v.file || v.archivo || '',
+    motivo: v.motivo || v.accion_requerida || v.error || v.detalle || '',
+    accion_requerida: v.accion_requerida || '',
+    estado: v.estado || '',
+    cargar_manual: v.cargar_manual === true,
+    otro_cliente: v.otro_cliente === true
+  };
+}
+
+function normalizarListaResultado(data, claves) {
+  const out = [];
+  (claves || []).forEach(k => {
+    const val = data && data[k];
+    if (Array.isArray(val)) val.forEach(x => out.push(splitNombreMotivo(x)));
+  });
+  const rpdf = data && data.resultados_por_pdf;
+  if (rpdf && typeof rpdf === 'object') {
+    Object.values(rpdf).forEach(x => {
+      if (!x || typeof x !== 'object') return;
+      const estado = String(x.estado || '').toLowerCase();
+      const esManual = x.cargar_manual === true || /manual/.test(String(x.accion_requerida || '')) || estado === 'fallida';
+      const esOtro = x.otro_cliente === true || estado === 'otro_cliente';
+      if (claves.includes('cargar_manual') && esManual && x.cargar_manual === true) out.push(splitNombreMotivo(x));
+      if (claves.includes('otro_cliente') && esOtro) out.push(splitNombreMotivo(x));
+    });
+  }
+  // dedup por pdf_nombre + motivo
+  const seen = new Set();
+  return out.filter(x => {
+    const key = String(x.pdf_nombre || '') + '|' + String(x.motivo || '') + '|' + String(x.accion_requerida || '');
+    if (!x.pdf_nombre && !x.motivo) return false;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function renderListaDetalle(containerId, items, badgeClass, badgeText, noteClass, defaultNote) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = (items || []).map(it => {
+    const nom = it.pdf_nombre || it.pdf || it.nombre || String(it || '');
+    const mot = it.motivo || '';
+    const acc = it.accion_requerida || '';
+    const nota = acc || mot || defaultNote || '';
+    return `<div class="history-item" style="align-items:flex-start;">
+      <i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;margin-top:2px;"></i>
+      <span class="history-name" style="white-space:normal;line-height:1.35;">${escapeHtml(nom)}${nota ? `<div class="${noteClass}">${escapeHtml(nota)}</div>` : ''}</span>
+      <span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span>
+    </div>`;
+  }).join('');
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -948,21 +1033,34 @@ function iniciarPolling() {
         stopPolling();
         // Auto-sincronizar proveedores nuevos a PROVEEDORES (no bloquea el flujo)
         autoSyncProveedores();
-        const nf = data.fallidos && data.fallidos.length > 0;
+        const manuales = normalizarListaResultado(data, ['cargar_manual','manuales','requieren_carga_manual']);
+        const otrosCliente = normalizarListaResultado(data, ['otro_cliente','otros_cliente','facturas_otro_cliente']);
+        const fallidosVisibles = (data.fallidos || []).filter(x => {
+          const sx = splitNombreMotivo(x);
+          const txt = (sx.motivo || sx.pdf_nombre || '').toLowerCase();
+          return !txt.includes('otro cliente') && !txt.includes('cargar manualmente');
+        });
+        const nf = fallidosVisibles.length > 0;
+        const nm = manuales.length > 0;
+        const no = otrosCliente.length > 0;
         const naCount = Array.isArray(data.no_en_arca) ? data.no_en_arca.length : 0;
         // v13/v14: si lineas_finales_generadas está reportado, usarlo; si no viene, confiar en prn_guardado
         // Esto evita mostrar "PRN listo" cuando prn_guardado viene cacheado de una corrida anterior
         const _lineas = data.lineas_finales_generadas;
         const prnReal = data.prn_guardado === true && (_lineas == null || Number(_lineas) > 0);
+        const incidenciasTxt = [nf ? `${fallidosVisibles.length} error(es)` : '', nm ? `${manuales.length} carga manual` : '', no ? `${otrosCliente.length} omitida(s) por otro cliente` : ''].filter(Boolean).join(' · ');
         if (!prnReal) {
           updateProcesoUX('final', 100, 'Sin PRN generado', naCount ? `${naCount} factura(s) no están en el registro ARCA cargado — no se generó PRN.` : 'No se generó ninguna línea de PRN en esta corrida.', { error:true, progressText:'No se generó PRN.' });
         } else {
-          updateProcesoUX('final', 100, nf ? 'Finalizado con errores' : 'PRN listo', nf ? `PRN generado con ${data.fallidos.length} archivo(s) con error.` : 'PRN generado correctamente. Revisá Drive y conciliación.', { progressText: nf ? 'Revisar facturas fallidas.' : 'Proceso completo.' });
+          updateProcesoUX('final', 100, incidenciasTxt ? 'PRN listo con avisos' : 'PRN listo', incidenciasTxt ? `PRN generado. Avisos: ${incidenciasTxt}.` : 'PRN generado correctamente. Revisá Drive y conciliación.', { progressText: incidenciasTxt ? 'Revisar avisos.' : 'Proceso completo.' });
         }
-        logProceso(!prnReal ? 'Proceso terminado SIN generar PRN.' : (nf ? 'Proceso terminado con facturas fallidas.' : 'Proceso terminado correctamente.'));
-        mostrarEstadoProceso('listo', data.fallidos, prnReal, naCount, data.prn_file_id, data.prn_file_name, data.lineas_finales_generadas);
+        logProceso(!prnReal ? 'Proceso terminado SIN generar PRN.' : (incidenciasTxt ? 'Proceso terminado con avisos: ' + incidenciasTxt : 'Proceso terminado correctamente.'));
+        mostrarEstadoProceso('listo', fallidosVisibles, prnReal, naCount, data.prn_file_id, data.prn_file_name, data.lineas_finales_generadas, manuales, otrosCliente);
         mostrarDiagnostico(data);
-        if (data.fallidos && data.fallidos.length > 0) mostrarFallidos(data.fallidos);
+        if (fallidosVisibles.length > 0) mostrarFallidos(fallidosVisibles);
+        else document.getElementById('cardFallidos').style.display = 'none';
+        mostrarCargaManual(manuales);
+        mostrarOtroCliente(otrosCliente);
         if (data.verificacion || data.conciliacion || (data.no_en_arca && data.no_en_arca.length) || (data.ya_procesadas && data.ya_procesadas.length)) mostrarConciliacion(data.verificacion, data.conciliacion, data.no_en_arca, data.ya_procesadas);
         files = files.filter(f => !['done','en_cola','al_prn'].includes(f.status));
         renderQueue();
@@ -981,7 +1079,7 @@ function iniciarPolling() {
 
 function aplicarEstadosArchivos(estados) {
   let actualizado = false;
-  let counts = { procesando:0, al_prn:0, fallida:0 };
+  let counts = { procesando:0, al_prn:0, fallida:0, cargar_manual:0, otro_cliente:0 };
   files.forEach(f => {
     const nombreBase = f.name.replace(/^\d{11}__/, '');
     const nuevoEstado = estados[f.name] || estados[nombreBase];
@@ -994,12 +1092,13 @@ function aplicarEstadosArchivos(estados) {
   if (actualizado) {
     renderQueue();
     const alPrn = files.filter(f => f.status === 'al_prn').length;
-    const fallidas = files.filter(f => f.status === 'fallida').length;
-    const total = files.filter(f => ['en_cola','procesando','al_prn','fallida'].includes(f.status)).length || files.length;
+    const fallidas = files.filter(f => ['fallida','cargar_manual'].includes(f.status)).length;
+    const otros = files.filter(f => f.status === 'otro_cliente').length;
+    const total = files.filter(f => ['en_cola','procesando','al_prn','fallida','cargar_manual','otro_cliente'].includes(f.status)).length || files.length;
     if (total > 0) {
       const pct = 65 + Math.min(30, ((alPrn + fallidas) / total) * 30);
-      updateProcesoUX('ia', pct, 'Procesando archivos', `${alPrn} al PRN · ${fallidas} fallidas · ${total} total.`, { progressText:`${alPrn + fallidas}/${total} archivos resueltos` });
-      setStepDetail('ia', `${alPrn} OK / ${fallidas} error`);
+      updateProcesoUX('ia', pct, 'Procesando archivos', `${alPrn} al PRN · ${fallidas} manual/error · ${otros} otro cliente · ${total} total.`, { progressText:`${alPrn + fallidas + otros}/${total} archivos resueltos` });
+      setStepDetail('ia', `${alPrn} OK / ${fallidas} revisar / ${otros} omitidas`);
     }
   }
 }
@@ -1045,7 +1144,7 @@ function mostrarDiagnostico(data) {
   el.style.display = 'flex';
 }
 
-function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prnFileName, lineasCount) {
+function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prnFileName, lineasCount, manuales, otrosCliente) {
   const el = document.getElementById('estadoProceso');
   if (!el) return;
   
@@ -1061,6 +1160,8 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prn
     const rp = document.getElementById('resetPanel');
     if (rp) rp.style.display = 'none';
     const nf = fallidos && fallidos.length > 0;
+    const nm = manuales && manuales.length > 0;
+    const no = otrosCliente && otrosCliente.length > 0;
     if (prnReal === false) {
       // No se generó PRN real (0 líneas / todas no_en_arca): NO decir "PRN listo".
       el.className = 'alert a-warn';
@@ -1075,8 +1176,9 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prn
         ? ` <a href="https://drive.google.com/file/d/${escapeHtml(prnFileId)}/view" target="_blank" rel="noopener" style="color:#1a6e38;font-weight:600;margin-left:6px;text-decoration:underline;"><i class="ti ti-download" style="font-size:13px;"></i> Ver en Drive</a>`
         : '';
       el.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>' + _driveLinkHtml;
-      document.getElementById('_epMsg').textContent = nf
-        ? `✓ PRN generado${_lineasTxt}. ${fallidos.length} ${pluralizar(fallidos.length, 'error', 'errores')}.`
+      const avisos = [nf ? `${fallidos.length} ${pluralizar(fallidos.length, 'error', 'errores')}` : '', nm ? `${manuales.length} carga manual` : '', no ? `${otrosCliente.length} otro cliente` : ''].filter(Boolean).join(' · ');
+      document.getElementById('_epMsg').textContent = avisos
+        ? `✓ PRN generado${_lineasTxt}. Avisos: ${avisos}.`
         : `✓ PRN listo${_lineasTxt}.`;
     }
   }
@@ -1173,12 +1275,24 @@ function mostrarFallidos(fallidos) {
   _reintentoCliente = clienteSeleccionado;
   _reintentoPeriodo = periodo;
   document.getElementById('cardFallidos').style.display = 'block';
-  document.getElementById('listFallidos').innerHTML = fallidos.map(nombre => `
-    <div class="history-item">
-      <i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;"></i>
-      <span class="history-name">${escapeHtml(nombre)}</span>
-      <span class="badge b-error">error</span>
-    </div>`).join('');
+  const items = fallidos.map(splitNombreMotivo);
+  renderListaDetalle('listFallidos', items, 'b-error', 'error', 'manual-note', 'Error sin motivo informado');
+}
+
+function mostrarCargaManual(items) {
+  const card = document.getElementById('cardManual');
+  if (!card) return;
+  if (!items || !items.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  renderListaDetalle('listManual', items, 'b-cargar_manual', 'cargar manual', 'manual-note', 'Acción requerida: cargar manualmente en Holistor.');
+}
+
+function mostrarOtroCliente(items) {
+  const card = document.getElementById('cardOtroCliente');
+  if (!card) return;
+  if (!items || !items.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  renderListaDetalle('listOtroCliente', items, 'b-otro_cliente', 'omitida', 'other-note', 'No entra al PRN de este cliente.');
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -1209,7 +1323,7 @@ function renderQueue() {
   const labels = {
     pending:'pendiente', uploading:'verificando', done:'listo', error:'error',
     duplicate:'existe', en_cola:'cola', procesando:'procesando…',
-    al_prn:'al PRN ✓', fallida:'error', no_en_arca:'fuera de ARCA', ya_procesada:'ya procesada', duplicada:'duplicada'
+    al_prn:'al PRN ✓', fallida:'error', no_en_arca:'fuera de ARCA', ya_procesada:'ya procesada', duplicada:'duplicada', otro_cliente:'otro cliente', cargar_manual:'carga manual', gemini_json_invalido:'JSON inválido'
   };
   document.getElementById('fileList').innerHTML = files.map((f,i) => `
     <div class="file-item">
@@ -1544,7 +1658,7 @@ Object.assign(window, {
 
 window.addEventListener('DOMContentLoaded', initApp);
 
-console.log('Holistor uploader inline JS cargado OK');
+console.log('Holistor uploader v49 frontend carga manual / otro cliente cargado OK');
 
 </script>
 

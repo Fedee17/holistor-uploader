@@ -878,11 +878,12 @@ function logProceso(msg) {
 
 function resetProcesoUX() {
   procesoActual = { step:'validacion', pct:0, total:0, procesadas:0 };
-  const card = document.getElementById('processCard');
-  if (card) card.classList.remove('active');
   const log = document.getElementById('processLog');
   if (log) log.innerHTML = '';
   updateProcesoUX('validacion', 0, 'En espera', 'Todavía no se inició ningún procesamiento.');
+  // FIX: sacar 'active' DESPUÉS de updateProcesoUX — que la agrega internamente
+  const card = document.getElementById('processCard');
+  if (card) card.classList.remove('active');
 }
 
 function updateProcesoUX(step, pct, statusText, subtitle, opts = {}) {

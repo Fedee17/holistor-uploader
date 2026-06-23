@@ -1555,7 +1555,8 @@ console.log('Holistor uploader inline JS cargado OK');
       try {
         const res = await originalFetch(input, init);
         res.clone().json().then(data => {
-          if (data?.proceso_ya_finalizado === true || data?.listo === true) { state.finalizado=true; state.inFlight=false; setProcesarDisabled(false); }
+          if (data?.proceso_ya_finalizado === true || (data?.listo === true && data?.prn_guardado === true)) { state.finalizado=true; state.inFlight=false; setProcesarDisabled(false); }
+          else if (data?.listo === true) { state.inFlight=false; setProcesarDisabled(false); }
           else if (data?.proceso_ya_activo === true) { state.inFlight=true; setProcesarDisabled(true); }
           else if (data?.ok === false) { state.inFlight=false; setProcesarDisabled(false); }
         }).catch(()=>{});
@@ -1564,7 +1565,7 @@ console.log('Holistor uploader inline JS cargado OK');
     }
     if (url.includes('/holistor-estado')) {
       const res = await originalFetch(input, init);
-      res.clone().json().then(data => { if (data?.listo === true) { state.finalizado=true; state.inFlight=false; setProcesarDisabled(false); } }).catch(()=>{});
+      res.clone().json().then(data => { if (data?.listo === true && data?.prn_guardado === true) { state.finalizado=true; state.inFlight=false; setProcesarDisabled(false); } else if (data?.listo === true) { state.inFlight=false; setProcesarDisabled(false); } }).catch(()=>{});
       return res;
     }
     if (url.includes('/holistor-reset')) {

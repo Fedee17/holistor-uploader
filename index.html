@@ -506,6 +506,8 @@ function onClienteChange() {
     document.getElementById('clienteHint').textContent = '';
   }
   resetRegistro();
+  // Limpiar el resultado del cliente anterior al cambiar de cliente
+  resetProcesoUX();
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

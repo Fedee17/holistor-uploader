@@ -1022,9 +1022,26 @@ function iniciarPolling() {
       
       if (data.listo === true) {
         // Ignorar SIEMPRE el resultado cacheado durante polling activo.
-        // desde_cache:true significa que n8n devuelve la corrida anterior (no la actual).
-        // El resultado real llega cuando listo:true sin desde_cache.
         if (data.desde_cache) { return; }
+
+        // Validación de contenido: solo aceptar listo:true cuando hay evidencia real
+        // de que el proceso terminó — el PRN está guardado en Drive (prn_guardado:true)
+        // O hay ítems que explican por qué no hay PRN (fallidos, no_en_arca, ya_procesadas, etc.)
+        // Sin esto, un listo:true vacío (race condition, error silencioso) muestra "✓ PRN listo"
+        // antes de que n8n haya terminado.
+        const _tieneContenido = data.prn_guardado === true
+          || (Array.isArray(data.fallidos)     && data.fallidos.length     > 0)
+          || (Array.isArray(data.no_en_arca)   && data.no_en_arca.length   > 0)
+          || (Array.isArray(data.ya_procesadas)&& data.ya_procesadas.length> 0)
+          || (Array.isArray(data.cargar_manual)&& data.cargar_manual.length> 0)
+          || (data.conciliacion && Array.isArray(data.conciliacion.procesadas_registradas)
+              && data.conciliacion.procesadas_registradas.length > 0);
+        if (!_tieneContenido) {
+          // listo:true pero sin contenido verificable → n8n probablemente no terminó
+          // (race condition al inicio de la corrida). Seguir esperando.
+          return;
+        }
+
         _resultadoYaMostrado = true;
         stopPolling();
         autoSyncProveedores();

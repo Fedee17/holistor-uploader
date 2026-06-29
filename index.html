@@ -706,20 +706,53 @@ async function handleExcelFile(file) {
   const zone = document.getElementById('excelZone');
   mostrarCargando(zone, file);
 
-  let registros, receptorCuit;
+  let registros, receptorCuit, periodoPrincipal, totalFechas;
   try {
-    ({ registros, receptorCuit } = await parsearRegistroARCA(file));
+    ({ registros, receptorCuit, periodoPrincipal, totalFechas } = await parsearRegistroARCA(file));
   } catch(err) {
     ezCache.ezSub.textContent = 'Error: ' + err.message;
     showAlert('Error al leer Excel: ' + err.message, 'error');
     return;
   }
 
+  // Validar que el CUIT receptor del Excel coincida con el cliente seleccionado
   const cuitLimpio = clienteSeleccionado.cuit.replace(/[^0-9]/g,'').padStart(11,'0');
   if (receptorCuit !== cuitLimpio) {
     ezCache.ezSub.textContent = `CUIT mismatch`;
     showAlert(`CUIT ${receptorCuit} ≠ ${clienteSeleccionado.cuit}`, 'error');
+    resetRegistro();
     return;
+  }
+
+  // Validar que el período del Excel coincida con el período seleccionado en la página.
+  // Si no coinciden, el backend va a cargar comprobantes del mes equivocado → todas
+  // las facturas quedan como "no está en ARCA" → proceso zombie o PRN vacío.
+  if (periodoPrincipal && periodo) {
+    const periodoSeleccionado = `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}`;
+    if (periodoPrincipal !== periodoSeleccionado) {
+      // Formatear ambos períodos de forma legible
+      const [pa, pm] = periodoPrincipal.split('-');
+      const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                     'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      const excelLegible    = `${meses[parseInt(pm)] || pm} ${pa}`;
+      const selecLegible    = `${meses[periodo.mes] || periodo.mes} ${periodo.anio}`;
+      const pct = totalFechas > 0 ? Math.round((_periodoContador?.[periodoPrincipal] || 0) / totalFechas * 100) : 0;
+
+      ezCache.ezSub.textContent = `⚠ Excel de ${excelLegible} ≠ período ${selecLegible}`;
+      ezCache.ezAction.textContent = '';
+      const zone = document.getElementById('excelZone');
+      zone.classList.remove('loaded');
+      zone.classList.add('highlight');
+      setTimeout(() => zone.classList.remove('highlight'), 4000);
+
+      showAlert(
+        `El Excel de ARCA corresponde a <strong>${excelLegible}</strong> pero tenés seleccionado <strong>${selecLegible}</strong>. ` +
+        `Cambiá el período en la página o cargá el Excel del mes correcto.`,
+        'error'
+      );
+      document.getElementById('excelInput').value = '';
+      return;
+    }
   }
 
   await guardarRegistroEnN8n(zone, registros, receptorCuit);
@@ -813,7 +846,32 @@ function parsearRegistroARCA(file) {
         }
         
         if (!registros.length) throw new Error('Sin comprobantes');
-        resolve({ registros, receptorCuit });
+
+        // Detectar período del Excel a partir de las fechas de los comprobantes.
+        // ARCA exporta fechas como "DD/MM/YYYY". Las contamos por YYYY-MM
+        // y tomamos el más frecuente como "período declarado" del Excel.
+        const _periodoContador = {};
+        for (const reg of registros) {
+          const f = String(reg.fecha || '');
+          let _mes, _anio;
+          // DD/MM/YYYY (formato ARCA típico)
+          const m1 = f.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+          if (m1) { _mes = parseInt(m1[2]); _anio = parseInt(m1[3]); }
+          else {
+            // YYYY-MM-DD (ISO)
+            const m2 = f.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (m2) { _mes = parseInt(m2[2]); _anio = parseInt(m2[1]); }
+          }
+          if (_mes && _anio && _mes >= 1 && _mes <= 12) {
+            const k = `${_anio}-${String(_mes).padStart(2,'0')}`;
+            _periodoContador[k] = (_periodoContador[k] || 0) + 1;
+          }
+        }
+        const _periodoEntries = Object.entries(_periodoContador).sort((a,b) => b[1]-a[1]);
+        const periodoPrincipal = _periodoEntries[0]?.[0] || '';  // ej: "2026-05"
+        const totalFechas      = _periodoEntries.reduce((s,[,c]) => s+c, 0);
+
+        resolve({ registros, receptorCuit, periodoPrincipal, totalFechas, periodoContador: _periodoContador });
       } catch(err) { reject(err); }
     };
     reader.onerror = () => reject(new Error('No se pudo leer archivo'));

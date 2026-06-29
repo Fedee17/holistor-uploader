@@ -1141,8 +1141,11 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prn
     document.getElementById('_epMsg').textContent = 'Procesando…';
   } else if (estado === 'listo') {
     el.style.display = 'flex';
+    // No ocultar resetPanel — puede haberse llegado a 'listo' por caché mientras
+    // el proceso real sigue corriendo en n8n. El botón queda disponible como
+    // válvula de escape ante zombies o resultados de caché que tapan el proceso.
     const rp = document.getElementById('resetPanel');
-    if (rp) rp.style.display = 'none';
+    if (rp) rp.style.display = 'block';
     const nf = fallidos && fallidos.length > 0;
     if (prnReal === false) {
       // No se generó PRN real (0 líneas / todas no_en_arca): NO decir "PRN listo".

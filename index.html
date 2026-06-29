@@ -841,7 +841,10 @@ function parsearRegistroARCA(file) {
             total: String(r[29]||''),
             denominacion_emisor: String(r[8]||''),
             fecha: String(r[0]||''),
-            estado: 'pendiente'
+            estado: 'pendiente',
+            // col[11]=Tipo Cambio, col[12]=Moneda — necesarios para convertir USD→pesos en el PRN
+            tipo_cambio: String(r[11]||'1'),
+            moneda: String(r[12]||'$')
           });
         }
         
@@ -1018,7 +1021,10 @@ function iniciarPolling() {
       if (!data) return;
       
       if (data.listo === true) {
-        if (data.desde_cache && _resultadoYaMostrado) { stopPolling(); return; }
+        // Ignorar SIEMPRE el resultado cacheado durante polling activo.
+        // desde_cache:true significa que n8n devuelve la corrida anterior (no la actual).
+        // El resultado real llega cuando listo:true sin desde_cache.
+        if (data.desde_cache) { return; }
         _resultadoYaMostrado = true;
         stopPolling();
         autoSyncProveedores();

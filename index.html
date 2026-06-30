@@ -1444,6 +1444,20 @@ async function verificarDuplicado(nombre) {
 }
 
 async function addFiles(newFiles) {
+  try {
+    await addFilesInner(newFiles);
+  } catch (e) {
+    // Cualquier excepción que antes cortaba la ejecución en silencio
+    // (sin mostrar nada en pantalla) ahora se ve como alerta + log,
+    // y se limpian los ítems "uploading" que pudieron quedar a mitad de camino.
+    console.error('addFiles error:', e);
+    showAlert('Error al agregar archivos: ' + (e && e.message ? e.message : String(e)), 'error');
+    files = files.filter(f => !f._temp);
+    renderQueue();
+  }
+}
+
+async function addFilesInner(newFiles) {
   const pdfs = Array.from(newFiles).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
   if (!pdfs.length) { showAlert('Solo PDFs', 'error'); return; }
 
@@ -1672,7 +1686,14 @@ function initApp() {
   const fileInput = document.getElementById('fileInput');
   
   dropZone.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', (e) => addFiles(e.target.files));
+  fileInput.addEventListener('change', (e) => {
+    // Sin esto, el navegador no dispara 'change' si se vuelve a elegir
+    // el mismo archivo (mismo nombre/ruta) por segunda vez consecutiva —
+    // el click en "elegir archivo" no hace nada visible, mientras que
+    // arrastrar sí funciona porque genera una lista de archivos nueva cada vez.
+    addFiles(e.target.files);
+    e.target.value = '';
+  });
   
   ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
     dropZone.addEventListener(evt, (e) => e.preventDefault());
@@ -1693,6 +1714,7 @@ function initApp() {
   });
   excelInput.addEventListener('change', (e) => {
     if (e.target.files[0]) handleExcelFile(e.target.files[0]);
+    e.target.value = '';  // mismo fix que fileInput: permite re-elegir el mismo Excel
   });
   
   ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {

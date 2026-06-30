@@ -1772,7 +1772,23 @@ console.log('Holistor uploader inline JS cargado OK');
     }
     if (url.includes('/holistor-estado')) {
       const res = await originalFetch(input, init);
-      res.clone().json().then(data => { if (data?.listo === true && data?.prn_guardado === true) { state.finalizado=true; state.inFlight=false; setProcesarDisabled(false); } else if (data?.listo === true) { state.inFlight=false; setProcesarDisabled(false); } }).catch(()=>{});
+      res.clone().json().then(data => {
+        // Mismo criterio que iniciarPolling(): ignorar siempre cache y exigir
+        // contenido verificable antes de considerar el proceso terminado.
+        // Sin esto, un listo:true desde_cache o vacío reactivaba el botón
+        // "Procesar" antes de tiempo, permitiendo doble ejecución concurrente.
+        if (data?.desde_cache) return;
+        const tieneContenido = data?.prn_guardado === true
+          || (Array.isArray(data?.fallidos)      && data.fallidos.length      > 0)
+          || (Array.isArray(data?.no_en_arca)    && data.no_en_arca.length    > 0)
+          || (Array.isArray(data?.ya_procesadas) && data.ya_procesadas.length > 0)
+          || (Array.isArray(data?.cargar_manual) && data.cargar_manual.length > 0)
+          || (data?.conciliacion && Array.isArray(data.conciliacion.procesadas_registradas)
+              && data.conciliacion.procesadas_registradas.length > 0);
+        if (data?.listo === true && !tieneContenido) return;  // listo prematuro, seguir esperando
+        if (data?.listo === true && data?.prn_guardado === true) { state.finalizado=true; state.inFlight=false; setProcesarDisabled(false); }
+        else if (data?.listo === true) { state.inFlight=false; setProcesarDisabled(false); }
+      }).catch(()=>{});
       return res;
     }
     if (url.includes('/holistor-reset')) {

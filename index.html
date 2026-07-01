@@ -940,13 +940,20 @@ function logProceso(msg) {
 }
 
 function resetProcesoUX() {
+  // Limpia el panel del proceso sin llamar a updateProcesoUX (que agrega 'active' internamente
+  // y causaría un flash visual o dejaría el card visible cuando no debería estarlo).
   procesoActual = { step:'validacion', pct:0, total:0, procesadas:0 };
   const log = document.getElementById('processLog');
   if (log) log.innerHTML = '';
-  updateProcesoUX('validacion', 0, 'En espera', 'Todavía no se inició ningún procesamiento.');
-  // FIX: sacar 'active' DESPUÉS de updateProcesoUX — que la agrega internamente
   const card = document.getElementById('processCard');
   if (card) card.classList.remove('active');
+  // Limpiar el banner de estado visible (✓ PRN listo / Procesando... / etc.)
+  const ep = document.getElementById('estadoProceso');
+  if (ep) { ep.style.display = 'none'; ep.innerHTML = ''; }
+  // Limpiar reset panel
+  const rp = document.getElementById('resetPanel');
+  if (rp) rp.style.display = 'none';
+  _resultadoYaMostrado = false;
 }
 
 function updateProcesoUX(step, pct, statusText, subtitle, opts = {}) {
@@ -1009,7 +1016,10 @@ function iniciarPolling() {
       showAlert('Procesamiento tardando demasiado. Recargá si el PRN está en Drive.', 'warn');
       updateProcesoUX('ia', procesoActual.pct || 70, 'Demorado', 'El proceso sigue sin confirmar finalización. Puede estar bloqueado o n8n puede seguir trabajando.', { error:true, progressText:'Revisar n8n o usar Liberar proceso si quedó zombie.' });
       logProceso('Advertencia: el procesamiento superó el tiempo esperado.');
-      mostrarEstadoProceso('listo', []);
+      // NO llamar mostrarEstadoProceso('listo', []) sin datos reales:
+      // prnReal=undefined → prnReal===false da false → muestra "✓ PRN listo" vacío.
+      // El usuario ya ve el aviso de demorado arriba — no mostrar estado de éxito falso.
+      mostrarEstadoProceso('listo', [], false);
     }
   }, POLLING_TIMEOUT_MS);
 

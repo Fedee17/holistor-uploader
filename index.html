@@ -738,7 +738,11 @@ async function handleExcelFile(file) {
                      'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
       const excelLegible    = `${meses[parseInt(pm)] || pm} ${pa}`;
       const selecLegible    = `${meses[periodo.mes] || periodo.mes} ${periodo.anio}`;
-      const pct = totalFechas > 0 ? Math.round((_periodoContador?.[periodoPrincipal] || 0) / totalFechas * 100) : 0;
+      // Se sacó el cálculo de "pct" que había acá: usaba una variable (_periodoContador)
+      // que nunca existía en este punto del código — rompía todo con un error antes
+      // de llegar a mostrar el aviso de abajo, y la página se quedaba trabada en
+      // "Leyendo comprobantes…" para siempre. Ese número tampoco se llegaba a mostrar
+      // en ningún lado, así que se puede sacar sin que falte nada en pantalla.
 
       ezCache.ezSub.textContent = `⚠ Excel de ${excelLegible} ≠ período ${selecLegible}`;
       ezCache.ezAction.textContent = '';

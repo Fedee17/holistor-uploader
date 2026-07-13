@@ -242,6 +242,9 @@
       </div>
     </div>
   </div>
+  <div id="timerBox" style="display:none; background:#eef2ff; border:0.5px solid #c7d2fe; border-radius:8px; padding:10px 14px; margin-bottom:1rem; font-size:14px; color:#3730a3; text-align:center; font-weight:600; font-variant-numeric:tabular-nums;">
+    <i class="ti ti-clock" style="font-size:14px;"></i> <span id="timerRestante"></span>
+  </div>
   <div id="estadoProceso" class="alert" style="display:none;"></div>
 
   <div class="card process-card" id="processCard">
@@ -261,7 +264,6 @@
     </div>
     <div class="process-progress">
       <div class="process-progress-head"><span id="processProgressLabel">0%</span><span id="processProgressText">Sin actividad</span></div>
-      <div id="timerRestante" style="font-size:11px;color:#1a73e8;text-align:right;margin-bottom:4px;font-variant-numeric:tabular-nums;"></div>
       <div class="process-bar-bg"><div class="process-bar-fill" id="processBarFill"></div></div>
     </div>
     <div class="process-log" id="processLog"></div>
@@ -371,6 +373,8 @@ let errores = 0;
 let pollingInterval = null;
 let pollingTimeoutMax = null;
 let countdownInterval = null;
+let _procesoInicioTs = null;
+let _procesoTimeoutTotalMs = null;
 let _resultadoYaMostrado = false;
 const BATCH_FRONTEND_SIZE = 100;
 
@@ -1011,6 +1015,8 @@ function resetProcesoUX() {
   const rp = document.getElementById('resetPanel');
   if (rp) rp.style.display = 'none';
   detenerCountdown();
+  _procesoInicioTs = null;
+  _procesoTimeoutTotalMs = null;
   _resultadoYaMostrado = false;
 }
 
@@ -1063,10 +1069,16 @@ function stopPolling() {
 // Cuenta regresiva visible del tiempo máximo estimado para esta corrida.
 // Es solo informativo — el timeout real lo sigue manejando pollingTimeoutMax;
 // esto nunca corta el proceso, solo le muestra al usuario cuánto falta.
+function mostrarTimerBox(mostrar) {
+  const box = document.getElementById('timerBox');
+  if (box) box.style.display = mostrar ? 'block' : 'none';
+}
+
 function iniciarCountdown(ms) {
   detenerCountdown();
   const el = document.getElementById('timerRestante');
   if (!el) return;
+  mostrarTimerBox(true);
   const fin = Date.now() + ms;
   function tick() {
     const restanteMs = fin - Date.now();
@@ -1089,6 +1101,7 @@ function detenerCountdown() {
   if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
   const el = document.getElementById('timerRestante');
   if (el) el.textContent = '';
+  mostrarTimerBox(false);
 }
 
 function iniciarPolling() {
@@ -1100,14 +1113,24 @@ function iniciarPolling() {
   files.forEach(f => { if (f.status === 'done') f.status = 'en_cola'; });
   renderQueue();
 
-  // Timeout proporcional a la cantidad de facturas en cola en este momento
-  // (después de pasar 'done' a 'en_cola' arriba). Si no hay ninguna en cola
-  // detectable (ej. "Procesar ahora" sin haber tocado la lista local de
-  // archivos), cae al piso de 5 minutos de calcularTimeoutProceso.
-  const _cantidadFacturasLote = files.filter(f => f.status === 'en_cola').length;
-  const _timeoutProcesoMs = calcularTimeoutProceso(_cantidadFacturasLote);
-  logProceso(`Tiempo máximo estimado para este lote: ${Math.round(_timeoutProcesoMs/60000)} min (${_cantidadFacturasLote || '?'} factura(s)).`);
-  iniciarCountdown(_timeoutProcesoMs);
+  // Timeout proporcional a la cantidad de facturas del lote. Si ya se calculó
+  // un tiempo total en startUpload() (caso normal: "Subir y procesar"), se usa
+  // ese total menos lo ya transcurrido, para que el timer visible (arrancado
+  // en el click del botón) y este timeout real lleguen a cero juntos. Si no
+  // hay nada calculado (ej. "Procesar ahora" directo, sin pasar por
+  // startUpload), se calcula de cero acá mismo.
+  let _timeoutProcesoMs;
+  if (_procesoInicioTs && _procesoTimeoutTotalMs) {
+    const _transcurrido = Date.now() - _procesoInicioTs;
+    _timeoutProcesoMs = Math.max(30000, _procesoTimeoutTotalMs - _transcurrido); // piso de 30s
+  } else {
+    const _cantidadFacturasLote = files.filter(f => f.status === 'en_cola').length;
+    _procesoInicioTs = Date.now();
+    _procesoTimeoutTotalMs = calcularTimeoutProceso(_cantidadFacturasLote);
+    _timeoutProcesoMs = _procesoTimeoutTotalMs;
+    iniciarCountdown(_timeoutProcesoMs);
+  }
+  logProceso(`Tiempo máximo estimado restante: ${Math.round(_timeoutProcesoMs/60000)} min.`);
 
   pollingTimeoutMax = setTimeout(() => {
     if (pollingInterval) {
@@ -1656,6 +1679,16 @@ async function startUpload() {
     showAlert('No hay PDFs pendientes para subir.', 'warn');
     return;
   }
+
+  // Arrancar el timer visible YA, desde el momento del click en "Subir y
+  // procesar" — no recién cuando arranca el polling (que es varios pasos
+  // después: subida de PDFs + espera de indexación de Drive). Se calcula acá
+  // con la cantidad real de facturas y se reutiliza en iniciarPolling()
+  // restando lo ya transcurrido, para que el timer visible y el timeout real
+  // del watchdog lleguen a cero juntos.
+  _procesoInicioTs = Date.now();
+  _procesoTimeoutTotalMs = calcularTimeoutProceso(pending.length);
+  iniciarCountdown(_procesoTimeoutTotalMs);
 
   uploading = true;
   setUploadControlsDisabled(true);

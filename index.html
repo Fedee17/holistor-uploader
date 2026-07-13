@@ -261,6 +261,7 @@
     </div>
     <div class="process-progress">
       <div class="process-progress-head"><span id="processProgressLabel">0%</span><span id="processProgressText">Sin actividad</span></div>
+      <div id="timerRestante" style="font-size:11px;color:#1a73e8;text-align:right;margin-bottom:4px;font-variant-numeric:tabular-nums;"></div>
       <div class="process-bar-bg"><div class="process-bar-fill" id="processBarFill"></div></div>
     </div>
     <div class="process-log" id="processLog"></div>
@@ -369,6 +370,7 @@ let subidos = 0;
 let errores = 0;
 let pollingInterval = null;
 let pollingTimeoutMax = null;
+let countdownInterval = null;
 let _resultadoYaMostrado = false;
 const BATCH_FRONTEND_SIZE = 100;
 
@@ -1008,6 +1010,7 @@ function resetProcesoUX() {
   // Limpiar reset panel
   const rp = document.getElementById('resetPanel');
   if (rp) rp.style.display = 'none';
+  detenerCountdown();
   _resultadoYaMostrado = false;
 }
 
@@ -1054,6 +1057,38 @@ function progresoPorArchivos() {
 function stopPolling() {
   if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
   if (pollingTimeoutMax) { clearTimeout(pollingTimeoutMax); pollingTimeoutMax = null; }
+  detenerCountdown();
+}
+
+// Cuenta regresiva visible del tiempo máximo estimado para esta corrida.
+// Es solo informativo — el timeout real lo sigue manejando pollingTimeoutMax;
+// esto nunca corta el proceso, solo le muestra al usuario cuánto falta.
+function iniciarCountdown(ms) {
+  detenerCountdown();
+  const el = document.getElementById('timerRestante');
+  if (!el) return;
+  const fin = Date.now() + ms;
+  function tick() {
+    const restanteMs = fin - Date.now();
+    if (restanteMs <= 0) {
+      el.textContent = 'Tiempo estimado agotado — el proceso puede seguir trabajando en n8n';
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+      return;
+    }
+    const totalSeg = Math.ceil(restanteMs / 1000);
+    const mm = Math.floor(totalSeg / 60);
+    const ss = totalSeg % 60;
+    el.textContent = `Tiempo restante estimado: ${mm}:${String(ss).padStart(2,'0')}`;
+  }
+  tick();
+  countdownInterval = setInterval(tick, 1000);
+}
+
+function detenerCountdown() {
+  if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+  const el = document.getElementById('timerRestante');
+  if (el) el.textContent = '';
 }
 
 function iniciarPolling() {
@@ -1072,6 +1107,7 @@ function iniciarPolling() {
   const _cantidadFacturasLote = files.filter(f => f.status === 'en_cola').length;
   const _timeoutProcesoMs = calcularTimeoutProceso(_cantidadFacturasLote);
   logProceso(`Tiempo máximo estimado para este lote: ${Math.round(_timeoutProcesoMs/60000)} min (${_cantidadFacturasLote || '?'} factura(s)).`);
+  iniciarCountdown(_timeoutProcesoMs);
 
   pollingTimeoutMax = setTimeout(() => {
     if (pollingInterval) {

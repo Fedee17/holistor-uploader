@@ -1128,8 +1128,11 @@ function iniciarPolling() {
     _procesoInicioTs = Date.now();
     _procesoTimeoutTotalMs = calcularTimeoutProceso(_cantidadFacturasLote);
     _timeoutProcesoMs = _procesoTimeoutTotalMs;
-    iniciarCountdown(_timeoutProcesoMs);
   }
+  // stopPolling() (llamado arriba, al entrar a esta función) apaga el timer
+  // visible vía detenerCountdown() — hay que prenderlo de nuevo acá SIEMPRE,
+  // sin importar la rama, o se queda apagado justo al pasar a "IA + PRN".
+  iniciarCountdown(_timeoutProcesoMs);
   logProceso(`Tiempo máximo estimado restante: ${Math.round(_timeoutProcesoMs/60000)} min.`);
 
   pollingTimeoutMax = setTimeout(() => {

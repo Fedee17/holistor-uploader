@@ -317,6 +317,21 @@ const POLLING_TIMEOUT_MS = 15 * 60 * 1000;
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
+// Calcula un timeout de polling proporcional a la cantidad de facturas del
+// lote, en vez de un valor fijo que le queda corto a lotes grandes y largo
+// a lotes chicos. 25s/factura es el extremo superior observado (15-25s por
+// factura entre Gemini y Sheets); 90s de margen fijo para indexación de
+// Drive y arranque. Piso de 5 min y techo de 45 min para no quedar ni muy
+// ajustado ni esperando indefinidamente.
+function calcularTimeoutProceso(cantidadFacturas) {
+  const SEG_POR_FACTURA = 25;
+  const OVERHEAD_SEG = 90;
+  const MIN_MS = 5 * 60 * 1000;
+  const MAX_MS = 45 * 60 * 1000;
+  const estimadoMs = (Math.max(1, cantidadFacturas) * SEG_POR_FACTURA + OVERHEAD_SEG) * 1000;
+  return Math.min(MAX_MS, Math.max(MIN_MS, estimadoMs));
+}
+
 async function fetchConTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -815,7 +830,14 @@ function parsearRegistroARCA(file) {
         const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:null, raw:false });
-        
+        // Segunda lectura en modo raw (valor numérico real de la celda, sin el
+        // formato de visualización de Excel). La necesitamos solo para
+        // tipo_cambio (col 11): algunas filas de ARCA traen esa celda con un
+        // formato de Excel que le saca el punto decimal al mostrarla como texto
+        // (ej. "1438.43498" → se lee como "143.843.498"). El valor crudo no
+        // tiene ese problema porque no pasa por el formato de visualización.
+        const rowsRaw = XLSX.utils.sheet_to_json(ws, { header:1, defval:null, raw:true });
+
         if (rows.length < 3) throw new Error('Archivo vacío');
 
         const headers = (rows[1] || []).map(h => String(h||'').trim().toLowerCase());
@@ -857,6 +879,16 @@ function parsearRegistroARCA(file) {
           const numHasta = String(r[4]||'');
           const clave = `${cuitEm}-${parseInt(tipoCod)||0}-${parseInt(ptoVta)||0}-${parseInt(numHasta)||0}`;
 
+          // Preferir el valor numérico crudo de la celda (rowsRaw) para
+          // tipo_cambio: evita que el formato de visualización de Excel de
+          // esa celda puntual le borre el punto decimal (ver comentario en
+          // la lectura de rowsRaw más arriba). Si no vino como número ahí
+          // (celda vacía, texto, etc.), cae al string formateado de siempre.
+          const _tcRawCell = rowsRaw[i] ? rowsRaw[i][11] : null;
+          const tipoCambioVal = (typeof _tcRawCell === 'number' && isFinite(_tcRawCell) && _tcRawCell > 0)
+            ? String(_tcRawCell)
+            : String(r[11] || '1');
+
           registros.push({
             clave,
             cuit_emisor: cuitEm,
@@ -868,7 +900,7 @@ function parsearRegistroARCA(file) {
             fecha: String(r[0]||''),
             estado: 'pendiente',
             // col[11]=Tipo Cambio, col[12]=Moneda — necesarios para convertir USD→pesos en el PRN
-            tipo_cambio: String(r[11]||'1'),
+            tipo_cambio: tipoCambioVal,
             moneda: String(r[12]||'$')
           });
         }
@@ -1032,7 +1064,15 @@ function iniciarPolling() {
   logProceso('Procesamiento iniciado: PDFs en cola para Gemini y PRN.');
   files.forEach(f => { if (f.status === 'done') f.status = 'en_cola'; });
   renderQueue();
-  
+
+  // Timeout proporcional a la cantidad de facturas en cola en este momento
+  // (después de pasar 'done' a 'en_cola' arriba). Si no hay ninguna en cola
+  // detectable (ej. "Procesar ahora" sin haber tocado la lista local de
+  // archivos), cae al piso de 5 minutos de calcularTimeoutProceso.
+  const _cantidadFacturasLote = files.filter(f => f.status === 'en_cola').length;
+  const _timeoutProcesoMs = calcularTimeoutProceso(_cantidadFacturasLote);
+  logProceso(`Tiempo máximo estimado para este lote: ${Math.round(_timeoutProcesoMs/60000)} min (${_cantidadFacturasLote || '?'} factura(s)).`);
+
   pollingTimeoutMax = setTimeout(() => {
     if (pollingInterval) {
       stopPolling();
@@ -1043,8 +1083,14 @@ function iniciarPolling() {
       // prnReal=undefined → prnReal===false da false → muestra "✓ PRN listo" vacío.
       // El usuario ya ve el aviso de demorado arriba — no mostrar estado de éxito falso.
       mostrarEstadoProceso('listo', [], false);
+      // Liberar el candado local anti-doble-PRN (bloque v19 al final del archivo).
+      // Sin esto, el botón "Subir y procesar" queda trabado indefinidamente
+      // para este cliente/período después de un timeout del navegador, aunque
+      // el proceso en n8n ya haya terminado o fallado — el usuario ve el botón
+      // "sin hacer nada" en el próximo click, sin ningún error visible.
+      if (window.__holistorLiberarGuardaLocal) window.__holistorLiberarGuardaLocal();
     }
-  }, POLLING_TIMEOUT_MS);
+  }, _timeoutProcesoMs);
 
   pollingInterval = setInterval(async () => {
     try {
@@ -1803,6 +1849,14 @@ console.log('Holistor uploader inline JS cargado OK');
   function keyActual(body){ return String(body?.cliente_cuit || clienteActual() || '') + '|' + String(body?.periodo || periodoActual() || ''); }
   function setProcesarDisabled(disabled){ ['btnSubir','btnProcesar','selCliente','selMes','selAnio'].forEach(id => { const el=qs(id); if (el) el.disabled = !!disabled; }); }
   function jsonResponse(obj){ return new Response(JSON.stringify(obj), { status:200, headers:{'Content-Type':'application/json'} }); }
+  // Hook para que el timeout de iniciarPolling() (definido en el otro bloque
+  // <script>, fuera de esta IIFE, sin acceso a `state`) pueda liberar el
+  // candado local cuando el navegador se rinde esperando una respuesta.
+  window.__holistorLiberarGuardaLocal = function(){
+    state.inFlight = false;
+    state.finalizado = false;
+    setProcesarDisabled(false);
+  };
   const originalFetch = window.fetch.bind(window);
   window.fetch = async function(input, init) {
     const url = typeof input === 'string' ? input : (input && input.url) || '';

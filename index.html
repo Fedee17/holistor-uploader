@@ -1698,12 +1698,35 @@ async function subirUnPDF(item) {
   fd.append('anio', String(periodo.anio));
   fd.append('periodo', periodoStr());
 
-  const res = await fetchConTimeout(WEBHOOK.upload(), { method: 'POST', body: fd }, FETCH_TIMEOUT_MS);
-  const data = await jsonSeguro(res);
-  if (!res.ok || data.ok === false) {
-    throw new Error(data.mensaje || `HTTP ${res.status}`);
+  // Reintento automático: los 403/timeouts que vimos hoy fueron picos cortos
+  // de la API de Google (confirmado -- la misma subida funcionaba perfecto
+  // segundos después, sin cambiar nada). Antes esto quedaba en manos del
+  // usuario ("volvé a subir este archivo a mano") -- no hay motivo para no
+  // resolverlo solo: 3 intentos con una pausa corta entre cada uno alcanza
+  // para superar un pico transitorio sin intervención humana.
+  const INTENTOS_MAX = 3;
+  const ESPERA_ENTRE_INTENTOS_MS = 2500;
+  let ultimoError = null;
+
+  for (let intento = 1; intento <= INTENTOS_MAX; intento++) {
+    try {
+      const res = await fetchConTimeout(WEBHOOK.upload(), { method: 'POST', body: fd }, FETCH_TIMEOUT_MS);
+      const data = await jsonSeguro(res);
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.mensaje || `HTTP ${res.status}`);
+      }
+      if (intento > 1) logProceso(`Subida de ${item.name} funcionó en el reintento ${intento}.`);
+      return data;
+    } catch (err) {
+      ultimoError = err;
+      if (intento < INTENTOS_MAX) {
+        logProceso(`Intento ${intento}/${INTENTOS_MAX} de subir ${item.name} falló (${err.message}). Reintentando...`);
+        await sleep(ESPERA_ENTRE_INTENTOS_MS);
+      }
+    }
   }
-  return data;
+  // Se agotaron los reintentos -- recién ahí es un fallo real que el usuario debe ver.
+  throw ultimoError;
 }
 
 async function startUpload() {

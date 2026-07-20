@@ -1014,6 +1014,30 @@ function resetProcesoUX() {
   // Limpiar reset panel
   const rp = document.getElementById('resetPanel');
   if (rp) rp.style.display = 'none';
+  // Limpiar el panel de conciliación del cliente/corrida anterior. Sin esto,
+  // al cambiar de cliente en la MISMA pestaña (sin recargar la página) el
+  // panel se queda mostrando "Conciliadas"/"Falta procesar" del cliente
+  // ANTERIOR hasta que termine una corrida nueva -- si alguien mira la
+  // pantalla en ese momento intermedio, puede leerse como si los datos del
+  // cliente nuevo estuvieran mal, cuando en realidad son de otro cliente.
+  const cc = document.getElementById('cardConciliacion');
+  if (cc) cc.style.display = 'none';
+  const ccContent = document.getElementById('concilContent');
+  if (ccContent) ccContent.innerHTML = '';
+  // Mismo criterio para fallidos / carga manual / otro cliente.
+  const cf = document.getElementById('cardFallidos');
+  if (cf) cf.style.display = 'none';
+  const listF = document.getElementById('listFallidos');
+  if (listF) listF.innerHTML = '';
+  const cm = document.getElementById('cardManual');
+  if (cm) cm.style.display = 'none';
+  const listM = document.getElementById('listManual');
+  if (listM) listM.innerHTML = '';
+  const co = document.getElementById('cardOtroCliente');
+  if (co) co.style.display = 'none';
+  const listO = document.getElementById('listOtroCliente');
+  if (listO) listO.innerHTML = '';
+  archivosFallidos = [];
   detenerCountdown();
   _procesoInicioTs = null;
   _procesoTimeoutTotalMs = null;
@@ -1141,10 +1165,14 @@ function iniciarPolling() {
       showAlert('Procesamiento tardando demasiado. Recargá si el PRN está en Drive.', 'warn');
       updateProcesoUX('ia', procesoActual.pct || 70, 'Demorado', 'El proceso sigue sin confirmar finalización. Puede estar bloqueado o n8n puede seguir trabajando.', { error:true, progressText:'Revisar n8n o usar Liberar proceso si quedó zombie.' });
       logProceso('Advertencia: el procesamiento superó el tiempo esperado.');
-      // NO llamar mostrarEstadoProceso('listo', []) sin datos reales:
-      // prnReal=undefined → prnReal===false da false → muestra "✓ PRN listo" vacío.
-      // El usuario ya ve el aviso de demorado arriba — no mostrar estado de éxito falso.
-      mostrarEstadoProceso('listo', [], false);
+      // NO pasar prnReal=false acá: eso significa "confirmado, no se generó PRN",
+      // que es un dato que NO tenemos en este punto -- solo sabemos que la página
+      // se cansó de esperar según SU PROPIO cálculo de tiempo, no que el backend
+      // haya terminado ni mucho menos que haya fallado. Pasar false hacía que el
+      // usuario viera "No se generó ningún PRN en esta corrida" como si fuera un
+      // resultado confirmado, cuando en realidad el proceso puede seguir
+      // trabajando tranquilamente en n8n. Se usa null para el caso "incierto".
+      mostrarEstadoProceso('listo', [], null);
       // Liberar el candado local anti-doble-PRN (bloque v19 al final del archivo).
       // Sin esto, el botón "Subir y procesar" queda trabado indefinidamente
       // para este cliente/período después de un timeout del navegador, aunque
@@ -1313,7 +1341,14 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prn
     const rp = document.getElementById('resetPanel');
     if (rp) rp.style.display = 'block';
     const nf = fallidos && fallidos.length > 0;
-    if (prnReal === false) {
+    if (prnReal === null) {
+      // Caso incierto: la página dejó de esperar por su propio timeout,
+      // no porque el backend haya confirmado nada. Nunca decir "no se generó"
+      // acá -- puede estar terminado, puede seguir corriendo. Ser honestos.
+      el.className = 'alert a-warn';
+      el.innerHTML = '<i class="ti ti-help-circle" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
+      document.getElementById('_epMsg').textContent = 'No se pudo confirmar si el proceso terminó. Puede seguir trabajando en el servidor -- esperá unos minutos y volvé a mirar esta pantalla, o revisá Drive antes de reintentar.';
+    } else if (prnReal === false) {
       // No se generó PRN real (0 líneas / todas no_en_arca): NO decir "PRN listo".
       el.className = 'alert a-warn';
       el.innerHTML = '<i class="ti ti-alert-triangle" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';

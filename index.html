@@ -361,6 +361,7 @@ let periodo = null;
 let forzarReproceso = false;
 let clienteSeleccionado = null;
 let _archivoExcelPendiente = null;
+let _ultimoExcelParseado = null;  // { zone, registros, receptorCuit, periodoPrincipal } del último Excel leído, para poder revalidar sin releer el archivo si el usuario cambia el período después
 let registroSubido = false;
 let archivosFallidos = [];
 let _reintentoCliente = null;
@@ -747,6 +748,23 @@ async function handleExcelFile(file) {
     return;
   }
 
+  // Guardamos el Excel ya parseado para poder revalidarlo sin releer el
+  // archivo si el usuario cambia el período después de ver el aviso de
+  // "no coincide" (ver validarPeriodoYGuardarExcel / actualizarPeriodo).
+  _ultimoExcelParseado = { zone, registros, receptorCuit, periodoPrincipal, totalFechas };
+
+  await validarPeriodoYGuardarExcel();
+}
+
+// Separado de handleExcelFile para poder volver a correr esta validación
+// cuando el usuario cambia el período DESPUÉS de subir el Excel, sin releer
+// el archivo. Antes, el aviso "Excel de <mes> != período <otro mes>" quedaba
+// pegado en pantalla para siempre aunque el usuario corrigiera el período,
+// porque nada volvía a llamar a esta validación al cambiar el desplegable.
+async function validarPeriodoYGuardarExcel() {
+  if (!_ultimoExcelParseado) return;
+  const { zone, registros, receptorCuit, periodoPrincipal } = _ultimoExcelParseado;
+
   // Validar que el período del Excel coincida con el período seleccionado en la página.
   // Si no coinciden, el backend va a cargar comprobantes del mes equivocado → todas
   // las facturas quedan como "no está en ARCA" → proceso zombie o PRN vacío.
@@ -759,15 +777,9 @@ async function handleExcelFile(file) {
                      'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
       const excelLegible    = `${meses[parseInt(pm)] || pm} ${pa}`;
       const selecLegible    = `${meses[periodo.mes] || periodo.mes} ${periodo.anio}`;
-      // Se sacó el cálculo de "pct" que había acá: usaba una variable (_periodoContador)
-      // que nunca existía en este punto del código — rompía todo con un error antes
-      // de llegar a mostrar el aviso de abajo, y la página se quedaba trabada en
-      // "Leyendo comprobantes…" para siempre. Ese número tampoco se llegaba a mostrar
-      // en ningún lado, así que se puede sacar sin que falte nada en pantalla.
 
       ezCache.ezSub.textContent = `⚠ Excel de ${excelLegible} ≠ período ${selecLegible}`;
       ezCache.ezAction.textContent = '';
-      const zone = document.getElementById('excelZone');
       zone.classList.remove('loaded');
       zone.classList.add('highlight');
       setTimeout(() => zone.classList.remove('highlight'), 4000);
@@ -782,7 +794,11 @@ async function handleExcelFile(file) {
     }
   }
 
+  // El período ya coincide (o el Excel no tiene un período detectable):
+  // limpiamos cualquier aviso de mismatch que hubiera quedado de un intento
+  // anterior y guardamos el registro.
   await guardarRegistroEnN8n(zone, registros, receptorCuit);
+  _ultimoExcelParseado = null;
 
   // Aviso no bloqueante: proveedores del Excel que no están en PROVEEDORES
   try {
@@ -1870,6 +1886,13 @@ function actualizarPeriodo() {
   if (mes && anio) {
     periodo = { mes, anio };
     document.getElementById('periodoInfo').textContent = `${mes}/${anio}`;
+    // Si había un Excel ya leído que quedó bloqueado por no coincidir con el
+    // período anterior, lo revalidamos contra el período nuevo -- antes el
+    // aviso de "no coincide" quedaba pegado en pantalla aunque se corrigiera
+    // el período acá.
+    if (_ultimoExcelParseado && !registroSubido) {
+      validarPeriodoYGuardarExcel();
+    }
   }
 }
 

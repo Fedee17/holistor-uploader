@@ -1210,7 +1210,10 @@ function iniciarPolling() {
       if (data.listo === true) {
         // Ignorar SIEMPRE el resultado cacheado durante polling activo.
         if (data.desde_cache) { return; }
-
+        // Ignorar resultados de una corrida distinta a la que esta página disparó
+        // (staticData de n8n puede tardar en reflejar la corrida nueva mientras
+        // una ejecución larga sigue corriendo — ver notas del proyecto).
+        if (data.run_id && window.__holistorActiveRunId && data.run_id !== window.__holistorActiveRunId) { return; }
         // Validación de contenido: solo aceptar listo:true cuando hay evidencia real
         // de que el proceso terminó — el PRN está guardado en Drive (prn_guardado:true)
         // O hay ítems que explican por qué no hay PRN (fallidos, no_en_arca, ya_procesadas, etc.)
@@ -2019,6 +2022,7 @@ console.log('Holistor uploader inline JS cargado OK');
       if (state.finalizado && state.activeKey === key && !forzar) return jsonResponse({ ok:false, proceso_ya_activo:true, proceso_ya_finalizado:true, mensaje:'Bloqueado por frontend: este cliente/período ya generó PRN. Usá Forzar o Liberar proceso para rehacer.' });
       if (state.inFlight && state.activeKey === key && !forzar) return jsonResponse({ ok:false, proceso_ya_activo:true, mensaje:'Bloqueado por frontend: ya hay un holistor-procesar en curso para este cliente/período.' });
       state.inFlight = true; state.activeKey = key; state.finalizado = false; state.requestId = state.requestId || `${Date.now()}_${Math.random().toString(36).slice(2,10)}`;
+      window.__holistorActiveRunId = state.requestId;
       setProcesarDisabled(true);
       if (init && typeof init.body === 'string') init = { ...init, body: JSON.stringify({ ...body, request_id: state.requestId, frontend_run_id: state.requestId }) };
       try {

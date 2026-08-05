@@ -1,1 +1,113 @@
 
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estudio Riorda — Balances Bancarios</title>
+  <link rel="stylesheet" href="balances.css">
+</head>
+<body>
+
+  <header class="balances-header">
+    <h1>Extracción de Balances Bancarios</h1>
+    <nav class="balances-nav">
+      <a href="index.html">Facturas (Holistor)</a>
+      <a href="balances.html" aria-current="page">Balances Bancarios</a>
+    </nav>
+  </header>
+
+  <main class="balances-main">
+
+    <!-- Paso 1: elegir cliente -->
+    <section id="balances-seccion-cliente" class="balances-card">
+      <h2>1. Elegí el cliente</h2>
+
+      <div class="balances-campo">
+        <label for="balances-select-cliente">Cliente</label>
+        <select id="balances-select-cliente">
+          <option value="">Cargando clientes…</option>
+        </select>
+      </div>
+
+      <p id="balances-bancos-habilitados" class="balances-nota"></p>
+
+      <button id="balances-btn-mostrar-alta" type="button" class="balances-link-boton">
+        + Agregar cliente o banco nuevo
+      </button>
+    </section>
+
+    <!-- Formulario de alta de cliente/banco (oculto por defecto, JS lo muestra) -->
+    <section id="balances-seccion-alta" class="balances-card" hidden>
+      <h2>Agregar cliente o banco</h2>
+
+      <div class="balances-campo">
+        <label for="balances-alta-cliente">Nombre del cliente</label>
+        <input type="text" id="balances-alta-cliente" placeholder="Ej: Porta SRL">
+      </div>
+
+      <div class="balances-campo">
+        <label for="balances-alta-banco">Banco</label>
+        <select id="balances-alta-banco">
+          <option value="">Elegí un banco</option>
+          <option value="Galicia">Galicia</option>
+          <option value="Nación">Nación</option>
+          <option value="Santander">Santander</option>
+          <option value="Macro">Macro</option>
+        </select>
+      </div>
+
+      <div class="balances-acciones">
+        <button id="balances-btn-confirmar-alta" type="button">Agregar</button>
+        <button id="balances-btn-cancelar-alta" type="button" class="balances-boton-secundario">Cancelar</button>
+      </div>
+
+      <p id="balances-alta-mensaje" class="balances-nota" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- Paso 2: subir PDFs -->
+    <section id="balances-seccion-upload" class="balances-card">
+      <h2>2. Subí los resúmenes bancarios</h2>
+      <p class="balances-nota">Podés subir todos los PDFs juntos, de cualquier banco — el sistema detecta a cuál corresponde cada uno.</p>
+
+      <div id="balances-zona-drop" class="balances-dropzone">
+        <p>Arrastrá los PDFs acá, o hacé click para elegirlos</p>
+        <input type="file" id="balances-input-archivos" accept="application/pdf" multiple hidden>
+      </div>
+
+      <ul id="balances-lista-archivos" class="balances-lista-archivos"></ul>
+
+      <div class="balances-acciones">
+        <button id="balances-btn-procesar" type="button" disabled>Procesar resúmenes</button>
+      </div>
+    </section>
+
+    <!-- Estado / progreso -->
+    <section id="balances-seccion-estado" class="balances-card" hidden>
+      <h2>Procesando…</h2>
+      <div id="balances-barra-progreso" class="balances-barra-progreso">
+        <div id="balances-barra-progreso-relleno" class="balances-barra-progreso-relleno"></div>
+      </div>
+      <p id="balances-estado-texto" class="balances-nota" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- Resultados -->
+    <section id="balances-seccion-resultados" class="balances-card" hidden>
+      <h2>Resultado</h2>
+
+      <div id="balances-resultado-resumen"></div>
+
+      <div id="balances-resultado-avisos"></div>
+
+      <div id="balances-resultado-fallos"></div>
+
+      <button id="balances-btn-nueva-carga" type="button" class="balances-boton-secundario">
+        Cargar más resúmenes
+      </button>
+    </section>
+
+  </main>
+
+  <script src="balances.js"></script>
+</body>
+</html>

@@ -287,6 +287,10 @@
     <div class="card-header" style="color:#3730a3;"><i class="ti ti-user-exclamation"></i> Facturas omitidas por posible otro cliente</div>
     <div id="listOtroCliente"></div>
   </div>
+  <div class="card" id="cardDiscrepancias" style="display:none; border-color:#c7d2fe; background:#fbfcff;">
+    <div class="card-header" style="color:#3730a3;"><i class="ti ti-git-compare"></i> Discrepancias con PROVEEDORES</div>
+    <div id="listDiscrepancias"></div>
+  </div>
   <div class="card" id="cardConciliacion" style="display:none;">
     <div class="card-header"><i class="ti ti-report-analytics" style="color:#1a73e8;"></i> Conciliación de comprobantes</div>
     <div id="concilContent"></div>
@@ -1053,6 +1057,10 @@ function resetProcesoUX() {
   if (co) co.style.display = 'none';
   const listO = document.getElementById('listOtroCliente');
   if (listO) listO.innerHTML = '';
+  const cd = document.getElementById('cardDiscrepancias');
+  if (cd) cd.style.display = 'none';
+  const listD = document.getElementById('listDiscrepancias');
+  if (listD) listD.innerHTML = '';
   archivosFallidos = [];
   detenerCountdown();
   _procesoInicioTs = null;
@@ -1210,7 +1218,10 @@ function iniciarPolling() {
       if (data.listo === true) {
         // Ignorar SIEMPRE el resultado cacheado durante polling activo.
         if (data.desde_cache) { return; }
-
+        // Ignorar resultados de una corrida distinta a la que esta página disparó
+        // (staticData de n8n puede tardar en reflejar la corrida nueva mientras
+        // una ejecución larga sigue corriendo — ver notas del proyecto).
+        if (data.run_id && window.__holistorActiveRunId && data.run_id !== window.__holistorActiveRunId) { return; }
         // Validación de contenido: solo aceptar listo:true cuando hay evidencia real
         // de que el proceso terminó — el PRN está guardado en Drive (prn_guardado:true)
         // O hay ítems que explican por qué no hay PRN (fallidos, no_en_arca, ya_procesadas, etc.)
@@ -1256,6 +1267,7 @@ function iniciarPolling() {
         else { const cf = document.getElementById('cardFallidos'); if (cf) cf.style.display = 'none'; }
         mostrarCargaManual(manuales);
         mostrarOtroCliente(otrosCliente);
+        mostrarDiscrepancias(data.discrepancias);
         if (data.verificacion || data.conciliacion || (data.no_en_arca && data.no_en_arca.length) || (data.ya_procesadas && data.ya_procesadas.length)) mostrarConciliacion(data.verificacion, data.conciliacion, data.no_en_arca, data.ya_procesadas);
         files = files.filter(f => !['done','en_cola','al_prn'].includes(f.status));
         renderQueue();
@@ -1558,6 +1570,25 @@ function mostrarOtroCliente(items) {
   if (!items || !items.length) { card.style.display = 'none'; return; }
   card.style.display = 'block';
   renderListaDetalle('listOtroCliente', items, 'b-otro_cliente', 'omitida', 'other-note', 'No entra al PRN de este cliente.');
+}
+
+function mostrarDiscrepancias(items) {
+  const card = document.getElementById('cardDiscrepancias');
+  if (!card) return;
+  if (!items || !items.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  const labels = { rubro: 'Rubro', pcia: 'Provincia', rubro_forzado: 'Rubro (forzado)' };
+  document.getElementById('listDiscrepancias').innerHTML = items.map(it => {
+    const tipoLbl = labels[it.tipo] || it.tipo || '';
+    const forzado = it.tipo === 'rubro_forzado';
+    return `<div class="history-item" style="align-items:flex-start;">
+      <i class="ti ti-alert-triangle" style="font-size:15px;color:#3730a3;flex-shrink:0;margin-top:2px;"></i>
+      <span class="history-name" style="white-space:normal;line-height:1.35;">
+        ${escapeHtml(it.pdf || '')} — CUIT ${escapeHtml(it.cuit || '')}
+        <div class="other-note">${tipoLbl}: PROVEEDORES dice <strong>${escapeHtml(it.proveedores || '')}</strong>, Gemini leyó <strong>${escapeHtml(it.gemini || '')}</strong>${forzado ? ' (se usó PROVEEDORES, forzado)' : ' (se usó lo que dijo Gemini)'}</div>
+      </span>
+    </div>`;
+  }).join('');
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -2019,6 +2050,7 @@ console.log('Holistor uploader inline JS cargado OK');
       if (state.finalizado && state.activeKey === key && !forzar) return jsonResponse({ ok:false, proceso_ya_activo:true, proceso_ya_finalizado:true, mensaje:'Bloqueado por frontend: este cliente/período ya generó PRN. Usá Forzar o Liberar proceso para rehacer.' });
       if (state.inFlight && state.activeKey === key && !forzar) return jsonResponse({ ok:false, proceso_ya_activo:true, mensaje:'Bloqueado por frontend: ya hay un holistor-procesar en curso para este cliente/período.' });
       state.inFlight = true; state.activeKey = key; state.finalizado = false; state.requestId = state.requestId || `${Date.now()}_${Math.random().toString(36).slice(2,10)}`;
+      window.__holistorActiveRunId = state.requestId;
       setProcesarDisabled(true);
       if (init && typeof init.body === 'string') init = { ...init, body: JSON.stringify({ ...body, request_id: state.requestId, frontend_run_id: state.requestId }) };
       try {

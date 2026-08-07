@@ -1477,7 +1477,7 @@ async function reintentar() {
   try {
     document.getElementById('cardFallidos').style.display = 'none';
     archivosFallidos = [];
-    await sendFlush();
+    await sendFlush(true);
   } catch(e) {
     showAlert('Error al reintentar.', 'error');
   } finally {
@@ -1868,7 +1868,7 @@ async function autoSyncProveedores() {
   }
 }
 
-async function sendFlush() {
+async function sendFlush(forzar) {
   if (!validarPrecondiciones()) return;
 
   try {
@@ -1884,7 +1884,8 @@ async function sendFlush() {
         periodo: periodoStr(),
         cliente_cuit: clienteSeleccionado.cuit,
         cliente_nombre: clienteSeleccionado.nombre || '',
-        tiene_registro: registroSubido
+        tiene_registro: registroSubido,
+        forzar: forzar === true
       })
     }, FETCH_TIMEOUT_MS);
     const data = await jsonSeguro(res);

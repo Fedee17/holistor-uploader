@@ -63,7 +63,7 @@ async function balancesCargarClientes() {
       return;
     }
 
-    el.selectCliente.innerHTML = '<option value="">Elegí un cliente</option>' +
+    el.selectCliente.innerHTML = '<option value="" disabled selected hidden>Elegí un cliente</option>' +
       balancesEstado.clientes
         .map(c => `<option value="${balancesEscapar(c.cliente)}">${balancesEscapar(c.cliente)}</option>`)
         .join('');

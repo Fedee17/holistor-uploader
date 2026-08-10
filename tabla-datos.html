@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estudio Riorda — Tabla de Datos</title>
+  <link rel="stylesheet" href="tabla-datos.css">
+</head>
+<body>
+
+  <header class="balances-header">
+    <h1>Tabla de Datos — Balances Bancarios</h1>
+    <nav class="balances-nav">
+      <a href="index.html">Facturas</a>
+      <div class="balances-nav-item">
+        <a href="balances.html" aria-current="true">Balances Bancarios ▾</a>
+        <div class="balances-nav-dropdown">
+          <a href="balances.html">Cargar resúmenes</a>
+          <a href="tabla-datos.html" class="balances-nav-activa">Tabla de datos</a>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <main class="tabla-main">
+
+    <section class="balances-card">
+      <h2>Elegí el cliente</h2>
+      <div class="balances-campo">
+        <label for="tabla-select-cliente">Cliente</label>
+        <select id="tabla-select-cliente">
+          <option value="" disabled selected hidden>Cargando clientes…</option>
+        </select>
+      </div>
+    </section>
+
+    <section id="tabla-seccion-estado" class="balances-card">
+      <p id="tabla-estado-texto" class="balances-nota">Elegí un cliente para ver sus datos.</p>
+    </section>
+
+    <section id="tabla-seccion-tabla" class="balances-card tabla-card-ancha" hidden>
+      <h2 id="tabla-titulo-cliente"></h2>
+      <div class="tabla-scroll">
+        <table id="tabla-datos-tabla">
+          <thead id="tabla-datos-thead"></thead>
+          <tbody id="tabla-datos-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="tabla-datos.js"></script>
+</body>
+</html>

@@ -81,16 +81,15 @@ body {
 .balances-nav-dropdown {
   display: none;
   position: absolute;
+  /* Sin margin-top: un hueco entre el link y el menú corta el hover al
+     mover el mouse en diagonal hacia abajo, cerrando el menú antes de
+     llegar a las opciones — por eso el desplegable se cerraba solo. El
+     padding-top de acá da la misma separación visual sin crear ese hueco. */
   top: 100%;
   left: 0;
-  margin-top: 0.5rem;
-  background: var(--balances-color-superficie);
-  border: 1px solid var(--balances-color-borde);
-  border-radius: 8px;
-  box-shadow: var(--balances-sombra);
+  padding-top: 0.5rem;
   min-width: 180px;
-  overflow: hidden;
-  padding: 0.35rem 0;
+  z-index: 30;
 }
 
 .balances-nav-item:hover .balances-nav-dropdown,
@@ -98,7 +97,16 @@ body {
   display: block;
 }
 
-.balances-nav-dropdown a {
+.balances-nav-dropdown-caja {
+  background: var(--balances-color-superficie);
+  border: 1px solid var(--balances-color-borde);
+  border-radius: 8px;
+  box-shadow: var(--balances-sombra);
+  overflow: hidden;
+  padding: 0.35rem 0;
+}
+
+.balances-nav-dropdown-caja a {
   display: block;
   padding: 0.55rem 0.9rem;
   font-size: 0.9rem;
@@ -106,11 +114,11 @@ body {
   text-decoration: none;
 }
 
-.balances-nav-dropdown a:hover {
+.balances-nav-dropdown-caja a:hover {
   background: var(--balances-color-fondo);
 }
 
-.balances-nav-dropdown a.balances-nav-activa {
+.balances-nav-dropdown-caja a.balances-nav-activa {
   color: var(--balances-color-primario);
   font-weight: 600;
 }

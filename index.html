@@ -1702,7 +1702,7 @@ async function addFilesInner(newFiles) {
   tempItems.forEach(t => files.push(t));
   renderQueue();
 
-  const CONCURRENCY_VERIF = 10;
+  const CONCURRENCY_VERIF = 4;
   const resultados = new Array(pdfs.length);
   let nextIdx = 0;
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY_VERIF, pdfs.length) }, async () => {

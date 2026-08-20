@@ -161,11 +161,6 @@
 </head>
 <body>
 <div class="container">
- <div class="container">
-  <div style="display:flex;justify-content:flex-end;gap:16px;margin-bottom:10px;font-size:13px;">
-    <a href="index.html" style="color:#1a1a1a;font-weight:600;text-decoration:none;">Facturas</a>
-    <a href="balances.html" style="color:#888;text-decoration:none;">Balances Bancarios</a>
-  </div>
   <h1 style="margin-bottom:1.5rem;"><i class="ti ti-file-invoice"></i> Holistor — Subir facturas</h1>
   <div id="alert" class="alert"></div>
   <div class="stats">
@@ -1482,7 +1477,7 @@ async function reintentar() {
   try {
     document.getElementById('cardFallidos').style.display = 'none';
     archivosFallidos = [];
-    await sendFlush(true);
+    await sendFlush();
   } catch(e) {
     showAlert('Error al reintentar.', 'error');
   } finally {
@@ -1702,7 +1697,7 @@ async function addFilesInner(newFiles) {
   tempItems.forEach(t => files.push(t));
   renderQueue();
 
-  const CONCURRENCY_VERIF = 4;
+  const CONCURRENCY_VERIF = 10;
   const resultados = new Array(pdfs.length);
   let nextIdx = 0;
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY_VERIF, pdfs.length) }, async () => {
@@ -1873,7 +1868,7 @@ async function autoSyncProveedores() {
   }
 }
 
-async function sendFlush(forzar) {
+async function sendFlush() {
   if (!validarPrecondiciones()) return;
 
   try {
@@ -1889,8 +1884,7 @@ async function sendFlush(forzar) {
         periodo: periodoStr(),
         cliente_cuit: clienteSeleccionado.cuit,
         cliente_nombre: clienteSeleccionado.nombre || '',
-        tiene_registro: registroSubido,
-        forzar: forzar === true
+        tiene_registro: registroSubido
       })
     }, FETCH_TIMEOUT_MS);
     const data = await jsonSeguro(res);

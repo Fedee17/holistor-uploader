@@ -301,7 +301,7 @@
   </button>
   <div class="card" id="cardAuditoria" style="display:none; border-color:#fcd34d; background:#fffdf5;">
     <div class="card-header" style="color:#92400e;"><i class="ti ti-file-off"></i> Facturas en ARCA sin PDF subido</div>
-    <div id="listAuditoria"></div>
+    <div id="listAuditoria" style="max-height:280px; overflow-y:auto;"></div>
   </div>
   <div class="card" id="cardConciliacion" style="display:none;">
     <div class="card-header"><i class="ti ti-report-analytics" style="color:#1a73e8;"></i> Conciliación de comprobantes</div>
@@ -1611,6 +1611,14 @@ async function verAuditoria() {
   const card = document.getElementById('cardAuditoria');
   const lista = document.getElementById('listAuditoria');
   if (!btn || !card || !lista) return;
+
+  // Interruptor: si el panel ya está abierto, este mismo click lo cierra
+  // sin volver a pedir nada al servidor.
+  if (card.style.display === 'block') {
+    card.style.display = 'none';
+    return;
+  }
+
   btn.disabled = true;
   try {
     const res = await fetchConTimeout(WEBHOOK.auditoria(), {

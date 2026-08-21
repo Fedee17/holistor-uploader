@@ -271,7 +271,7 @@
       <div class="process-progress-head"><span id="processProgressLabel">0%</span><span id="processProgressText">Sin actividad</span></div>
       <div class="process-bar-bg"><div class="process-bar-fill" id="processBarFill"></div></div>
     </div>
-    <div class="process-log" id="processLog"></div>
+    <div class="process-log" id="processLog" style="max-height:220px; overflow-y:auto;"></div>
   </div>
   <div id="resetPanel" style="display:none; margin-bottom:1rem; text-align:right;">
     <button class="btn-reset" onclick="resetProceso()"><i class="ti ti-refresh" style="font-size:12px;"></i> Liberar proceso</button>
@@ -584,11 +584,20 @@ function mostrarProveedoresFaltantes(faltantes, registros) {
     const r = registros.find(x => String(x.cuit_emisor || '').replace(/[^0-9]/g,'') === c);
     return r ? (r.denominacion_emisor || '') : '';
   };
-  box.innerHTML = `<div class="registry-warn-head"><i class="ti ti-user-question" style="font-size:14px;"></i> ${faltantes.length} proveedor${faltantes.length!==1?'es':''} sin cargar en PROVEEDORES</div>`
-    + `Se procesan igual, pero cargalos en el sheet para máxima precisión:`
-    + `<div style="margin-top:6px;font-family:monospace;font-size:11px;line-height:1.5;">`
+  box.innerHTML = `<div class="registry-warn-head" style="cursor:pointer;" onclick="toggleProvFaltantesLista()"><i class="ti ti-user-question" style="font-size:14px;"></i> ${faltantes.length} proveedor${faltantes.length!==1?'es':''} sin cargar en PROVEEDORES <i class="ti ti-chevron-down" id="provFaltantesChevron" style="font-size:12px;"></i></div>`
+    + `Se procesan igual, pero cargalos en el sheet para máxima precisión (tocá el título para ver/ocultar la lista):`
+    + `<div id="provFaltantesLista" style="display:none; margin-top:6px; max-height:200px; overflow-y:auto; font-family:monospace; font-size:11px; line-height:1.5;">`
     + faltantes.map(c => `${c} — ${escapeHtml(nombre(c))}`).join('<br>') + `</div>`;
   box.style.display = 'block';
+}
+
+function toggleProvFaltantesLista() {
+  const lista = document.getElementById('provFaltantesLista');
+  const chevron = document.getElementById('provFaltantesChevron');
+  if (!lista) return;
+  const abierta = lista.style.display !== 'none';
+  lista.style.display = abierta ? 'none' : 'block';
+  if (chevron) chevron.className = abierta ? 'ti ti-chevron-down' : 'ti ti-chevron-up';
 }
 
 // PROCESO Y RESET
@@ -1342,6 +1351,9 @@ function actualizarProgresoProceso(procesadas, total) {
 
 function mostrarDiagnostico(data) {
   // F1/F3/F6/F7: muestra error_critico, advertencias y PRN incompleto en el banner superior.
+  // El error/incompleto (cortos, importantes) quedan siempre visibles. La lista
+  // de advertencias técnicas crudas (puede ser larga) queda colapsada detrás de
+  // un título con la cantidad, igual que el resto de los paneles largos.
   const adv = Array.isArray(data.advertencias) ? data.advertencias.filter(Boolean) : [];
   const err = String(data.error_critico || '').trim();
   const incompleto = data.prn_lineas_incompleto === true;
@@ -1353,7 +1365,10 @@ function mostrarDiagnostico(data) {
     html += `<div style="font-weight:600;margin-bottom:4px;">El PRN puede estar incompleto: faltan líneas en PRN_LINEAS. Revisá antes de importar en Holistor.</div>`;
   }
   if (adv.length) {
-    html += `<div style="font-size:12px;line-height:1.5;">` + adv.map(a => '• ' + escapeHtml(a)).join('<br>') + `</div>`;
+    html += `<div style="cursor:pointer;font-size:12px;font-weight:600;" onclick="toggleAdvertenciasTecnicas()">`
+      + `${adv.length} advertencia${adv.length!==1?'s':''} técnica${adv.length!==1?'s':''} <i class="ti ti-chevron-down" id="advTecnicasChevron" style="font-size:11px;"></i></div>`
+      + `<div id="advTecnicasLista" style="display:none; margin-top:4px; max-height:220px; overflow-y:auto; font-size:12px; line-height:1.5;">`
+      + adv.map(a => '• ' + escapeHtml(a)).join('<br>') + `</div>`;
   }
   const el = document.getElementById('alert');
   const tipo = err ? 'a-error' : 'a-warn';
@@ -1361,6 +1376,15 @@ function mostrarDiagnostico(data) {
   el.className = 'alert ' + tipo;
   el.innerHTML = `<i class="ti ti-${icon}"></i><span>${html}</span>`;
   el.style.display = 'flex';
+}
+
+function toggleAdvertenciasTecnicas() {
+  const lista = document.getElementById('advTecnicasLista');
+  const chevron = document.getElementById('advTecnicasChevron');
+  if (!lista) return;
+  const abierta = lista.style.display !== 'none';
+  lista.style.display = abierta ? 'none' : 'block';
+  if (chevron) chevron.className = abierta ? 'ti ti-chevron-down' : 'ti ti-chevron-up';
 }
 
 function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prnFileName, lineasCount, manuales, otrosCliente) {

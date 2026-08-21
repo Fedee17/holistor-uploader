@@ -161,6 +161,11 @@
 </head>
 <body>
 <div class="container">
+ <div class="container">
+  <div style="display:flex;justify-content:flex-end;gap:16px;margin-bottom:10px;font-size:13px;">
+    <a href="index.html" style="color:#1a1a1a;font-weight:600;text-decoration:none;">Facturas</a>
+    <a href="balances.html" style="color:#888;text-decoration:none;">Balances Bancarios</a>
+  </div>
   <h1 style="margin-bottom:1.5rem;"><i class="ti ti-file-invoice"></i> Holistor — Subir facturas</h1>
   <div id="alert" class="alert"></div>
   <div class="stats">
@@ -291,6 +296,13 @@
     <div class="card-header" style="color:#3730a3;"><i class="ti ti-git-compare"></i> Discrepancias con PROVEEDORES</div>
     <div id="listDiscrepancias"></div>
   </div>
+  <button class="btn-secondary" id="btnAuditoria" onclick="verAuditoria()" style="display:none; margin-bottom:1rem;">
+    <i class="ti ti-clipboard-check"></i> Ver auditoría — facturas que faltan
+  </button>
+  <div class="card" id="cardAuditoria" style="display:none; border-color:#fcd34d; background:#fffdf5;">
+    <div class="card-header" style="color:#92400e;"><i class="ti ti-file-off"></i> Facturas en ARCA sin PDF subido</div>
+    <div id="listAuditoria"></div>
+  </div>
   <div class="card" id="cardConciliacion" style="display:none;">
     <div class="card-header"><i class="ti ti-report-analytics" style="color:#1a73e8;"></i> Conciliación de comprobantes</div>
     <div id="concilContent"></div>
@@ -307,6 +319,7 @@
 const BASE_WEBHOOK = 'https://fede123.app.n8n.cloud/webhook';
 const WEBHOOK = {
   upload:    () => BASE_WEBHOOK + '/holistor-upload',
+  auditoria: () => BASE_WEBHOOK + '/holistor-auditoria',
   procesar:  () => BASE_WEBHOOK + '/holistor-procesar',
   verificar: () => BASE_WEBHOOK + '/holistor-verificar',
   estado:    () => BASE_WEBHOOK + '/holistor-estado',
@@ -1384,6 +1397,8 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prn
         ? `No se generó PRN: ${naCount} factura(s) no están en el registro ARCA cargado. Cargá el Excel de ARCA y reprocesá.`
         : 'No se generó ningún PRN en esta corrida. Revisá el detalle o Drive.';
     } else {
+      const btnAud = document.getElementById('btnAuditoria');
+      if (btnAud) btnAud.style.display = 'inline-flex';
       el.className = 'alert a-success';
       const _lineasTxt = (lineasCount && Number(lineasCount) > 0) ? ` · ${lineasCount} ${pluralizar(Number(lineasCount),'línea','líneas')}` : '';
       const _driveLinkHtml = prnFileId
@@ -1477,7 +1492,7 @@ async function reintentar() {
   try {
     document.getElementById('cardFallidos').style.display = 'none';
     archivosFallidos = [];
-    await sendFlush();
+    await sendFlush(true);
   } catch(e) {
     showAlert('Error al reintentar.', 'error');
   } finally {
@@ -1591,6 +1606,43 @@ function mostrarDiscrepancias(items) {
   }).join('');
 }
 
+async function verAuditoria() {
+  const btn = document.getElementById('btnAuditoria');
+  const card = document.getElementById('cardAuditoria');
+  const lista = document.getElementById('listAuditoria');
+  if (!btn || !card || !lista) return;
+  btn.disabled = true;
+  try {
+    const res = await fetchConTimeout(WEBHOOK.auditoria(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cliente_cuit: clienteSeleccionado.cuit,
+        periodo: periodoStr()
+      })
+    }, 30000);
+    const data = await jsonSeguro(res);
+    if (!data || data.ok !== true) throw new Error('Respuesta inválida');
+    const items = data.pendientes || [];
+    card.style.display = 'block';
+    if (!items.length) {
+      lista.innerHTML = '<div class="history-item"><i class="ti ti-circle-check" style="color:#1a6e38;"></i><span>No falta ninguna factura — todo lo que está en ARCA ya fue procesado.</span></div>';
+    } else {
+      lista.innerHTML = items.map(it => `<div class="history-item" style="align-items:flex-start;">
+        <i class="ti ti-file-off" style="font-size:15px;color:#92400e;flex-shrink:0;margin-top:2px;"></i>
+        <span class="history-name" style="white-space:normal;line-height:1.35;">
+          ${escapeHtml(it.proveedor || '')} — ${escapeHtml(it.fecha || '')}
+          <div class="other-note">CUIT ${escapeHtml(String(it.cuit_emisor||''))} · Total: ${escapeHtml(String(it.total||''))}</div>
+        </span>
+      </div>`).join('');
+    }
+  } catch (e) {
+    showAlert('No se pudo cargar la auditoría.', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // STATS / QUEUE / HISTORY
 // ──────────────────────────────────────────────────────────────────────────────
@@ -1697,7 +1749,7 @@ async function addFilesInner(newFiles) {
   tempItems.forEach(t => files.push(t));
   renderQueue();
 
-  const CONCURRENCY_VERIF = 10;
+  const CONCURRENCY_VERIF = 4;
   const resultados = new Array(pdfs.length);
   let nextIdx = 0;
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY_VERIF, pdfs.length) }, async () => {
@@ -1868,7 +1920,7 @@ async function autoSyncProveedores() {
   }
 }
 
-async function sendFlush() {
+async function sendFlush(forzar) {
   if (!validarPrecondiciones()) return;
 
   try {
@@ -1884,7 +1936,8 @@ async function sendFlush() {
         periodo: periodoStr(),
         cliente_cuit: clienteSeleccionado.cuit,
         cliente_nombre: clienteSeleccionado.nombre || '',
-        tiene_registro: registroSubido
+        tiene_registro: registroSubido,
+        forzar: forzar === true
       })
     }, FETCH_TIMEOUT_MS);
     const data = await jsonSeguro(res);

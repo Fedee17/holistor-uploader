@@ -296,6 +296,10 @@
     <div class="card-header" style="color:#3730a3;"><i class="ti ti-git-compare"></i> Discrepancias con PROVEEDORES</div>
     <div id="listDiscrepancias"></div>
   </div>
+  <div class="card" id="cardBajaConfianza" style="display:none; border-color:#fcd34d; background:#fffdf5;">
+    <div class="card-header" style="color:#92400e;"><i class="ti ti-zoom-question"></i> Facturas con baja confianza de lectura</div>
+    <div id="listBajaConfianza" style="max-height:220px; overflow-y:auto;"></div>
+  </div>
   <button class="btn-secondary" id="btnAuditoria" onclick="verAuditoria()" style="display:none; margin-bottom:1rem;">
     <i class="ti ti-clipboard-check"></i> Ver auditoría — facturas que faltan
   </button>
@@ -1290,6 +1294,7 @@ function iniciarPolling() {
         mostrarCargaManual(manuales);
         mostrarOtroCliente(otrosCliente);
         mostrarDiscrepancias(data.discrepancias);
+        mostrarBajaConfianza(data.baja_confianza);
         if (data.verificacion || data.conciliacion || (data.no_en_arca && data.no_en_arca.length) || (data.ya_procesadas && data.ya_procesadas.length)) mostrarConciliacion(data.verificacion, data.conciliacion, data.no_en_arca, data.ya_procesadas);
         files = files.filter(f => !['done','en_cola','al_prn'].includes(f.status));
         renderQueue();
@@ -1625,6 +1630,22 @@ function mostrarDiscrepancias(items) {
       <span class="history-name" style="white-space:normal;line-height:1.35;">
         ${escapeHtml(it.pdf || '')} — CUIT ${escapeHtml(it.cuit || '')}
         <div class="other-note">${tipoLbl}: PROVEEDORES dice <strong>${escapeHtml(it.proveedores || '')}</strong>, Gemini leyó <strong>${escapeHtml(it.gemini || '')}</strong>${forzado ? ' (se usó PROVEEDORES, forzado)' : ' (se usó lo que dijo Gemini)'}</div>
+      </span>
+    </div>`;
+  }).join('');
+}
+
+function mostrarBajaConfianza(items) {
+  const card = document.getElementById('cardBajaConfianza');
+  if (!card) return;
+  if (!items || !items.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  document.getElementById('listBajaConfianza').innerHTML = items.map(it => {
+    return `<div class="history-item" style="align-items:flex-start;">
+      <i class="ti ti-zoom-question" style="font-size:15px;color:#92400e;flex-shrink:0;margin-top:2px;"></i>
+      <span class="history-name" style="white-space:normal;line-height:1.35;">
+        ${escapeHtml(it.pdf || '')}
+        <div class="other-note">${escapeHtml(it.motivo || 'Sin motivo especificado.')}</div>
       </span>
     </div>`;
   }).join('');

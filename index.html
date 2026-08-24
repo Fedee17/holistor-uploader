@@ -941,6 +941,23 @@ function parsearRegistroARCA(file) {
             ? String(_tcRawCell)
             : String(r[11] || '1');
 
+                   // Desglose por alícuota — para poder cruzar después el neto/IVA que
+          // extrae Gemini de cada factura contra lo que ARCA tiene registrado
+          // para esa alícuota puntual, no solo el total. Solo se incluyen las
+          // alícuotas que realmente tienen un monto (evita mandar ceros de más).
+          const _alicuotasRaw = [
+            { alic: '21',   neto: r[21], iva: r[20] },
+            { alic: '10.5', neto: r[19], iva: r[18] },
+            { alic: '27',   neto: r[23], iva: r[22] },
+            { alic: '5',    neto: r[17], iva: r[16] },
+            { alic: '2.5',  neto: r[15], iva: r[14] },
+          ].filter(x => {
+            const n = parseFloat(String(x.neto||'0').replace(',', '.')) || 0;
+            const i = parseFloat(String(x.iva||'0').replace(',', '.')) || 0;
+            return n > 0 || i > 0;
+          });
+          const desgloseAlicuotas = _alicuotasRaw.length ? JSON.stringify(_alicuotasRaw) : '';
+
           registros.push({
             clave,
             cuit_emisor: cuitEm,
@@ -953,7 +970,8 @@ function parsearRegistroARCA(file) {
             estado: 'pendiente',
             // col[11]=Tipo Cambio, col[12]=Moneda — necesarios para convertir USD→pesos en el PRN
             tipo_cambio: tipoCambioVal,
-            moneda: String(r[12]||'$')
+            moneda: String(r[12]||'$'),
+            desglose_alicuotas: desgloseAlicuotas
           });
         }
         

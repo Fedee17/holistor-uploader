@@ -242,7 +242,7 @@
       </div>
       <div class="btn-row">
         <button class="btn-primary" id="btnSubir" onclick="handleSubir()"><i class="ti ti-upload"></i> Subir y procesar</button>
-        <button class="btn-secondary" id="btnProcesar" onclick="sendFlush()" style="display:none;"><i class="ti ti-player-play"></i> Procesar ahora</button>
+        <button class="btn-secondary" id="btnProcesar" onclick="sendFlush(document.getElementById('chkForzar').checked)" style="display:none;"><i class="ti ti-player-play"></i> Procesar ahora</button>
         <button class="btn-secondary" onclick="clearPending()">Limpiar pendientes</button>
       </div>
     </div>

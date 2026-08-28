@@ -1227,7 +1227,7 @@ function iniciarPolling() {
   iniciarCountdown(_timeoutProcesoMs);
   logProceso(`Tiempo máximo estimado restante: ${Math.round(_timeoutProcesoMs/60000)} min.`);
 
-  pollingTimeoutMax = setTimeout(() => {
+    function _timeoutProcesoVencido() {
     if (pollingInterval) {
       stopPolling();
       showAlert('Procesamiento tardando demasiado. Recargá si el PRN está en Drive.', 'warn');
@@ -1248,7 +1248,8 @@ function iniciarPolling() {
       // "sin hacer nada" en el próximo click, sin ningún error visible.
       if (window.__holistorLiberarGuardaLocal) window.__holistorLiberarGuardaLocal();
     }
-  }, _timeoutProcesoMs);
+  }
+  pollingTimeoutMax = setTimeout(_timeoutProcesoVencido, _timeoutProcesoMs);
 
   pollingInterval = setInterval(async () => {
     try {
@@ -1257,8 +1258,27 @@ function iniciarPolling() {
       const res = await fetchConTimeout(`${WEBHOOK.estado()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`, {}, 30000);
       if (!res.ok) return;
       const data = await jsonSeguro(res);
-      if (!data) return;
-      
+            if (!data) return;
+
+      // Si el total real que devuelve el servidor es mayor al que se usó para
+      // calcular el tiempo de espera (por ejemplo, había archivos de una sesión
+      // anterior ya en la carpeta de Entrada que la página no sabía que existían),
+      // recalcular y extender el tiempo — en vez de cortar antes de tiempo un
+      // lote genuinamente más grande de lo esperado.
+      if (data.progreso && typeof data.progreso.total === 'number' && data.progreso.total > 0) {
+        const _timeoutQueDeberiaSer = calcularTimeoutProceso(data.progreso.total);
+        if (_timeoutQueDeberiaSer > _procesoTimeoutTotalMs) {
+          const _extendidoMs = _timeoutQueDeberiaSer - (Date.now() - _procesoInicioTs);
+          if (_extendidoMs > 0) {
+            _procesoTimeoutTotalMs = _timeoutQueDeberiaSer;
+            clearTimeout(pollingTimeoutMax);
+            pollingTimeoutMax = setTimeout(_timeoutProcesoVencido, _extendidoMs);
+            iniciarCountdown(_extendidoMs);
+            logProceso(`Lote más grande de lo esperado (${data.progreso.total} facturas) — tiempo de espera extendido a ${Math.round(_timeoutQueDeberiaSer/60000)} min.`);
+          }
+        }
+      }
+
       if (data.listo === true) {
         // Ignorar SIEMPRE el resultado cacheado durante polling activo.
         if (data.desde_cache) { return; }

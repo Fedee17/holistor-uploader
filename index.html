@@ -1992,7 +1992,7 @@ async function startUpload() {
   updateProcesoUX('ia', 58, 'Esperando Drive', 'PDFs subidos. Esperando indexación de Google Drive antes de iniciar Gemini.', { progressText:'Indexando archivos…' });
   showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
   await sleep(DRIVE_INDEX_DELAY_MS);
-  await sendFlush();
+  await sendFlush(document.getElementById('chkForzar').checked);
 }
 
 async function autoSyncProveedores() {

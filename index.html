@@ -242,8 +242,7 @@
       </div>
       <div class="btn-row">
         <button class="btn-primary" id="btnSubir" onclick="handleSubir()"><i class="ti ti-upload"></i> Subir y procesar</button>
-        <button class="btn-secondary" id="btnProcesar" onclick="sendFlush(document.getElementById('chkForzar').checked)" style="display:none;"><i class="ti ti-player-play"></i> Procesar ahora</button>
-        <button class="btn-secondary" onclick="clearPending()">Limpiar pendientes</button>
+        <button class="btn-secondary" id="btnProcesar" onclick="procesarAhoraConEspera()" style="display:none;"><i class="ti ti-player-play"></i> Procesar ahora</button>        <button class="btn-secondary" onclick="clearPending()">Limpiar pendientes</button>
       </div>
     </div>
   </div>
@@ -1555,10 +1554,11 @@ async function reintentar() {
   if (_reintentoCliente) clienteSeleccionado = _reintentoCliente;
   if (_reintentoPeriodo) periodo = _reintentoPeriodo;
   document.querySelectorAll('#cardFallidos button').forEach(b => b.disabled = true);
-  showAlert('Reintentando fallidas…', 'info');
+  showAlert('Reintentando fallidas… esperando indexación de Drive', 'info');
   try {
     document.getElementById('cardFallidos').style.display = 'none';
     archivosFallidos = [];
+    await sleep(DRIVE_INDEX_DELAY_MS);
     await sendFlush(true);
   } catch(e) {
     showAlert('Error al reintentar.', 'error');
@@ -2051,6 +2051,13 @@ async function sendFlush(forzar) {
     showAlert(`No se pudo iniciar el procesamiento: ${escapeHtml(detalle)}`, 'error');
   }
 }
+
+async function procesarAhoraConEspera() {
+  const forzar = document.getElementById('chkForzar').checked;
+  showAlert('Esperando indexación de Drive…', 'info');
+  await sleep(DRIVE_INDEX_DELAY_MS);
+  await sendFlush(forzar);
+} 
 
 // ──────────────────────────────────────────────────────────────────────────────
 // EVENTOS Y PERÍODO

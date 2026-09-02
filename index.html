@@ -1974,6 +1974,7 @@ async function startUpload() {
     }
     renderQueue();
     renderHistory();
+    await sleep(1000);
   }
 
   uploading = false;
@@ -1984,6 +1985,12 @@ async function startUpload() {
   if (!subidosOk) {
     showAlert('No se pudo subir ningún PDF. Revisá conexión o n8n.', 'error');
     return;
+  }
+
+  const fallidosNombres = pending.filter(f => f.status === 'error').map(f => f.name);
+  if (fallidosNombres.length > 0) {
+    showAlert(`${pending.length - fallidosNombres.length}/${pending.length} PDFs subidos. Fallaron ${fallidosNombres.length}: ${fallidosNombres.join(', ')}`, 'warn');
+    logProceso(`Subida parcial: fallaron ${fallidosNombres.length} de ${pending.length} — ${fallidosNombres.join(', ')}`);
   }
 
   updateProcesoUX('registro', 50, registroSubido ? 'Registro ARCA cargado' : 'Sin registro ARCA', registroSubido ? 'El registro ARCA quedó disponible para conciliación.' : 'Se procesará sin conciliación completa.', { progressText: registroSubido ? 'Registro listo' : 'Sin registro' });

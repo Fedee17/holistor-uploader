@@ -1341,7 +1341,7 @@ function iniciarPolling() {
         mostrarOtroCliente(otrosCliente);
         mostrarDiscrepancias(data.discrepancias);
         mostrarBajaConfianza(data.baja_confianza);
-        if (data.verificacion || data.conciliacion || (data.no_en_arca && data.no_en_arca.length) || (data.ya_procesadas && data.ya_procesadas.length)) mostrarConciliacion(data.verificacion, data.conciliacion, data.no_en_arca, data.ya_procesadas);
+        if (data.verificacion || data.conciliacion || (data.no_en_arca && data.no_en_arca.length) || (data.ya_procesadas && data.ya_procesadas.length) || (data.duplicados_en_lote && data.duplicados_en_lote.length)) mostrarConciliacion(data.verificacion, data.conciliacion, data.no_en_arca, data.ya_procesadas, data.duplicados_en_lote);
         files = files.filter(f => !['done','en_cola','al_prn'].includes(f.status));
         renderQueue();
       } else if (data.archivos_estado || data.progreso) {
@@ -1493,12 +1493,13 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prn
 // ──────────────────────────────────────────────────────────────────────────────
 // CONCILIACIÓN / VERIFICACIÓN PRN_LINEAS vs REGISTRO_ESPERADO
 // ──────────────────────────────────────────────────────────────────────────────
-function mostrarConciliacion(verif, concil, noEnArca, yaProcesadas) {
+function mostrarConciliacion(verif, concil, noEnArca, yaProcesadas, duplicadosEnLote) {
   const card = document.getElementById('cardConciliacion');
   noEnArca = noEnArca || [];
   yaProcesadas = yaProcesadas || [];
+  duplicadosEnLote = duplicadosEnLote || [];
   const hayVerif = !!(verif && verif.resumen);
-  if (!hayVerif && !concil && !noEnArca.length && !yaProcesadas.length) { card.style.display = 'none'; return; }
+  if (!hayVerif && !concil && !noEnArca.length && !yaProcesadas.length && !duplicadosEnLote.length) { card.style.display = 'none'; return; }
   card.style.display = 'block';
   card.scrollIntoView({ behavior:'smooth', block:'nearest' });
 
@@ -1523,7 +1524,8 @@ function mostrarConciliacion(verif, concil, noEnArca, yaProcesadas) {
     html += buildConcilSection('circle-x', 'En registro pero NO procesadas', concil.registro_no_procesadas || [], 'err');
   }
   html += buildNaSection(noEnArca);
-  html += buildYpSection(yaProcesadas);
+   html += buildYpSection(yaProcesadas);
+  html += buildDupSection(duplicadosEnLote);
   document.getElementById('concilContent').innerHTML = html;
   document.querySelectorAll('#concilContent .concil-head').forEach(h => {
     const body = h.nextElementSibling;
@@ -1550,9 +1552,9 @@ function buildNaSection(noEnArca) {
   return `<div class="concil-section"><div class="concil-head"><i class="ti ti-clock-pause concil-icon ci-warn"></i><span class="concil-title">No procesadas — no están en ARCA</span><span class="concil-badge cb-warn">${noEnArca.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${noEnArca.length ? rows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
 }
 
-function buildYpSection(yaProcesadas) {
-  const rows = yaProcesadas.slice(0,150).map(it => `<div class="concil-row"><span class="concil-key">${escapeHtml(it.emisor||it.pdf||'')}</span><span class="concil-denom">procesada el ${escapeHtml(it.procesada_en||'')}</span><span class="concil-total">${escapeHtml(it.total||'')}</span></div>`).join('');
-  return `<div class="concil-section"><div class="concil-head"><i class="ti ti-history concil-icon ci-ok"></i><span class="concil-title">Ya procesadas antes — no regeneradas</span><span class="concil-badge cb-ok">${yaProcesadas.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${yaProcesadas.length ? rows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
+function buildDupSection(duplicadosEnLote) {
+  const rows = duplicadosEnLote.slice(0,150).map(it => `<div class="concil-row"><span class="concil-key">${escapeHtml(it.emisor||it.pdf||'')}</span><span class="concil-denom">${escapeHtml(it.pdf||'')} — mismo comprobante que otro archivo de este lote</span><span class="concil-total">${escapeHtml(it.total||'')}</span></div>`).join('');
+  return `<div class="concil-section"><div class="concil-head"><i class="ti ti-copy concil-icon ci-warn"></i><span class="concil-title">Duplicado dentro de este mismo lote</span><span class="concil-badge cb-warn">${duplicadosEnLote.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${duplicadosEnLote.length ? rows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

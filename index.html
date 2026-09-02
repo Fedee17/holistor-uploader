@@ -334,6 +334,15 @@ const WEBHOOK = {
 };
 
 const DRIVE_INDEX_DELAY_MS = 6000;
+
+// La indexación de Drive puede tardar más con lotes grandes -- 6s alcanza
+// para pocos archivos, pero con 18+ puede quedarse corto. Se suman 400ms
+// por cada archivo arriba de 5, con un techo de 20s para no hacer esperar
+// de más en lotes muy grandes.
+function calcularEsperaIndexacion(cantidadArchivos) {
+  if (!cantidadArchivos || cantidadArchivos <= 5) return DRIVE_INDEX_DELAY_MS;
+  return Math.min(20000, DRIVE_INDEX_DELAY_MS + (cantidadArchivos - 5) * 400);
+}
 const FETCH_TIMEOUT_MS = 90000;
 const POLLING_INTERVAL_MS = 5000;
 const POLLING_TIMEOUT_MS = 15 * 60 * 1000;
@@ -1555,10 +1564,11 @@ async function reintentar() {
   if (_reintentoPeriodo) periodo = _reintentoPeriodo;
   document.querySelectorAll('#cardFallidos button').forEach(b => b.disabled = true);
   showAlert('Reintentando fallidas… esperando indexación de Drive', 'info');
-  try {
+   try {
+    const _cantidadReintentar = archivosFallidos.length;
     document.getElementById('cardFallidos').style.display = 'none';
     archivosFallidos = [];
-    await sleep(DRIVE_INDEX_DELAY_MS);
+    await sleep(calcularEsperaIndexacion(_cantidadReintentar));
     await sendFlush(true);
   } catch(e) {
     showAlert('Error al reintentar.', 'error');
@@ -1997,8 +2007,8 @@ async function startUpload() {
   setStepDetail('registro', registroSubido ? 'Cargado' : 'Omitido');
   logProceso(registroSubido ? 'Registro ARCA disponible para conciliación.' : 'Procesamiento sin registro ARCA.');
   updateProcesoUX('ia', 58, 'Esperando Drive', 'PDFs subidos. Esperando indexación de Google Drive antes de iniciar Gemini.', { progressText:'Indexando archivos…' });
-  showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
-  await sleep(DRIVE_INDEX_DELAY_MS);
+    showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
+  await sleep(calcularEsperaIndexacion(pending.length));
   await sendFlush(document.getElementById('chkForzar').checked);
 }
 

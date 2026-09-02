@@ -1333,7 +1333,7 @@ function iniciarPolling() {
           updateProcesoUX('final', 100, incidenciasTxt ? 'PRN listo con avisos' : 'PRN listo', incidenciasTxt ? `PRN generado. Avisos: ${incidenciasTxt}.` : 'PRN generado correctamente.', { progressText: incidenciasTxt ? 'Revisar avisos.' : 'Proceso completo.' });
         }
         logProceso(!prnReal ? 'Proceso terminado SIN generar PRN.' : (incidenciasTxt ? 'Proceso terminado con avisos: ' + incidenciasTxt : 'Proceso terminado correctamente.'));
-        mostrarEstadoProceso('listo', fallidosVisibles, prnReal, naCount, data.prn_file_id, data.prn_file_name, data.lineas_finales_generadas, manuales, otrosCliente);
+        mostrarEstadoProceso('listo', fallidosVisibles, prnReal, naCount, data.prn_file_id, data.prn_file_name, data.lineas_finales_generadas, manuales, otrosCliente, data.facturas_finales_generadas);
         mostrarDiagnostico(data);
         if (fallidosVisibles.length > 0) mostrarFallidos(fallidosVisibles);
         else { const cf = document.getElementById('cardFallidos'); if (cf) cf.style.display = 'none'; }
@@ -1438,7 +1438,7 @@ function toggleAdvertenciasTecnicas() {
   if (chevron) chevron.className = abierta ? 'ti ti-chevron-down' : 'ti ti-chevron-up';
 }
 
-function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prnFileName, lineasCount, manuales, otrosCliente) {
+function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prnFileName, lineasCount, manuales, otrosCliente, facturasCount) {
   const el = document.getElementById('estadoProceso');
   if (!el) return;
   
@@ -1475,7 +1475,7 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prn
       const btnAud = document.getElementById('btnAuditoria');
       if (btnAud) btnAud.style.display = 'inline-flex';
       el.className = 'alert a-success';
-      const _lineasTxt = (lineasCount && Number(lineasCount) > 0) ? ` · ${lineasCount} ${pluralizar(Number(lineasCount),'línea','líneas')}` : '';
+     const _facturasTxt = (facturasCount && Number(facturasCount) > 0) ? ` · ${facturasCount} ${pluralizar(Number(facturasCount),'factura','facturas')}` : '';
       const _driveLinkHtml = prnFileId
         ? ` <a href="https://drive.google.com/file/d/${escapeHtml(prnFileId)}/view" target="_blank" rel="noopener" style="color:#1a6e38;font-weight:600;margin-left:6px;text-decoration:underline;"><i class="ti ti-download" style="font-size:13px;"></i> Ver en Drive</a>`
         : '';
@@ -1484,8 +1484,8 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prn
       const no_ep = otrosCliente && otrosCliente.length > 0;
       const avisos_ep = [nf ? `${fallidos.length} ${pluralizar(fallidos.length, 'error', 'errores')}` : '', nm_ep ? `${manuales.length} carga manual` : '', no_ep ? `${otrosCliente.length} otro cliente` : ''].filter(Boolean).join(' · ');
       document.getElementById('_epMsg').textContent = avisos_ep
-        ? `✓ PRN generado${_lineasTxt}. Avisos: ${avisos_ep}.`
-        : `✓ PRN listo${_lineasTxt}.`;
+        ? `✓ PRN generado${_facturasTxt}. Avisos: ${avisos_ep}.`
+        : `✓ PRN listo${_facturasTxt}.`;
     }
   }
 }

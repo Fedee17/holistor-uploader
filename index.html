@@ -1988,9 +1988,9 @@ async function escanearYProcesar() {
 
 function manejarResultadoEscaneo(data) {
   const nuevas = Array.isArray(data.nuevas_en_escaneo) ? data.nuevas_en_escaneo.length : 0;
-  const yaProcesadas = Array.isArray(data.ya_procesadas) ? data.ya_procesadas.length : 0;
-  const duplicadasLote = Array.isArray(data.duplicados_en_lote) ? data.duplicados_en_lote.length : 0;
-  const repetidas = yaProcesadas + duplicadasLote;
+  const yaProcesadas = Array.isArray(data.ya_procesadas) ? data.ya_procesadas : [];
+  const duplicadasLote = Array.isArray(data.duplicados_en_lote) ? data.duplicados_en_lote : [];
+  const repetidas = yaProcesadas.length + duplicadasLote.length;
 
   if (repetidas === 0) {
     logProceso('Escaneo: todo nuevo, procesando directo.');
@@ -1998,43 +1998,78 @@ function manejarResultadoEscaneo(data) {
     return;
   }
 
+  mostrarConciliacion(null, null, [], yaProcesadas, duplicadasLote);
+
   if (nuevas === 0) {
-    updateProcesoUX('final', 100, 'Ya procesadas', `Las ${repetidas} factura(s) de este lote ya habían sido procesadas antes. No hace falta hacer nada.`, { progressText: 'Sin nada nuevo para procesar.' });
+    updateProcesoUX('final', 100, 'Ya procesadas', `Las ${repetidas} factura(s) de este lote ya habían sido procesadas antes. No hace falta hacer nada — mirá el detalle abajo.`, { progressText: 'Sin nada nuevo para procesar.' });
     logProceso(`Escaneo: las ${repetidas} facturas ya estaban procesadas. Nada nuevo.`);
+    return;
   }
 
-  mostrarCartelEscaneo(nuevas, repetidas);
+  mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote);
 }
 
-function mostrarCartelEscaneo(nuevas, repetidas) {
-  const existente = document.getElementById('cartelEscaneo');
+function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
+  const existente = document.getElementById('modalEscaneoFondo');
   if (existente) existente.remove();
 
-  const div = document.createElement('div');
-  div.id = 'cartelEscaneo';
-  div.style.cssText = 'margin:1rem 0;padding:1rem;border:1px solid #f5c451;background:#fff8e1;border-radius:8px;';
+  const LIMITE = 6;
+  const todas = [...yaProcesadas.map(f => ({...f, tipo:'ya'})), ...duplicadasLote.map(f => ({...f, tipo:'dup'}))];
+  const repetidas = todas.length;
+  const visibles = todas.slice(0, LIMITE);
+  const resto = repetidas - visibles.length;
+
+  function formatearFecha(iso) {
+    if (!iso) return '';
+    try {
+      return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch(e) { return iso; }
+  }
+
+  const filas = visibles.map(f => `
+    <div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #eee;font-size:13px;">
+      <span>${escapeHtml(f.emisor || f.pdf || '')}</span>
+      <span style="color:#666;white-space:nowrap;">${f.tipo === 'ya' ? 'procesada el ' + escapeHtml(formatearFecha(f.procesada_en)) : 'repetida dentro de este mismo lote'}</span>
+    </div>`).join('');
+
+  const filaResto = resto > 0
+    ? `<div style="padding:8px 0;font-size:13px;color:#666;">y ${resto} más — ver el detalle completo abajo, en "Ya procesadas antes" / "Duplicado dentro de este mismo lote"</div>`
+    : '';
 
   let mensaje, botones;
   if (nuevas === 0) {
     mensaje = `${repetidas} factura(s) de este lote ya habían sido procesadas antes. ¿Querés reprocesarlas de todos modos?`;
-    botones = `<button id="btnEscaneoSi" style="margin-right:.5rem;">Sí, reprocesar</button><button id="btnEscaneoNo">No, dejar así</button>`;
+    botones = `<button id="btnEscaneoSi" style="flex:1;">Sí, reprocesar</button><button id="btnEscaneoNo" style="flex:1;">No, dejar así</button>`;
   } else {
     mensaje = `${repetidas} de las ${nuevas + repetidas} factura(s) de este lote ya habían sido procesadas antes. ¿Querés reprocesarlas también, o solo las ${nuevas} nueva(s)?`;
-    botones = `<button id="btnEscaneoSi" style="margin-right:.5rem;">Reprocesar todas (${nuevas + repetidas})</button><button id="btnEscaneoNo">Solo las nuevas (${nuevas})</button>`;
+    botones = `<button id="btnEscaneoSi" style="flex:1;">Reprocesar todas (${nuevas + repetidas})</button><button id="btnEscaneoNo" style="flex:1;">Solo las nuevas (${nuevas})</button>`;
   }
 
-  div.innerHTML = `<div style="margin-bottom:.75rem;">${escapeHtml(mensaje)}</div><div>${botones}</div>`;
+  const fondo = document.createElement('div');
+  fondo.id = 'modalEscaneoFondo';
+  fondo.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9999;padding:1rem;';
 
-  const cont = document.getElementById('cardConciliacion') || document.body;
-  cont.parentNode.insertBefore(div, cont);
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background:#fff;border-radius:12px;max-width:440px;width:100%;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 30px rgba(0,0,0,.25);';
+
+  modal.innerHTML = `
+    <div style="padding:1.25rem 1.25rem 0;">${escapeHtml(mensaje)}</div>
+    <div style="padding:.75rem 1.25rem;overflow-y:auto;flex:1;">
+      ${filas}${filaResto}
+    </div>
+    <div style="padding:1rem 1.25rem;border-top:1px solid #eee;display:flex;gap:8px;">${botones}</div>
+  `;
+
+  fondo.appendChild(modal);
+  document.body.appendChild(fondo);
 
   document.getElementById('btnEscaneoSi').addEventListener('click', () => {
-    div.remove();
+    fondo.remove();
     logProceso('Escaneo: usuario eligió reprocesar todo.');
     sendFlush(true, false);
   });
   document.getElementById('btnEscaneoNo').addEventListener('click', () => {
-    div.remove();
+    fondo.remove();
     if (nuevas === 0) {
       logProceso('Escaneo: usuario eligió no reprocesar nada.');
       updateProcesoUX('final', 100, 'Sin cambios', 'No se reprocesó nada.', { progressText: 'Listo.' });

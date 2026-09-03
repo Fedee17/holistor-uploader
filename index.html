@@ -2141,11 +2141,10 @@ async function sendFlush(forzar, soloEscanear) {
 }
 
 async function procesarAhoraConEspera() {
-  const forzar = document.getElementById('chkForzar').checked;
   showAlert('Esperando indexación de Drive…', 'info');
   await sleep(DRIVE_INDEX_DELAY_MS);
-  await sendFlush(forzar);
-} 
+  await escanearYProcesar();
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // EVENTOS Y PERÍODO

@@ -1300,6 +1300,7 @@ function iniciarPolling() {
         // Sin esto, un listo:true vacío (race condition, error silencioso) muestra "✓ PRN listo"
         // antes de que n8n haya terminado.
         const _tieneContenido = data.prn_guardado === true
+          || data.solo_escaneo === true
           || (Array.isArray(data.fallidos)     && data.fallidos.length     > 0)
           || (Array.isArray(data.no_en_arca)   && data.no_en_arca.length   > 0)
           || (Array.isArray(data.ya_procesadas)&& data.ya_procesadas.length> 0)
@@ -1314,6 +1315,10 @@ function iniciarPolling() {
 
         _resultadoYaMostrado = true;
         stopPolling();
+        if (data.solo_escaneo === true) {
+          manejarResultadoEscaneo(data);
+          return;
+        }
         autoSyncProveedores();
         const manuales = normalizarListaResultado(data, ['cargar_manual','manuales','requieren_carga_manual']);
         const otrosCliente = normalizarListaResultado(data, ['otro_cliente','otros_cliente','facturas_otro_cliente']);
@@ -2009,9 +2014,9 @@ async function startUpload() {
   setStepDetail('registro', registroSubido ? 'Cargado' : 'Omitido');
   logProceso(registroSubido ? 'Registro ARCA disponible para conciliación.' : 'Procesamiento sin registro ARCA.');
   updateProcesoUX('ia', 58, 'Esperando Drive', 'PDFs subidos. Esperando indexación de Google Drive antes de iniciar Gemini.', { progressText:'Indexando archivos…' });
-    showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
+  showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
   await sleep(calcularEsperaIndexacion(pending.length));
-  await sendFlush(document.getElementById('chkForzar').checked);
+  await escanearYProcesar();
 }
 
 async function autoSyncProveedores() {
@@ -2030,7 +2035,70 @@ async function autoSyncProveedores() {
   }
 }
 
-async function sendFlush(forzar) {
+async function escanearYProcesar() {
+  await sendFlush(false, true);
+}
+
+function manejarResultadoEscaneo(data) {
+  const nuevas = Array.isArray(data.nuevas_en_escaneo) ? data.nuevas_en_escaneo.length : 0;
+  const yaProcesadas = Array.isArray(data.ya_procesadas) ? data.ya_procesadas.length : 0;
+  const duplicadasLote = Array.isArray(data.duplicados_en_lote) ? data.duplicados_en_lote.length : 0;
+  const repetidas = yaProcesadas + duplicadasLote;
+
+  if (repetidas === 0) {
+    logProceso('Escaneo: todo nuevo, procesando directo.');
+    sendFlush(false, false);
+    return;
+  }
+
+  if (nuevas === 0) {
+    updateProcesoUX('final', 100, 'Ya procesadas', `Las ${repetidas} factura(s) de este lote ya habían sido procesadas antes. No hace falta hacer nada.`, { progressText: 'Sin nada nuevo para procesar.' });
+    logProceso(`Escaneo: las ${repetidas} facturas ya estaban procesadas. Nada nuevo.`);
+  }
+
+  mostrarCartelEscaneo(nuevas, repetidas);
+}
+
+function mostrarCartelEscaneo(nuevas, repetidas) {
+  const existente = document.getElementById('cartelEscaneo');
+  if (existente) existente.remove();
+
+  const div = document.createElement('div');
+  div.id = 'cartelEscaneo';
+  div.style.cssText = 'margin:1rem 0;padding:1rem;border:1px solid #f5c451;background:#fff8e1;border-radius:8px;';
+
+  let mensaje, botones;
+  if (nuevas === 0) {
+    mensaje = `${repetidas} factura(s) de este lote ya habían sido procesadas antes. ¿Querés reprocesarlas de todos modos?`;
+    botones = `<button id="btnEscaneoSi" style="margin-right:.5rem;">Sí, reprocesar</button><button id="btnEscaneoNo">No, dejar así</button>`;
+  } else {
+    mensaje = `${repetidas} de las ${nuevas + repetidas} factura(s) de este lote ya habían sido procesadas antes. ¿Querés reprocesarlas también, o solo las ${nuevas} nueva(s)?`;
+    botones = `<button id="btnEscaneoSi" style="margin-right:.5rem;">Reprocesar todas (${nuevas + repetidas})</button><button id="btnEscaneoNo">Solo las nuevas (${nuevas})</button>`;
+  }
+
+  div.innerHTML = `<div style="margin-bottom:.75rem;">${escapeHtml(mensaje)}</div><div>${botones}</div>`;
+
+  const cont = document.getElementById('cardConciliacion') || document.body;
+  cont.parentNode.insertBefore(div, cont);
+
+  document.getElementById('btnEscaneoSi').addEventListener('click', () => {
+    div.remove();
+    logProceso('Escaneo: usuario eligió reprocesar todo.');
+    sendFlush(true, false);
+  });
+  document.getElementById('btnEscaneoNo').addEventListener('click', () => {
+    div.remove();
+    if (nuevas === 0) {
+      logProceso('Escaneo: usuario eligió no reprocesar nada.');
+      updateProcesoUX('final', 100, 'Sin cambios', 'No se reprocesó nada.', { progressText: 'Listo.' });
+    } else {
+      logProceso('Escaneo: usuario eligió procesar solo las nuevas.');
+      sendFlush(false, false);
+    }
+  });
+}
+ 
+async function sendFlush(forzar, soloEscanear) {
   if (!validarPrecondiciones()) return;
 
   try {
@@ -2047,7 +2115,8 @@ async function sendFlush(forzar) {
         cliente_cuit: clienteSeleccionado.cuit,
         cliente_nombre: clienteSeleccionado.nombre || '',
         tiene_registro: registroSubido,
-        forzar: forzar === true
+        forzar: forzar === true,
+        soloEscanear: soloEscanear === true
       })
     }, FETCH_TIMEOUT_MS);
     const data = await jsonSeguro(res);

@@ -1995,6 +1995,21 @@ async function autoSyncProveedores() {
   }
 }
 
+function finalizarPantallaEscaneo(mensaje) {
+  const elBanner = document.getElementById('estadoProceso');
+  if (elBanner) {
+    elBanner.style.display = 'flex';
+    elBanner.className = 'alert a-success';
+    elBanner.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
+    document.getElementById('_epMsg').textContent = mensaje;
+  }
+  setUploadControlsDisabled(false);
+}
+
+async function escanearYProcesar() {
+  await sendFlush(false, true);
+}
+ 
 async function escanearYProcesar() {
   await sendFlush(false, true);
 }
@@ -2075,19 +2090,12 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
     logProceso('Escaneo: usuario eligió reprocesar todo.');
     sendFlush(true, false);
   });
-    document.getElementById('btnEscaneoNo').addEventListener('click', () => {
+      document.getElementById('btnEscaneoNo').addEventListener('click', () => {
     fondo.remove();
     if (nuevas === 0) {
       logProceso('Escaneo: usuario eligió no reprocesar nada.');
       updateProcesoUX('final', 100, 'Sin cambios', 'No se reprocesó nada.', { progressText: 'Listo.' });
-      const elBanner = document.getElementById('estadoProceso');
-      if (elBanner) {
-        elBanner.style.display = 'flex';
-        elBanner.className = 'alert a-success';
-        elBanner.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
-        document.getElementById('_epMsg').textContent = 'Listo — no se reprocesó nada.';
-      }
-      setUploadControlsDisabled(false);
+      finalizarPantallaEscaneo('Listo — no se reprocesó nada.');
     } else {
       logProceso('Escaneo: usuario eligió procesar solo las nuevas.');
       sendFlush(false, false);

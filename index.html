@@ -2004,13 +2004,7 @@ function manejarResultadoEscaneo(data) {
   }
 
   mostrarConciliacion(null, null, [], yaProcesadas, duplicadasLote);
-
-  if (nuevas === 0) {
-    updateProcesoUX('final', 100, 'Ya procesadas', `Las ${repetidas} factura(s) de este lote ya habían sido procesadas antes. No hace falta hacer nada — mirá el detalle abajo.`, { progressText: 'Sin nada nuevo para procesar.' });
-    logProceso(`Escaneo: las ${repetidas} facturas ya estaban procesadas. Nada nuevo.`);
-    return;
-  }
-
+  logProceso(`Escaneo: ${repetidas} ya procesada(s), ${nuevas} nueva(s).`);
   mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote);
 }
 

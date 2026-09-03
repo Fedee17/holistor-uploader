@@ -235,11 +235,6 @@
       <div id="loteResultado" style="display:none; font-size:13px; color:#188038; background:#e6f4ea; border-radius:8px; padding:8px 12px; margin-bottom:8px;">
         <i class="ti ti-circle-check" style="font-size:14px;"></i> <span id="loteResultadoText"></span>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:10px;margin-bottom:6px;font-size:13px;color:#666;">
-        <input type="checkbox" id="chkForzar" onchange="toggleForzar()" style="width:14px;height:14px;cursor:pointer;accent-color:#c5221f;">
-        <label for="chkForzar" style="cursor:pointer;user-select:none;">Forzar reprocesamiento</label>
-        <span style="font-size:11px;color:#aaa;">— subir aunque ya existan en Drive</span>
-      </div>
       <div class="btn-row">
         <button class="btn-primary" id="btnSubir" onclick="handleSubir()"><i class="ti ti-upload"></i> Subir y procesar</button>
         <button class="btn-secondary" id="btnProcesar" onclick="procesarAhoraConEspera()" style="display:none;"><i class="ti ti-player-play"></i> Procesar ahora</button>        <button class="btn-secondary" onclick="clearPending()">Limpiar pendientes</button>
@@ -387,7 +382,6 @@ function periodoStr() {
 // STATE
 // ──────────────────────────────────────────────────────────────────────────────
 let periodo = null;
-let forzarReproceso = false;
 let clienteSeleccionado = null;
 let _archivoExcelPendiente = null;
 let _ultimoExcelParseado = null;  // { zone, registros, receptorCuit, periodoPrincipal } del último Excel leído, para poder revalidar sin releer el archivo si el usuario cambia el período después
@@ -632,13 +626,6 @@ async function resetProceso() {
     }
   } catch(e) {
     showAlert('No se pudo conectar con n8n.', 'error');
-  }
-}
-
-function toggleForzar() {
-  forzarReproceso = document.getElementById('chkForzar').checked;
-  if (forzarReproceso) {
-    showAlert('Modo forzar activo: los archivos serán resubidos y reprocesados.', 'warn');
   }
 }
 
@@ -1811,20 +1798,6 @@ function renderHistory() {
 // ──────────────────────────────────────────────────────────────────────────────
 // VERIFICAR DUPLICADO Y AGREGAR ARCHIVOS
 // ──────────────────────────────────────────────────────────────────────────────
-async function verificarDuplicado(nombre) {
-  try {
-    const cuit = clienteSeleccionado?.cuit || '';
-    if (!cuit) return false;
-    const res = await fetchConTimeout(WEBHOOK.verificar(), {
-      method:'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre, cliente_cuit: cuit })
-    }, 45000);
-    if (!res.ok) return 'error';
-    const data = await jsonSeguro(res);
-    return data.existe === true;
-  } catch(e) { return 'error'; }
-}
 
 async function addFiles(newFiles) {
   try {
@@ -1840,40 +1813,16 @@ async function addFiles(newFiles) {
   }
 }
 
-async function addFilesInner(newFiles) {
+ async function addFilesInner(newFiles) {
   const pdfs = Array.from(newFiles).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
   if (!pdfs.length) { showAlert('Solo PDFs', 'error'); return; }
 
-  // Si todavía no hay cliente, no se puede verificar duplicado con el prefijo CUIT.
-  // Los agregamos como pendientes y se subirán cuando el usuario elija cliente.
-  if (!clienteSeleccionado || forzarReproceso) {
-    pdfs.forEach(f => files.push({ name: f.name, size: f.size, file: f, status: 'pending' }));
-    renderQueue();
-    if (!clienteSeleccionado) showAlert('Seleccioná cliente antes de subir; la verificación de duplicados se hará al procesar.', 'warn');
-    return;
-  }
-
-  const tempItems = pdfs.map(f => ({ name: f.name, size: f.size, file: f, status: 'uploading', _temp: true }));
-  tempItems.forEach(t => files.push(t));
+  // Ya no se verifica duplicado por nombre acá -- el backend detecta duplicados reales
+  // (por contenido y por comprobante) y nunca deja que se repita una factura en el PRN final,
+  // sin importar cuántas veces se vuelva a subir el mismo archivo.
+  pdfs.forEach(f => files.push({ name: f.name, size: f.size, file: f, status: 'pending' }));
   renderQueue();
-
-  const CONCURRENCY_VERIF = 4;
-  const resultados = new Array(pdfs.length);
-  let nextIdx = 0;
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY_VERIF, pdfs.length) }, async () => {
-    while (true) {
-      const i = nextIdx++;
-      if (i >= pdfs.length) break;
-      resultados[i] = await verificarDuplicado(pdfs[i].name);
-    }
-  }));
-
-  pdfs.forEach((f, i) => {
-    const item = tempItems[i];
-    item.status = resultados[i] === true ? 'duplicate' : resultados[i] === 'error' ? 'error' : 'pending';
-    delete item._temp;
-  });
-  renderQueue();
+  if (!clienteSeleccionado) showAlert('Seleccioná cliente antes de subir.', 'warn');
 }
 
 function removeFile(idx) {
@@ -1890,7 +1839,7 @@ function clearPending() {
 // UPLOAD Y PROCESAMIENTO
 // ──────────────────────────────────────────────────────────────────────────────
 function setUploadControlsDisabled(disabled) {
-  ['btnSubir', 'btnProcesar', 'selCliente', 'selMes', 'selAnio', 'chkForzar'].forEach(id => {
+    ['btnSubir', 'btnProcesar', 'selCliente', 'selMes', 'selAnio'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = disabled;
   });
@@ -2247,7 +2196,6 @@ Object.assign(window, {
   handleSubir,
   sendFlush,
   clearPending,
-  toggleForzar,
   resetProceso,
   reintentar,
   removeFile
@@ -2332,8 +2280,8 @@ console.log('Holistor uploader inline JS cargado OK');
   };
   document.addEventListener('click', function(e){
     const btn = e.target.closest && e.target.closest('#btnSubir,#btnProcesar'); if(!btn) return;
-    const key = clienteActual() + '|' + periodoActual(); const forzar = qs('chkForzar')?.checked === true;
-    if ((state.inFlight || state.finalizado) && state.activeKey === key && !forzar) { e.preventDefault(); e.stopPropagation(); alert(state.finalizado ? 'Este período ya generó PRN. Usá Forzar o Liberar proceso para rehacer.' : 'Ya hay un procesamiento en curso. Evito generar un segundo PRN.'); }
+        const key = clienteActual() + '|' + periodoActual();
+    if ((state.inFlight || state.finalizado) && state.activeKey === key) { e.preventDefault(); e.stopPropagation(); alert(state.finalizado ? 'Este período ya generó PRN. Usá "Liberar proceso" si necesitás rehacerlo.' : 'Ya hay un procesamiento en curso. Si creés que quedó trabado, usá "Liberar proceso" antes de reintentar.'); }
   }, true);
 })();
 </script>

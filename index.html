@@ -383,6 +383,7 @@ function periodoStr() {
 // ──────────────────────────────────────────────────────────────────────────────
 let periodo = null;
 let clienteSeleccionado = null;
+let escaneoEnCurso = false;
 let _archivoExcelPendiente = null;
 let _ultimoExcelParseado = null;  // { zone, registros, receptorCuit, periodoPrincipal } del último Excel leído, para poder revalidar sin releer el archivo si el usuario cambia el período después
 let registroSubido = false;
@@ -1195,8 +1196,13 @@ function iniciarPolling() {
   stopPolling();
   _resultadoYaMostrado = false;
   mostrarEstadoProceso('procesando');
-  updateProcesoUX('ia', 65, 'Procesando en n8n', 'Gemini está leyendo las facturas y generando líneas PRN.', { progressText:'Esperando avance del backend…' });
-  logProceso('Procesamiento iniciado: PDFs en cola para Gemini y PRN.');
+  if (escaneoEnCurso) {
+    updateProcesoUX('ia', 65, 'Revisando el lote', 'Comparando cada factura contra lo ya procesado antes.', { progressText:'Escaneando…' });
+    logProceso('Escaneo iniciado: revisando qué facturas ya estaban procesadas.');
+  } else {
+    updateProcesoUX('ia', 65, 'Procesando en n8n', 'Gemini está leyendo las facturas y generando líneas PRN.', { progressText:'Esperando avance del backend…' });
+    logProceso('Procesamiento iniciado: PDFs en cola para Gemini y PRN.');
+  }
   files.forEach(f => { if (f.status === 'done') f.status = 'en_cola'; });
   renderQueue();
 
@@ -1378,17 +1384,19 @@ function actualizarProgresoProceso(procesadas, total) {
   const el = document.getElementById('_epMsg');
   const p = Number(procesadas) || 0;
   const t = Number(total) || 0;
+  const verbo = escaneoEnCurso ? 'escaneadas' : 'al PRN';
+  const titulo = escaneoEnCurso ? 'Escaneando facturas' : 'Procesando facturas';
   if (el) {
-    if (t > 0) el.textContent = `${p}/${t} al PRN…`;
-    else if (p > 0) el.textContent = `${p} agregada${p !== 1 ? 's' : ''} al PRN…`;
+    if (t > 0) el.textContent = `${p}/${t} ${verbo}…`;
+    else if (p > 0) el.textContent = `${p} ${escaneoEnCurso ? 'escaneada' : 'agregada'}${p !== 1 ? 's' : ''}…`;
   }
   if (t > 0) {
     const pct = 65 + Math.min(30, (p / t) * 30);
-    updateProcesoUX('ia', pct, 'Procesando facturas', `Gemini/PRN: ${p} de ${t} facturas procesadas.`, { progressText:`${p}/${t} facturas al PRN` });
-    setStepDetail('ia', `${p}/${t} al PRN`);
+    updateProcesoUX('ia', pct, titulo, `${p} de ${t} facturas ${verbo}.`, { progressText:`${p}/${t} ${verbo}` });
+    setStepDetail('ia', `${p}/${t} ${verbo}`);
   } else if (p > 0) {
-    updateProcesoUX('ia', Math.max(procesoActual.pct, 70), 'Procesando facturas', `${p} facturas agregadas al PRN.`, { progressText:`${p} facturas al PRN` });
-    setStepDetail('ia', `${p} al PRN`);
+    updateProcesoUX('ia', Math.max(procesoActual.pct, 70), titulo, `${p} facturas ${verbo}.`, { progressText:`${p} ${verbo}` });
+    setStepDetail('ia', `${p} ${verbo}`);
   }
 }
 
@@ -2067,11 +2075,19 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
     logProceso('Escaneo: usuario eligió reprocesar todo.');
     sendFlush(true, false);
   });
-  document.getElementById('btnEscaneoNo').addEventListener('click', () => {
+    document.getElementById('btnEscaneoNo').addEventListener('click', () => {
     fondo.remove();
     if (nuevas === 0) {
       logProceso('Escaneo: usuario eligió no reprocesar nada.');
       updateProcesoUX('final', 100, 'Sin cambios', 'No se reprocesó nada.', { progressText: 'Listo.' });
+      const elBanner = document.getElementById('estadoProceso');
+      if (elBanner) {
+        elBanner.style.display = 'flex';
+        elBanner.className = 'alert a-success';
+        elBanner.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
+        document.getElementById('_epMsg').textContent = 'Listo — no se reprocesó nada.';
+      }
+      setUploadControlsDisabled(false);
     } else {
       logProceso('Escaneo: usuario eligió procesar solo las nuevas.');
       sendFlush(false, false);
@@ -2081,6 +2097,7 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
  
 async function sendFlush(forzar, soloEscanear) {
   if (!validarPrecondiciones()) return;
+  escaneoEnCurso = soloEscanear === true;
 
   try {
     updateProcesoUX('ia', 62, 'Iniciando n8n', 'Se envió la orden de procesamiento al workflow.', { progressText:'Disparando holistor-procesar…' });

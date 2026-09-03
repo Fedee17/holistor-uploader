@@ -1544,6 +1544,11 @@ function buildNaSection(noEnArca) {
   return `<div class="concil-section"><div class="concil-head"><i class="ti ti-clock-pause concil-icon ci-warn"></i><span class="concil-title">No procesadas — no están en ARCA</span><span class="concil-badge cb-warn">${noEnArca.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${noEnArca.length ? rows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
 }
 
+function buildYpSection(yaProcesadas) {
+  const rows = yaProcesadas.slice(0,150).map(it => `<div class="concil-row"><span class="concil-key">${escapeHtml(it.emisor||it.pdf||'')}</span><span class="concil-denom">procesada el ${escapeHtml(it.procesada_en||'')}</span><span class="concil-total">${escapeHtml(it.total||'')}</span></div>`).join('');
+  return `<div class="concil-section"><div class="concil-head"><i class="ti ti-history concil-icon ci-ok"></i><span class="concil-title">Ya procesadas antes — no regeneradas</span><span class="concil-badge cb-ok">${yaProcesadas.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${yaProcesadas.length ? rows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
+}
+
 function buildDupSection(duplicadosEnLote) {
   const rows = duplicadosEnLote.slice(0,150).map(it => `<div class="concil-row"><span class="concil-key">${escapeHtml(it.emisor||it.pdf||'')}</span><span class="concil-denom">${escapeHtml(it.pdf||'')} — mismo comprobante que otro archivo de este lote</span><span class="concil-total">${escapeHtml(it.total||'')}</span></div>`).join('');
   return `<div class="concil-section"><div class="concil-head"><i class="ti ti-copy concil-icon ci-warn"></i><span class="concil-title">Duplicado dentro de este mismo lote</span><span class="concil-badge cb-warn">${duplicadosEnLote.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${duplicadosEnLote.length ? rows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;

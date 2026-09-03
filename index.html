@@ -2049,37 +2049,46 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
   }
 
   const filas = visibles.map(f => `
-    <div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #eee;font-size:13px;">
-      <span>${escapeHtml(f.emisor || f.pdf || '')}</span>
-      <span style="color:#666;white-space:nowrap;">${f.tipo === 'ya' ? 'procesada el ' + escapeHtml(formatearFecha(f.procesada_en)) : 'repetida dentro de este mismo lote'}</span>
+    <div class="concil-row">
+      <span class="concil-denom">${escapeHtml(f.emisor || f.pdf || '')}</span>
+      <span class="concil-total">${f.tipo === 'ya' ? escapeHtml(formatearFecha(f.procesada_en)) : 'mismo lote'}</span>
     </div>`).join('');
 
   const filaResto = resto > 0
-    ? `<div style="padding:8px 0;font-size:13px;color:#666;">y ${resto} más — ver el detalle completo abajo, en "Ya procesadas antes" / "Duplicado dentro de este mismo lote"</div>`
+    ? `<div style="padding:8px 14px;font-size:12px;color:#888;">y ${resto} más — ver el detalle completo abajo</div>`
     : '';
 
-  let mensaje, botones;
+  let mensaje, primario, secundario;
   if (nuevas === 0) {
-    mensaje = `${repetidas} factura(s) de este lote ya habían sido procesadas antes. ¿Querés reprocesarlas de todos modos?`;
-    botones = `<button id="btnEscaneoSi" style="flex:1;">Sí, reprocesar</button><button id="btnEscaneoNo" style="flex:1;">No, dejar así</button>`;
+    mensaje = `${repetidas} factura${repetidas !== 1 ? 's' : ''} de este lote ya habían sido procesadas antes.`;
+    primario = { id: 'btnEscaneoNo', texto: 'No, dejar así' };
+    secundario = { id: 'btnEscaneoSi', texto: 'Sí, reprocesar' };
   } else {
-    mensaje = `${repetidas} de las ${nuevas + repetidas} factura(s) de este lote ya habían sido procesadas antes. ¿Querés reprocesarlas también, o solo las ${nuevas} nueva(s)?`;
-    botones = `<button id="btnEscaneoSi" style="flex:1;">Reprocesar todas (${nuevas + repetidas})</button><button id="btnEscaneoNo" style="flex:1;">Solo las nuevas (${nuevas})</button>`;
+    mensaje = `${repetidas} de las ${nuevas + repetidas} facturas de este lote ya habían sido procesadas antes.`;
+    primario = { id: 'btnEscaneoNo', texto: `Solo las nuevas (${nuevas})` };
+    secundario = { id: 'btnEscaneoSi', texto: `Reprocesar todas (${nuevas + repetidas})` };
   }
 
   const fondo = document.createElement('div');
   fondo.id = 'modalEscaneoFondo';
-  fondo.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9999;padding:1rem;';
+  fondo.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,20,18,.5);display:flex;align-items:center;justify-content:center;z-index:9999;padding:1rem;';
 
   const modal = document.createElement('div');
-  modal.style.cssText = 'background:#fff;border-radius:12px;max-width:440px;width:100%;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 30px rgba(0,0,0,.25);';
+  modal.className = 'card';
+  modal.style.cssText = 'max-width:440px;width:100%;max-height:80vh;display:flex;flex-direction:column;padding:0;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.3);';
 
   modal.innerHTML = `
-    <div style="padding:1.25rem 1.25rem 0;">${escapeHtml(mensaje)}</div>
-    <div style="padding:.75rem 1.25rem;overflow-y:auto;flex:1;">
+    <div style="padding:1.25rem 1.25rem .5rem;font-size:14px;line-height:1.5;">
+      <div style="font-weight:600;margin-bottom:2px;">¿Querés reprocesarlas?</div>
+      <div style="color:#555;">${escapeHtml(mensaje)}</div>
+    </div>
+    <div style="padding:.5rem 1.25rem;overflow-y:auto;flex:1;border-top:0.5px solid #f0f0ea;border-bottom:0.5px solid #f0f0ea;">
       ${filas}${filaResto}
     </div>
-    <div style="padding:1rem 1.25rem;border-top:1px solid #eee;display:flex;gap:8px;">${botones}</div>
+    <div style="padding:1rem 1.25rem;display:flex;gap:8px;">
+      <button id="${secundario.id}" class="btn-secondary" style="flex:1;">${secundario.texto}</button>
+      <button id="${primario.id}" class="btn-primary" style="flex:1;">${primario.texto}</button>
+    </div>
   `;
 
   fondo.appendChild(modal);
@@ -2090,7 +2099,7 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
     logProceso('Escaneo: usuario eligió reprocesar todo.');
     sendFlush(true, false);
   });
-      document.getElementById('btnEscaneoNo').addEventListener('click', () => {
+  document.getElementById('btnEscaneoNo').addEventListener('click', () => {
     fondo.remove();
     if (nuevas === 0) {
       logProceso('Escaneo: usuario eligió no reprocesar nada.');

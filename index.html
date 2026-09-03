@@ -1889,8 +1889,6 @@ async function startUpload() {
   if (uploading) return;
   if (!validarPrecondiciones()) return;
 
-  // Los duplicados se pueden reprocesar si el usuario los deja en cola o activa forzar.
-  files.forEach(f => { if (f.status === 'duplicate' && forzarReproceso) f.status = 'pending'; });
   const pending = files.filter(f => f.status === 'pending');
   if (!pending.length) {
     showAlert('No hay PDFs pendientes para subir.', 'warn');

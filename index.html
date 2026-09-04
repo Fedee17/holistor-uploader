@@ -1116,6 +1116,7 @@ function resetProcesoUX() {
   if (detalle) detalle.style.display = 'none';
   const btnDetTxt = document.getElementById('btnToggleDetalleTexto');
   if (btnDetTxt) btnDetTxt.textContent = 'Ver detalle de las facturas';
+  setStepDetail('ia', 'Gemini y formato Holistor');
   archivosFallidos = [];
   detenerCountdown();
   _procesoInicioTs = null;
@@ -1211,8 +1212,9 @@ function iniciarPolling() {
   stopPolling();
   _resultadoYaMostrado = false;
   mostrarEstadoProceso('procesando');
-  if (escaneoEnCurso) {
+    if (escaneoEnCurso) {
     updateProcesoUX('ia', 65, 'Revisando el lote', 'Comparando cada factura contra lo ya procesado antes.', { progressText:'Escaneando…' });
+    setStepDetail('ia', 'Revisando qué ya está hecho');
     logProceso('Escaneo iniciado: revisando qué facturas ya estaban procesadas.');
   } else {
     updateProcesoUX('ia', 65, 'Procesando en n8n', 'Gemini está leyendo las facturas y generando líneas PRN.', { progressText:'Esperando avance del backend…' });

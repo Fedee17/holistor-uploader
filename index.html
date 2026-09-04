@@ -1877,6 +1877,11 @@ async function verificarHuellaArchivo(cuit, periodo, huella) {
   } catch(e) { return null; }
 }
 
+function removeFile(idx) {
+  files.splice(idx, 1);
+  renderQueue();
+}
+ 
 function incluirIgual(i) {
   if (files[i]) {
     files[i].status = 'pending';

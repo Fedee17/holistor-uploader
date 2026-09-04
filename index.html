@@ -1850,14 +1850,7 @@ async function addFilesInner(newFiles) {
 async function addFiles(newFiles) {
   try {
     await addFilesInner(newFiles);
- 
-async function addFiles(newFiles) {
-  try {
-    await addFilesInner(newFiles);
   } catch (e) {
-    // Cualquier excepción que antes cortaba la ejecución en silencio
-    // (sin mostrar nada en pantalla) ahora se ve como alerta + log,
-    // y se limpian los ítems "uploading" que pudieron quedar a mitad de camino.
     console.error('addFiles error:', e);
     showAlert('Error al agregar archivos: ' + (e && e.message ? e.message : String(e)), 'error');
     files = files.filter(f => !f._temp);
@@ -1865,7 +1858,7 @@ async function addFiles(newFiles) {
   }
 }
 
- async function calcularHuellaArchivo(file) {
+async function calcularHuellaArchivo(file) {
   const buffer = await file.arrayBuffer();
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -1891,42 +1884,10 @@ function incluirIgual(i) {
   }
 }
 
- async function sendFlush(forzar, soloEscanear) {
-  if (!validarPrecondiciones()) return;
-  escaneoEnCurso = soloEscanear === true;
-  const pdfs = Array.from(newFiles).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
-  if (!pdfs.length) { showAlert('Solo PDFs', 'error'); return; }
-
-  const nuevosItems = pdfs.map(f => ({ name: f.name, size: f.size, file: f, status: 'uploading' }));
-  nuevosItems.forEach(it => files.push(it));
-  renderQueue();
-
-  if (!clienteSeleccionado) {
-    nuevosItems.forEach(it => { it.status = 'pending'; });
-    renderQueue();
-    showAlert('Seleccioná cliente antes de subir; la verificación se hará al procesar.', 'warn');
-    return;
-  }
-
-  const cuit = clienteSeleccionado.cuit;
-  const per = periodoStr();
-
-  await Promise.all(nuevosItems.map(async (it) => {
-    try {
-      const huella = await calcularHuellaArchivo(it.file);
-      const res = await verificarHuellaArchivo(cuit, per, huella);
-      it.status = (res && res.existe === true) ? 'ya_procesada' : 'pending';
-    } catch(e) {
-      it.status = 'pending';
-    }
-    renderQueue();
-  }));
-}
-
-function removeFile(idx) {
-  files.splice(idx, 1);
-  renderQueue();
-}
+// ──────────────────────────────────────────────────────────────────────────────
+// UPLOAD Y PROCESAMIENTO
+// ──────────────────────────────────────────────────────────────────────────────
+function setUploadControlsDisabled(disabled) {
 
 function clearPending() {
   files = files.filter(f => f.status !== 'pending');

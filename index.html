@@ -1110,6 +1110,12 @@ function resetProcesoUX() {
   if (cd) cd.style.display = 'none';
   const listD = document.getElementById('listDiscrepancias');
   if (listD) listD.innerHTML = '';
+  const btnDet = document.getElementById('btnToggleDetalle');
+  if (btnDet) btnDet.style.display = 'none';
+  const detalle = document.getElementById('detalleFacturasCard');
+  if (detalle) detalle.style.display = 'none';
+  const btnDetTxt = document.getElementById('btnToggleDetalleTexto');
+  if (btnDetTxt) btnDetTxt.textContent = 'Ver detalle de las facturas';
   archivosFallidos = [];
   detenerCountdown();
   _procesoInicioTs = null;

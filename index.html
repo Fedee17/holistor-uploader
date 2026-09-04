@@ -1451,13 +1451,18 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prn
   const el = document.getElementById('estadoProceso');
   if (!el) return;
   
-  if (estado === 'procesando') {
+    if (estado === 'procesando') {
     el.style.display = 'flex';
     el.className = 'alert a-info';
     const rp = document.getElementById('resetPanel');
     if (rp) rp.style.display = 'block';
     el.innerHTML = '<i class="ti ti-loader" style="font-size:16px;margin-top:1px;flex-shrink:0;animation:spin 1s linear infinite;"></i><span id="_epMsg"></span>';
     document.getElementById('_epMsg').textContent = 'Procesando…';
+
+    const q = document.getElementById('queue');
+    if (q) q.style.display = 'none';
+    const btnDet = document.getElementById('btnToggleDetalle');
+    if (btnDet) btnDet.style.display = files.length ? 'block' : 'none';
   } else if (estado === 'listo') {
     el.style.display = 'flex';
     // No ocultar resetPanel — puede haberse llegado a 'listo' por caché mientras

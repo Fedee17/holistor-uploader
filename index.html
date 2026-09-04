@@ -2061,7 +2061,8 @@ async function startUpload() {
   updateProcesoUX('registro', 50, registroSubido ? 'Registro ARCA cargado' : 'Sin registro ARCA', registroSubido ? 'El registro ARCA quedó disponible para conciliación.' : 'Se procesará sin conciliación completa.', { progressText: registroSubido ? 'Registro listo' : 'Sin registro' });
   setStepDetail('registro', registroSubido ? 'Cargado' : 'Omitido');
   logProceso(registroSubido ? 'Registro ARCA disponible para conciliación.' : 'Procesamiento sin registro ARCA.');
-  updateProcesoUX('ia', 58, 'Esperando Drive', 'PDFs subidos. Esperando indexación de Google Drive antes de iniciar Gemini.', { progressText:'Indexando archivos…' });
+    updateProcesoUX('ia', 58, 'Esperando Drive', 'PDFs subidos. Esperando indexación de Google Drive antes de revisar qué ya está hecho.', { progressText:'Indexando archivos…' });
+  setStepDetail('ia', 'Revisando qué ya está hecho');
   showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
   await sleep(calcularEsperaIndexacion(pending.length));
   await escanearYProcesar();

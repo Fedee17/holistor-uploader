@@ -789,7 +789,11 @@ async function handleExcelFile(file) {
 // porque nada volvía a llamar a esta validación al cambiar el desplegable.
 async function validarPeriodoYGuardarExcel() {
   if (!_ultimoExcelParseado) return;
-  actualizarPeriodo(); // releer el desplegable en este mismo momento, para no confiar en un valor que pudo quedar desactualizado
+  // Releemos el desplegable directo acá (sin pasar por actualizarPeriodo, que
+  // llamaría de vuelta a esta misma función y generaría un bucle sin fin).
+  const _mesActual = parseInt(document.getElementById('selMes').value);
+  const _anioActual = parseInt(document.getElementById('selAnio').value);
+  if (_mesActual && _anioActual) periodo = { mes: _mesActual, anio: _anioActual };
   const { zone, registros, receptorCuit, periodoPrincipal } = _ultimoExcelParseado;
 
   // Validar que el período del Excel coincida con el período seleccionado en la página.
@@ -1853,7 +1857,9 @@ function incluirIgual(i) {
   }
 }
 
- async function addFilesInner(newFiles) {
+ async function sendFlush(forzar, soloEscanear) {
+  if (!validarPrecondiciones()) return;
+  escaneoEnCurso = soloEscanear === true;
   const pdfs = Array.from(newFiles).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
   if (!pdfs.length) { showAlert('Solo PDFs', 'error'); return; }
 
@@ -1944,6 +1950,7 @@ async function subirUnPDF(item) {
 }
 
 async function startUpload() {
+  actualizarPeriodo(); // mismo motivo
   if (uploading) return;
   if (!validarPrecondiciones()) return;
 
@@ -2158,6 +2165,7 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
 }
  
 async function sendFlush(forzar, soloEscanear) {
+  actualizarPeriodo(); // releer el desplegable antes de mandar nada a n8n, por la misma razón que en el Excel
   if (!validarPrecondiciones()) return;
   escaneoEnCurso = soloEscanear === true;
 

@@ -1794,8 +1794,9 @@ function buildFileListHTML() {
       <i class="ti ti-file-type-pdf" style="font-size:16px;color:#c5221f;flex-shrink:0;"></i>
       <span class="file-name">${escapeHtml(f.name)}</span>
       <span class="file-size">${(f.size/1024).toFixed(0)} KB</span>
-      <span class="badge b-${f.status}" ${f.status==='ya_procesada'?`style="cursor:pointer;" title="Click para subir de todos modos" onclick="incluirIgual(${i})"`:''}>${ESTADO_LABELS[f.status]||f.status}</span>
-      ${['pending','duplicate','ya_procesada'].includes(f.status)?`<button class="btn-remove" onclick="removeFile(${i})"><i class="ti ti-x"></i></button>`:''}
+      ${f._yaProcesadaAviso ? `<span class="badge b-ya_procesada" title="Ya parece estar procesada antes -- el sistema te va a preguntar al procesar">ya procesada</span>` : ''}
+      <span class="badge b-${f.status}">${ESTADO_LABELS[f.status]||f.status}</span>
+      ${['pending','duplicate'].includes(f.status)?`<button class="btn-remove" onclick="removeFile(${i})"><i class="ti ti-x"></i></button>`:''}
     </div>`).join('');
 }
 
@@ -1867,17 +1868,20 @@ async function addFilesInner(newFiles) {
     return;
   }
 
-  const cuit = clienteSeleccionado.cuit;
+    const cuit = clienteSeleccionado.cuit;
   const per = periodoStr();
 
   await Promise.all(nuevosItems.map(async (it) => {
     try {
       const huella = await calcularHuellaArchivo(it.file);
       const res = await verificarHuellaArchivo(cuit, per, huella);
-      it.status = (res && res.existe === true) ? 'ya_procesada' : 'pending';
+      // Solo identifica -- la decisión de reprocesar o no la hace el escaneo del backend,
+      // que ya pregunta con el modal correspondiente. Acá nunca se excluye de la subida.
+      it._yaProcesadaAviso = (res && res.existe === true);
     } catch(e) {
-      it.status = 'pending';
+      it._yaProcesadaAviso = false;
     }
+    it.status = 'pending';
     renderQueue();
   }));
 }
@@ -2136,13 +2140,22 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
     ? `<div style="padding:8px 14px;font-size:12px;color:#888;">y ${resto} más — ver el detalle completo abajo</div>`
     : '';
 
+    const nYa = yaProcesadas.length;
+  const nDup = duplicadasLote.length;
+  function parteYa(n) { return `${n} ya procesada${n !== 1 ? 's' : ''} antes`; }
+  function parteDup(n) { return `${n} repetida${n !== 1 ? 's' : ''} dentro de este mismo lote`; }
+  let descripcion;
+  if (nYa > 0 && nDup > 0) descripcion = `${parteYa(nYa)} y ${parteDup(nDup)}`;
+  else if (nDup > 0) descripcion = parteDup(nDup);
+  else descripcion = parteYa(nYa);
+
   let mensaje, primario, secundario;
   if (nuevas === 0) {
-    mensaje = `${repetidas} factura${repetidas !== 1 ? 's' : ''} de este lote ya habían sido procesadas antes.`;
+    mensaje = `De este lote: ${descripcion}. ¿Querés reprocesarlas de todos modos?`;
     primario = { id: 'btnEscaneoNo', texto: 'No, dejar así' };
     secundario = { id: 'btnEscaneoSi', texto: 'Sí, reprocesar' };
   } else {
-    mensaje = `${repetidas} de las ${nuevas + repetidas} facturas de este lote ya habían sido procesadas antes.`;
+    mensaje = `De este lote: ${descripcion}. ¿Querés reprocesarlas también, o solo las ${nuevas} nueva(s)?`;
     primario = { id: 'btnEscaneoNo', texto: `Solo las nuevas (${nuevas})` };
     secundario = { id: 'btnEscaneoSi', texto: `Reprocesar todas (${nuevas + repetidas})` };
   }

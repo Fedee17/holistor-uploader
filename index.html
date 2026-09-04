@@ -1884,6 +1884,11 @@ function incluirIgual(i) {
   }
 }
 
+function clearPending() {
+ files = files.filter(f => f.status !== 'pending');
+ renderQueue();
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // UPLOAD Y PROCESAMIENTO
 // ──────────────────────────────────────────────────────────────────────────────

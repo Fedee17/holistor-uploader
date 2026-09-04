@@ -262,9 +262,13 @@
       <div class="pstep" data-step="final"><div class="pstep-icon"><i class="ti ti-file-check"></i></div><div class="pstep-label">Resultado</div><div class="pstep-detail" id="step-final-detail">PRN, fallidos y conciliación</div></div>
     </div>
     <div class="process-progress">
-      <div class="process-progress-head"><span id="processProgressLabel">0%</span><span id="processProgressText">Sin actividad</span></div>
-      <div class="process-bar-bg"><div class="process-bar-fill" id="processBarFill"></div></div>
+     <div class="process-progress-head"><span id="processProgressLabel">0%</span><span id="processProgressText">Sin actividad</span></div>
+     <div class="process-bar-bg"><div class="process-bar-fill" id="processBarFill"></div></div>
     </div>
+    <button class="btn-secondary" id="btnToggleDetalle" onclick="toggleDetalleFacturas()" style="display:none;width:100%;margin:8px 0;font-size:13px;">
+      <i class="ti ti-chevron-down"></i> <span id="btnToggleDetalleTexto">Ver detalle de las facturas</span>
+    </button>
+    <div id="detalleFacturasCard" style="display:none;max-height:220px;overflow-y:auto;border-top:0.5px solid #e0e0d8;padding-top:8px;margin-bottom:8px;"></div>
     <div class="process-log" id="processLog" style="max-height:220px; overflow-y:auto;"></div>
   </div>
   <div id="resetPanel" style="display:none; margin-bottom:1rem; text-align:right;">

@@ -1817,6 +1817,40 @@ function renderHistory() {
 // VERIFICAR DUPLICADO Y AGREGAR ARCHIVOS
 // ──────────────────────────────────────────────────────────────────────────────
 
+async function addFilesInner(newFiles) {
+  const pdfs = Array.from(newFiles).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+  if (!pdfs.length) { showAlert('Solo PDFs', 'error'); return; }
+
+  const nuevosItems = pdfs.map(f => ({ name: f.name, size: f.size, file: f, status: 'uploading' }));
+  nuevosItems.forEach(it => files.push(it));
+  renderQueue();
+
+  if (!clienteSeleccionado) {
+    nuevosItems.forEach(it => { it.status = 'pending'; });
+    renderQueue();
+    showAlert('Seleccioná cliente antes de subir; la verificación se hará al procesar.', 'warn');
+    return;
+  }
+
+  const cuit = clienteSeleccionado.cuit;
+  const per = periodoStr();
+
+  await Promise.all(nuevosItems.map(async (it) => {
+    try {
+      const huella = await calcularHuellaArchivo(it.file);
+      const res = await verificarHuellaArchivo(cuit, per, huella);
+      it.status = (res && res.existe === true) ? 'ya_procesada' : 'pending';
+    } catch(e) {
+      it.status = 'pending';
+    }
+    renderQueue();
+  }));
+}
+
+async function addFiles(newFiles) {
+  try {
+    await addFilesInner(newFiles);
+ 
 async function addFiles(newFiles) {
   try {
     await addFilesInner(newFiles);

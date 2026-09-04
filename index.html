@@ -1770,6 +1770,24 @@ function updateStats() {
   statsCache.statErrores.textContent = errores;
 }
 
+const ESTADO_LABELS = {
+  pending:'pendiente', uploading:'verificando', done:'listo', error:'error',
+  duplicate:'existe', en_cola:'cola', procesando:'procesando…',
+  al_prn:'al PRN ✓', fallida:'error', no_en_arca:'fuera de ARCA', ya_procesada:'ya procesada',
+  duplicada:'duplicada', otro_cliente:'otro cliente', cargar_manual:'carga manual', gemini_json_invalido:'JSON inválido'
+};
+
+function buildFileListHTML() {
+  return files.map((f,i) => `
+    <div class="file-item">
+      <i class="ti ti-file-type-pdf" style="font-size:16px;color:#c5221f;flex-shrink:0;"></i>
+      <span class="file-name">${escapeHtml(f.name)}</span>
+      <span class="file-size">${(f.size/1024).toFixed(0)} KB</span>
+      <span class="badge b-${f.status}" ${f.status==='ya_procesada'?`style="cursor:pointer;" title="Click para subir de todos modos" onclick="incluirIgual(${i})"`:''}>${ESTADO_LABELS[f.status]||f.status}</span>
+      ${['pending','duplicate','ya_procesada'].includes(f.status)?`<button class="btn-remove" onclick="removeFile(${i})"><i class="ti ti-x"></i></button>`:''}
+    </div>`).join('');
+}
+
 function renderQueue() {
   const q = document.getElementById('queue');
   if (!files.length) { q.style.display = 'none'; updateStats(); return; }
@@ -1785,21 +1803,23 @@ function renderQueue() {
     document.getElementById('loteInfo').style.display = 'none';
   }
   
-  const labels = {
-    pending:'pendiente', uploading:'verificando', done:'listo', error:'error',
-    duplicate:'existe', en_cola:'cola', procesando:'procesando…',
-    al_prn:'al PRN ✓', fallida:'error', no_en_arca:'fuera de ARCA', ya_procesada:'ya procesada',
-    duplicada:'duplicada', otro_cliente:'otro cliente', cargar_manual:'carga manual', gemini_json_invalido:'JSON inválido'
-  };
-  document.getElementById('fileList').innerHTML = files.map((f,i) => `
-    <div class="file-item">
-      <i class="ti ti-file-type-pdf" style="font-size:16px;color:#c5221f;flex-shrink:0;"></i>
-      <span class="file-name">${escapeHtml(f.name)}</span>
-      <span class="file-size">${(f.size/1024).toFixed(0)} KB</span>
-      <span class="badge b-${f.status}" ${f.status==='ya_procesada'?`style="cursor:pointer;" title="Click para subir de todos modos" onclick="incluirIgual(${i})"`:''}>${labels[f.status]||f.status}</span>
-      ${['pending','duplicate','ya_procesada'].includes(f.status)?`<button class="btn-remove" onclick="removeFile(${i})"><i class="ti ti-x"></i></button>`:''}
-    </div>`).join('');
+  document.getElementById('fileList').innerHTML = buildFileListHTML();
   updateStats();
+
+  const detalle = document.getElementById('detalleFacturasCard');
+  if (detalle && detalle.style.display !== 'none') {
+    detalle.innerHTML = buildFileListHTML();
+  }
+}
+
+function toggleDetalleFacturas() {
+  const cont = document.getElementById('detalleFacturasCard');
+  const abierto = cont.style.display !== 'none';
+  cont.style.display = abierto ? 'none' : 'block';
+  document.getElementById('btnToggleDetalleTexto').textContent = abierto ? 'Ver detalle de las facturas' : 'Ocultar detalle de las facturas';
+  const icon = document.querySelector('#btnToggleDetalle i');
+  if (icon) icon.className = abierto ? 'ti ti-chevron-down' : 'ti ti-chevron-up';
+  if (!abierto) cont.innerHTML = buildFileListHTML();
 }
 
 function renderHistory() {

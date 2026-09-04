@@ -2062,10 +2062,6 @@ async function escanearYProcesar() {
   await sendFlush(false, true);
 }
  
-async function escanearYProcesar() {
-  await sendFlush(false, true);
-}
-
 function manejarResultadoEscaneo(data) {
   const nuevas = Array.isArray(data.nuevas_en_escaneo) ? data.nuevas_en_escaneo.length : 0;
   const yaProcesadas = Array.isArray(data.ya_procesadas) ? data.ya_procesadas : [];

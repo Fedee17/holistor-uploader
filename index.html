@@ -789,6 +789,7 @@ async function handleExcelFile(file) {
 // porque nada volvía a llamar a esta validación al cambiar el desplegable.
 async function validarPeriodoYGuardarExcel() {
   if (!_ultimoExcelParseado) return;
+  actualizarPeriodo(); // releer el desplegable en este mismo momento, para no confiar en un valor que pudo quedar desactualizado
   const { zone, registros, receptorCuit, periodoPrincipal } = _ultimoExcelParseado;
 
   // Validar que el período del Excel coincida con el período seleccionado en la página.
@@ -1787,8 +1788,8 @@ function renderQueue() {
       <i class="ti ti-file-type-pdf" style="font-size:16px;color:#c5221f;flex-shrink:0;"></i>
       <span class="file-name">${escapeHtml(f.name)}</span>
       <span class="file-size">${(f.size/1024).toFixed(0)} KB</span>
-      <span class="badge b-${f.status}">${labels[f.status]||f.status}</span>
-      ${['pending','duplicate'].includes(f.status)?`<button class="btn-remove" onclick="removeFile(${i})"><i class="ti ti-x"></i></button>`:''}
+      <span class="badge b-${f.status}" ${f.status==='ya_procesada'?`style="cursor:pointer;" title="Click para subir de todos modos" onclick="incluirIgual(${i})"`:''}>${labels[f.status]||f.status}</span>
+      ${['pending','duplicate','ya_procesada'].includes(f.status)?`<button class="btn-remove" onclick="removeFile(${i})"><i class="ti ti-x"></i></button>`:''}
     </div>`).join('');
   updateStats();
 }
@@ -1826,16 +1827,60 @@ async function addFiles(newFiles) {
   }
 }
 
+ async function calcularHuellaArchivo(file) {
+  const buffer = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function verificarHuellaArchivo(cuit, periodo, huella) {
+  try {
+    const res = await fetchConTimeout(WEBHOOK.verificar(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cliente_cuit: cuit, periodo, huella })
+    }, 20000);
+    if (!res.ok) return null;
+    return await jsonSeguro(res);
+  } catch(e) { return null; }
+}
+
+function incluirIgual(i) {
+  if (files[i]) {
+    files[i].status = 'pending';
+    renderQueue();
+  }
+}
+
  async function addFilesInner(newFiles) {
   const pdfs = Array.from(newFiles).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
   if (!pdfs.length) { showAlert('Solo PDFs', 'error'); return; }
 
-  // Ya no se verifica duplicado por nombre acá -- el backend detecta duplicados reales
-  // (por contenido y por comprobante) y nunca deja que se repita una factura en el PRN final,
-  // sin importar cuántas veces se vuelva a subir el mismo archivo.
-  pdfs.forEach(f => files.push({ name: f.name, size: f.size, file: f, status: 'pending' }));
+  const nuevosItems = pdfs.map(f => ({ name: f.name, size: f.size, file: f, status: 'uploading' }));
+  nuevosItems.forEach(it => files.push(it));
   renderQueue();
-  if (!clienteSeleccionado) showAlert('Seleccioná cliente antes de subir.', 'warn');
+
+  if (!clienteSeleccionado) {
+    nuevosItems.forEach(it => { it.status = 'pending'; });
+    renderQueue();
+    showAlert('Seleccioná cliente antes de subir; la verificación se hará al procesar.', 'warn');
+    return;
+  }
+
+  const cuit = clienteSeleccionado.cuit;
+  const per = periodoStr();
+
+  await Promise.all(nuevosItems.map(async (it) => {
+    try {
+      const huella = await calcularHuellaArchivo(it.file);
+      const res = await verificarHuellaArchivo(cuit, per, huella);
+      it.status = (res && res.existe === true) ? 'ya_procesada' : 'pending';
+    } catch(e) {
+      it.status = 'pending';
+    }
+    renderQueue();
+  }));
 }
 
 function removeFile(idx) {

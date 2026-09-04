@@ -1888,16 +1888,6 @@ function incluirIgual(i) {
 // UPLOAD Y PROCESAMIENTO
 // ──────────────────────────────────────────────────────────────────────────────
 function setUploadControlsDisabled(disabled) {
-
-function clearPending() {
-  files = files.filter(f => f.status !== 'pending');
-  renderQueue();
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// UPLOAD Y PROCESAMIENTO
-// ──────────────────────────────────────────────────────────────────────────────
-function setUploadControlsDisabled(disabled) {
     ['btnSubir', 'btnProcesar', 'selCliente', 'selMes', 'selAnio'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = disabled;

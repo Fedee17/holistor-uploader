@@ -1064,6 +1064,8 @@ const PROCESS_STEP_LABEL = {
   final: 'Proceso finalizado'
 };
 let procesoActual = { step:'validacion', pct:0, total:0, procesadas:0 };
+let pasosVistos = new Set();
+let _procesoUXIniciado = false;
 
 function logProceso(msg) {
   const log = document.getElementById('processLog');
@@ -1125,6 +1127,8 @@ function resetProcesoUX() {
   if (btnDetTxt) btnDetTxt.textContent = 'Ver detalle de las facturas';
   setStepDetail('ia', 'Gemini y formato Holistor');
   archivosFallidos = [];
+  pasosVistos.clear();
+  _procesoUXIniciado = false;
   detenerCountdown();
   _procesoInicioTs = null;
   _procesoTimeoutTotalMs = null;
@@ -1132,6 +1136,11 @@ function resetProcesoUX() {
 }
 
 function updateProcesoUX(step, pct, statusText, subtitle, opts = {}) {
+  const stepAnterior = procesoActual.step;
+  if (_procesoUXIniciado && stepAnterior && stepAnterior !== step) {
+    pasosVistos.add(stepAnterior);
+  }
+  _procesoUXIniciado = true;
   procesoActual.step = step || procesoActual.step;
   procesoActual.pct = Math.max(0, Math.min(100, Number(pct ?? procesoActual.pct) || 0));
   const card = document.getElementById('processCard');
@@ -1142,7 +1151,7 @@ function updateProcesoUX(step, pct, statusText, subtitle, opts = {}) {
     const sIdx = PROCESS_STEPS.indexOf(s);
     el.classList.remove('done','active','error');
     if (opts.error && s === procesoActual.step) el.classList.add('error');
-    else if (sIdx < idx) el.classList.add('done');
+    else if (pasosVistos.has(s)) el.classList.add('done');
     else if (sIdx === idx) el.classList.add('active');
   });
   const pill = document.getElementById('processPill');

@@ -1812,7 +1812,9 @@ function buildFileListHTML() {
 function renderQueue() {
   const q = document.getElementById('queue');
   if (!files.length) { q.style.display = 'none'; updateStats(); return; }
-  q.style.display = 'block';
+  const btnDet = document.getElementById('btnToggleDetalle');
+  const enProceso = btnDet && btnDet.style.display !== 'none';
+  q.style.display = enProceso ? 'none' : 'block';
   const pending = files.filter(f => f.status === 'pending').length;
   document.getElementById('queueLabel').textContent = `${files.length} ${pluralizar(files.length, 'archivo', 'archivos')} — ${pending} pendiente${pending!==1?'s':''}`;
   

@@ -1241,7 +1241,7 @@ function iniciarPolling() {
     const _transcurrido = Date.now() - _procesoInicioTs;
     _timeoutProcesoMs = Math.max(30000, _procesoTimeoutTotalMs - _transcurrido); // piso de 30s
   } else {
-    const _cantidadFacturasLote = files.filter(f => f.status === 'en_cola').length;
+    const _cantidadFacturasLote = files.length;
     _procesoInicioTs = Date.now();
     _procesoTimeoutTotalMs = calcularTimeoutProceso(_cantidadFacturasLote);
     _timeoutProcesoMs = _procesoTimeoutTotalMs;

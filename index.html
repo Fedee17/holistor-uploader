@@ -2017,6 +2017,7 @@ async function startUpload() {
 
   uploading = true;
   setUploadControlsDisabled(true);
+  mostrarEstadoProceso('procesando');
   updateProcesoUX('validacion', 8, 'Validando', `Cliente: ${clienteSeleccionado.nombre || clienteSeleccionado.cuit} · Período ${periodoStr()}`, { progressText:'Validación inicial completa' });
   setStepDetail('validacion', 'Datos completos');
   logProceso('Validación completa: cliente, período y PDFs listos.');

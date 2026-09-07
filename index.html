@@ -2197,12 +2197,14 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
   fondo.appendChild(modal);
   document.body.appendChild(fondo);
 
-  document.getElementById('btnEscaneoSi').addEventListener('click', () => {
+    document.getElementById('btnEscaneoSi').addEventListener('click', () => {
     fondo.remove();
     logProceso('Escaneo: usuario eligió reprocesar todo.');
+    _procesoInicioTs = null;
+    _procesoTimeoutTotalMs = null;
     sendFlush(true, false);
   });
-  document.getElementById('btnEscaneoNo').addEventListener('click', () => {
+    document.getElementById('btnEscaneoNo').addEventListener('click', () => {
     fondo.remove();
     if (nuevas === 0) {
       logProceso('Escaneo: usuario eligió no reprocesar nada.');
@@ -2210,6 +2212,8 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
       finalizarPantallaEscaneo('Listo — no se reprocesó nada.');
     } else {
       logProceso('Escaneo: usuario eligió procesar solo las nuevas.');
+      _procesoInicioTs = null;
+      _procesoTimeoutTotalMs = null;
       sendFlush(false, false);
     }
   });

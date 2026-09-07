@@ -2120,7 +2120,6 @@ function manejarResultadoEscaneo(data) {
     return;
   }
 
-  mostrarConciliacion(null, null, [], yaProcesadas, duplicadasLote);
   logProceso(`Escaneo: ${repetidas} ya procesada(s), ${nuevas} nueva(s).`);
   mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote);
 }
@@ -2204,10 +2203,11 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
     _procesoTimeoutTotalMs = null;
     sendFlush(true, false);
   });
-    document.getElementById('btnEscaneoNo').addEventListener('click', () => {
+   document.getElementById('btnEscaneoNo').addEventListener('click', () => {
     fondo.remove();
     if (nuevas === 0) {
       logProceso('Escaneo: usuario eligió no reprocesar nada.');
+      mostrarConciliacion(null, null, [], yaProcesadas, duplicadasLote);
       updateProcesoUX('final', 100, 'Sin cambios', 'No se reprocesó nada.', { progressText: 'Listo.' });
       finalizarPantallaEscaneo('Listo — no se reprocesó nada.');
     } else {

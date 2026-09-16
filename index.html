@@ -2447,6 +2447,8 @@ console.log('Holistor uploader inline JS cargado OK');
           || (Array.isArray(data?.no_en_arca)    && data.no_en_arca.length    > 0)
           || (Array.isArray(data?.ya_procesadas) && data.ya_procesadas.length > 0)
           || (Array.isArray(data?.cargar_manual) && data.cargar_manual.length > 0)
+          || (Array.isArray(data?.duplicados_en_lote) && data.duplicados_en_lote.length > 0)
+          || (Array.isArray(data?.nuevas_en_escaneo)  && data.nuevas_en_escaneo.length  > 0)
           || (data?.conciliacion && Array.isArray(data.conciliacion.procesadas_registradas)
               && data.conciliacion.procesadas_registradas.length > 0);
         if (data?.listo === true && !tieneContenido) return;  // listo prematuro, seguir esperando

@@ -370,11 +370,45 @@ function calcularTimeoutProceso(cantidadFacturas) {
   return Math.min(MAX_MS, Math.max(MIN_MS, estimadoMs));
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// CLAVE DE ACCESO (auditoría 16/09/2026, S-01)
+// El backend exige un encabezado X-Holistor-Token en todos los pedidos. La clave
+// la escribe la persona una vez por sesión de navegador y NO vive en este
+// archivo (el repositorio es público). Si el backend responde 401/403, se borra
+// y se vuelve a pedir.
+// ──────────────────────────────────────────────────────────────────────────────
+const TOKEN_HEADER = 'X-Holistor-Token';
+const TOKEN_STORAGE_KEY = 'holistor_token_v1';
+function obtenerToken() {
+  try { return sessionStorage.getItem(TOKEN_STORAGE_KEY) || ''; } catch(e) { return ''; }
+}
+function guardarToken(t) {
+  try { if (t) sessionStorage.setItem(TOKEN_STORAGE_KEY, t); else sessionStorage.removeItem(TOKEN_STORAGE_KEY); } catch(e) {}
+}
+function pedirToken(mensaje) {
+  const actual = obtenerToken();
+  const t = window.prompt(mensaje || 'Ingresá la clave de acceso del sistema Holistor:', '');
+  const limpio = String(t || '').trim();
+  if (limpio) { guardarToken(limpio); return limpio; }
+  return actual;
+}
+function asegurarToken() {
+  if (obtenerToken()) return true;
+  return !!pedirToken();
+}
+
 async function fetchConTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const headers = Object.assign({}, options.headers || {});
+  const token = obtenerToken();
+  if (token) headers[TOKEN_HEADER] = token;
   try {
-    const res = await fetch(url, { ...options, signal: ctrl.signal });
+    const res = await fetch(url, { ...options, headers, signal: ctrl.signal });
+    if (res.status === 401 || res.status === 403) {
+      guardarToken('');
+      showAlert('La clave de acceso no es válida o venció. Recargá la página e ingresala de nuevo.', 'error');
+    }
     return res;
   } finally {
     clearTimeout(timer);
@@ -412,7 +446,21 @@ let countdownInterval = null;
 let _procesoInicioTs = null;
 let _procesoTimeoutTotalMs = null;
 let _resultadoYaMostrado = false;
-const BATCH_FRONTEND_SIZE = 100;
+// Tamaño de tanda (auditoría 16/09/2026, H-06): n8n Cloud corta cada ejecución a
+// los 40 minutos y una factura nueva tarda ~28 s → ~80 facturas por corrida
+// como máximo. Se procesan de a 40 para dejar margen. Cada tanda genera su
+// propio archivo PRN.
+const BATCH_FRONTEND_SIZE = 40;
+// Promesa que se resuelve cuando la corrida en curso terminó (resultado mostrado,
+// escaneo cerrado sin reprocesar, o tiempo agotado). La usa startUpload() para
+// encadenar tandas sin pisarse.
+let _resolverCorridaActual = null;
+function _corridaTerminada() {
+  if (typeof _resolverCorridaActual === 'function') { const r = _resolverCorridaActual; _resolverCorridaActual = null; r(); }
+}
+function esperarFinDeCorrida() {
+  return new Promise(resolve => { _resolverCorridaActual = resolve; });
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -460,9 +508,14 @@ function showAlert(msg, type) {
   const el = document.getElementById('alert');
   const icons = { success:'circle-check', error:'alert-circle', info:'info-circle', warn:'alert-triangle' };
   el.className = 'alert a-' + type;
-  el.innerHTML = `<i class="ti ti-${icons[type]||'info-circle'}"></i><span>${msg}</span>`;
+  const cerrar = (type === 'error')
+    ? ` <button type="button" onclick="document.getElementById('alert').style.display='none'" style="margin-left:auto;background:none;border:0;cursor:pointer;font-size:15px;color:inherit;" aria-label="Cerrar aviso"><i class="ti ti-x"></i></button>`
+    : '';
+  el.innerHTML = `<i class="ti ti-${icons[type]||'info-circle'}"></i><span>${msg}</span>${cerrar}`;
   el.style.display = 'flex';
-  if (type !== 'info') setTimeout(() => el.style.display = 'none', 6000);
+  // Los errores se quedan visibles hasta que la persona los cierra (antes desaparecían a los 6 s
+  // y un error de subida podía pasar desapercibido). Éxito y advertencia sí se ocultan solos.
+  if (type !== 'info' && type !== 'error') setTimeout(() => el.style.display = 'none', 6000);
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -1275,6 +1328,7 @@ function iniciarPolling() {
       // resultado confirmado, cuando en realidad el proceso puede seguir
       // trabajando tranquilamente en n8n. Se usa null para el caso "incierto".
       mostrarEstadoProceso('listo', [], null);
+      _corridaTerminada();
       // Liberar el candado local anti-doble-PRN (bloque v19 al final del archivo).
       // Sin esto, el botón "Subir y procesar" queda trabado indefinidamente
       // para este cliente/período después de un timeout del navegador, aunque
@@ -1364,7 +1418,10 @@ function iniciarPolling() {
           updateProcesoUX('final', 100, incidenciasTxt ? 'PRN listo con avisos' : 'PRN listo', incidenciasTxt ? `PRN generado. Avisos: ${incidenciasTxt}.` : 'PRN generado correctamente.', { progressText: incidenciasTxt ? 'Revisar avisos.' : 'Proceso completo.' });
         }
         logProceso(!prnReal ? 'Proceso terminado SIN generar PRN.' : (incidenciasTxt ? 'Proceso terminado con avisos: ' + incidenciasTxt : 'Proceso terminado correctamente.'));
-        mostrarEstadoProceso('listo', fallidosVisibles, prnReal, naCount, data.prn_file_id, data.prn_file_name, data.lineas_finales_generadas, manuales, otrosCliente, data.facturas_finales_generadas);
+        // Cantidad real de facturas en el archivo (en_prn), no solo las conciliadas exactas contra ARCA:
+        // sin ARCA o con totales "a revisar", facturas_finales_generadas daba 0 aunque el PRN tuviera líneas.
+        const _facturasEnPrn = (data.verificacion && data.verificacion.resumen && Number(data.verificacion.resumen.en_prn)) || data.facturas_finales_generadas;
+        mostrarEstadoProceso('listo', fallidosVisibles, prnReal, naCount, data.prn_file_id, data.prn_file_name, data.lineas_finales_generadas, manuales, otrosCliente, _facturasEnPrn);
         mostrarDiagnostico(data);
         if (fallidosVisibles.length > 0) mostrarFallidos(fallidosVisibles);
         else { const cf = document.getElementById('cardFallidos'); if (cf) cf.style.display = 'none'; }
@@ -1375,6 +1432,7 @@ function iniciarPolling() {
         if (data.verificacion || data.conciliacion || (data.no_en_arca && data.no_en_arca.length) || (data.ya_procesadas && data.ya_procesadas.length) || (data.duplicados_en_lote && data.duplicados_en_lote.length)) mostrarConciliacion(data.verificacion, data.conciliacion, data.no_en_arca, data.ya_procesadas, data.duplicados_en_lote);
         files = files.filter(f => !['done','en_cola','al_prn'].includes(f.status));
         renderQueue();
+        _corridaTerminada();
       } else if (data.archivos_estado || data.progreso) {
         if (data.archivos_estado && Object.keys(data.archivos_estado).length > 0) {
           aplicarEstadosArchivos(data.archivos_estado);
@@ -2007,84 +2065,105 @@ async function startUpload() {
   actualizarPeriodo(); // mismo motivo
   if (uploading) return;
   if (!validarPrecondiciones()) return;
+  if (!asegurarToken()) { showAlert('Sin clave de acceso no se puede procesar.', 'error'); return; }
 
-  const pending = files.filter(f => f.status === 'pending');
-  if (!pending.length) {
+  const pendingTotal = files.filter(f => f.status === 'pending');
+  if (!pendingTotal.length) {
     showAlert('No hay PDFs pendientes para subir.', 'warn');
     return;
   }
 
-  // Arrancar el timer visible YA, desde el momento del click en "Subir y
-  // procesar" — no recién cuando arranca el polling (que es varios pasos
-  // después: subida de PDFs + espera de indexación de Drive). Se calcula acá
-  // con la cantidad real de facturas y se reutiliza en iniciarPolling()
-  // restando lo ya transcurrido, para que el timer visible y el timeout real
-  // del watchdog lleguen a cero juntos.
-  _procesoInicioTs = Date.now();
-  _procesoTimeoutTotalMs = calcularTimeoutProceso(pending.length);
-  iniciarCountdown(_procesoTimeoutTotalMs);
+  // Se sube y procesa de a tandas de BATCH_FRONTEND_SIZE archivos: cada tanda
+  // se sube, se escanea/procesa y se espera su resultado antes de subir la
+  // siguiente. Motivo: el backend procesa TODO lo que haya en la carpeta de
+  // entrada del cliente, así que subir de a poco es la única forma de acotar
+  // cada ejecución de n8n al límite de 40 minutos.
+  const tandas = [];
+  for (let i = 0; i < pendingTotal.length; i += BATCH_FRONTEND_SIZE) tandas.push(pendingTotal.slice(i, i + BATCH_FRONTEND_SIZE));
+  if (tandas.length > 1) {
+    showAlert(`${pendingTotal.length} PDFs: se procesan en ${tandas.length} tandas de hasta ${BATCH_FRONTEND_SIZE}. Cada tanda genera su propio archivo PRN.`, 'info');
+    logProceso(`Lote grande: ${tandas.length} tandas de hasta ${BATCH_FRONTEND_SIZE} archivos.`);
+  }
 
-  uploading = true;
-  setUploadControlsDisabled(true);
-  mostrarEstadoProceso('procesando');
-  updateProcesoUX('validacion', 8, 'Validando', `Cliente: ${clienteSeleccionado.nombre || clienteSeleccionado.cuit} · Período ${periodoStr()}`, { progressText:'Validación inicial completa' });
-  setStepDetail('validacion', 'Datos completos');
-  logProceso('Validación completa: cliente, período y PDFs listos.');
-  updateProcesoUX('upload', 15, 'Subiendo PDFs', `${pending.length} archivo(s) se enviarán a Google Drive.`, { progressText:'Iniciando subida…' });
-  logProceso(`Subiendo ${pending.length} PDF(s) a n8n/Drive.`);
-  showAlert(`Subiendo ${pending.length} ${pluralizar(pending.length, 'PDF', 'PDFs')}…`, 'info');
-
-  for (const item of pending) {
-    try {
-      item.status = 'uploading';
-      renderQueue();
-      await subirUnPDF(item);
-      item.status = 'done';
-      subidos++;
-      const upOk = pending.filter(f => f.status === 'done').length;
-      const pctUpload = 15 + Math.min(30, (upOk / pending.length) * 30);
-      updateProcesoUX('upload', pctUpload, 'Subiendo PDFs', `${upOk}/${pending.length} PDF(s) subidos a Drive.`, { progressText:`${upOk}/${pending.length} PDFs subidos` });
-      setStepDetail('upload', `${upOk}/${pending.length} subidos`);
-      logProceso(`PDF subido: ${item.name}`);
-      history.unshift({ name: item.name, ok: true, time: new Date().toLocaleTimeString() });
-    } catch (err) {
-      item.status = 'error';
-      errores++;
-      history.unshift({ name: item.name, ok: false, time: new Date().toLocaleTimeString() });
-      const detalle = err.name === 'AbortError' ? 'timeout' : err.message;
-      console.error('Error subiendo PDF', item.name, err);
-      showAlert(`Error subiendo ${escapeHtml(item.name)}: ${escapeHtml(detalle)}`, 'error');
-      logProceso(`Error subiendo ${item.name}: ${detalle}`);
+  for (let t = 0; t < tandas.length; t++) {
+    const pending = tandas[t];
+    const etiquetaTanda = tandas.length > 1 ? ` (tanda ${t + 1} de ${tandas.length})` : '';
+    if (t > 0) {
+      resetProcesoUX();
+      document.getElementById('loteResultado').style.display = 'none';
     }
-    renderQueue();
-    renderHistory();
-    await sleep(1000);
-  }
 
-  uploading = false;
-  setUploadControlsDisabled(false);
-  updateStats();
+    _procesoInicioTs = Date.now();
+    _procesoTimeoutTotalMs = calcularTimeoutProceso(pending.length);
+    iniciarCountdown(_procesoTimeoutTotalMs);
 
-  const subidosOk = files.some(f => f.status === 'done');
-  if (!subidosOk) {
-    showAlert('No se pudo subir ningún PDF. Revisá conexión o n8n.', 'error');
-    return;
-  }
+    uploading = true;
+    setUploadControlsDisabled(true);
+    mostrarEstadoProceso('procesando');
+    updateProcesoUX('validacion', 8, 'Validando' + etiquetaTanda, `Cliente: ${clienteSeleccionado.nombre || clienteSeleccionado.cuit} · Período ${periodoStr()}`, { progressText:'Validación inicial completa' });
+    setStepDetail('validacion', 'Datos completos');
+    logProceso('Validación completa: cliente, período y PDFs listos' + etiquetaTanda + '.');
+    updateProcesoUX('upload', 15, 'Subiendo PDFs' + etiquetaTanda, `${pending.length} archivo(s) se enviarán a Google Drive.`, { progressText:'Iniciando subida…' });
+    logProceso(`Subiendo ${pending.length} PDF(s) a n8n/Drive${etiquetaTanda}.`);
+    showAlert(`Subiendo ${pending.length} ${pluralizar(pending.length, 'PDF', 'PDFs')}${etiquetaTanda}…`, 'info');
 
-  const fallidosNombres = pending.filter(f => f.status === 'error').map(f => f.name);
-  if (fallidosNombres.length > 0) {
-    showAlert(`${pending.length - fallidosNombres.length}/${pending.length} PDFs subidos. Fallaron ${fallidosNombres.length}: ${fallidosNombres.join(', ')}`, 'warn');
-    logProceso(`Subida parcial: fallaron ${fallidosNombres.length} de ${pending.length} — ${fallidosNombres.join(', ')}`);
-  }
+    for (const item of pending) {
+      try {
+        item.status = 'uploading';
+        renderQueue();
+        await subirUnPDF(item);
+        item.status = 'done';
+        subidos++;
+        const upOk = pending.filter(f => f.status === 'done').length;
+        const pctUpload = 15 + Math.min(30, (upOk / pending.length) * 30);
+        updateProcesoUX('upload', pctUpload, 'Subiendo PDFs' + etiquetaTanda, `${upOk}/${pending.length} PDF(s) subidos a Drive.`, { progressText:`${upOk}/${pending.length} PDFs subidos` });
+        setStepDetail('upload', `${upOk}/${pending.length} subidos`);
+        logProceso(`PDF subido: ${item.name}`);
+        history.unshift({ name: item.name, ok: true, time: new Date().toLocaleTimeString() });
+      } catch (err) {
+        item.status = 'error';
+        errores++;
+        history.unshift({ name: item.name, ok: false, time: new Date().toLocaleTimeString() });
+        const detalle = err.name === 'AbortError' ? 'timeout' : err.message;
+        console.error('Error subiendo PDF', item.name, err);
+        showAlert(`Error subiendo ${escapeHtml(item.name)}: ${escapeHtml(detalle)}`, 'error');
+        logProceso(`Error subiendo ${item.name}: ${detalle}`);
+      }
+      renderQueue();
+      renderHistory();
+      await sleep(1000);
+    }
 
-  updateProcesoUX('registro', 50, registroSubido ? 'Registro ARCA cargado' : 'Sin registro ARCA', registroSubido ? 'El registro ARCA quedó disponible para conciliación.' : 'Se procesará sin conciliación completa.', { progressText: registroSubido ? 'Registro listo' : 'Sin registro' });
-  setStepDetail('registro', registroSubido ? 'Cargado' : 'Omitido');
-  logProceso(registroSubido ? 'Registro ARCA disponible para conciliación.' : 'Procesamiento sin registro ARCA.');
+    uploading = false;
+    setUploadControlsDisabled(false);
+    updateStats();
+
+    const subidosOk = pending.some(f => f.status === 'done');
+    if (!subidosOk) {
+      showAlert('No se pudo subir ningún PDF' + etiquetaTanda + '. Revisá conexión o n8n.', 'error');
+      detenerCountdown();
+      continue;
+    }
+
+    const fallidosNombres = pending.filter(f => f.status === 'error').map(f => f.name);
+    if (fallidosNombres.length > 0) {
+      showAlert(`${pending.length - fallidosNombres.length}/${pending.length} PDFs subidos. Fallaron ${fallidosNombres.length}: ${fallidosNombres.join(', ')}`, 'warn');
+      logProceso(`Subida parcial: fallaron ${fallidosNombres.length} de ${pending.length} — ${fallidosNombres.join(', ')}`);
+    }
+
+    updateProcesoUX('registro', 50, registroSubido ? 'Registro ARCA cargado' : 'Sin registro ARCA', registroSubido ? 'El registro ARCA quedó disponible para conciliación.' : 'Se procesará sin conciliación completa.', { progressText: registroSubido ? 'Registro listo' : 'Sin registro' });
+    setStepDetail('registro', registroSubido ? 'Cargado' : 'Omitido');
+    logProceso(registroSubido ? 'Registro ARCA disponible para conciliación.' : 'Procesamiento sin registro ARCA.');
     updateProcesoUX('ia', 58, 'Esperando Drive', 'PDFs subidos. Esperando indexación de Google Drive antes de revisar qué ya está hecho.', { progressText:'Indexando archivos…' });
-  setStepDetail('ia', 'Revisando qué ya está hecho');
-  showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
-  await sleep(calcularEsperaIndexacion(pending.length));
-  await escanearYProcesar();
+    setStepDetail('ia', 'Revisando qué ya está hecho');
+    showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
+    await sleep(calcularEsperaIndexacion(pending.length));
+    const finDeCorrida = esperarFinDeCorrida();
+    await escanearYProcesar();
+    await finDeCorrida;
+    if (tandas.length > 1) logProceso(`Tanda ${t + 1} de ${tandas.length} terminada.`);
+  }
+  if (tandas.length > 1) showAlert(`Listo: se procesaron ${tandas.length} tandas. Hay un archivo PRN por tanda en Drive.`, 'success');
 }
 
 async function autoSyncProveedores() {
@@ -2220,6 +2299,7 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
       mostrarConciliacion(null, null, [], yaProcesadas, duplicadasLote);
       updateProcesoUX('final', 100, 'Sin cambios', 'No se reprocesó nada.', { progressText: 'Listo.' });
       finalizarPantallaEscaneo('Listo — no se reprocesó nada.');
+      _corridaTerminada();
     } else {
       logProceso('Escaneo: usuario eligió procesar solo las nuevas.');
       _procesoInicioTs = null;
@@ -2232,6 +2312,7 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
 async function sendFlush(forzar, soloEscanear) {
   actualizarPeriodo(); // releer el desplegable antes de mandar nada a n8n, por la misma razón que en el Excel
   if (!validarPrecondiciones()) return;
+  if (!asegurarToken()) { showAlert('Sin clave de acceso no se puede procesar.', 'error'); return; }
   escaneoEnCurso = soloEscanear === true;
 
   try {
@@ -2270,6 +2351,7 @@ async function sendFlush(forzar, soloEscanear) {
     updateProcesoUX('ia', procesoActual.pct || 60, 'Error al iniciar', `No se pudo iniciar n8n: ${detalle}`, { error:true, progressText:'Revisar webhook holistor-procesar' });
     logProceso(`Error iniciando procesamiento: ${detalle}`);
     showAlert(`No se pudo iniciar el procesamiento: ${escapeHtml(detalle)}`, 'error');
+    _corridaTerminada();
   }
 }
 
@@ -2313,6 +2395,7 @@ function initApp() {
     selAnio.appendChild(opt);
   }
 
+  asegurarToken();
   loadClientes();
 
   // Drop zone - PDFs
@@ -2417,9 +2500,13 @@ console.log('Holistor uploader inline JS cargado OK');
     if (url.includes('/holistor-procesar')) {
       let body = {}; try { body = JSON.parse(init?.body || '{}'); } catch(e) {}
       const key = keyActual(body); const forzar = body.forzar === true;
-      if (state.finalizado && state.activeKey === key && !forzar) return jsonResponse({ ok:false, proceso_ya_activo:true, proceso_ya_finalizado:true, mensaje:'Bloqueado por frontend: este cliente/período ya generó PRN. Usá Forzar o Liberar proceso para rehacer.' });
+      // Auditoría 16/09/2026 (U-01): el candado solo bloquea mientras hay un proceso EN CURSO.
+      // Un cliente/período que ya generó PRN puede procesar una segunda tanda sin "Liberar proceso":
+      // el backend ya evita duplicados por huella y por clave de comprobante.
       if (state.inFlight && state.activeKey === key && !forzar) return jsonResponse({ ok:false, proceso_ya_activo:true, mensaje:'Bloqueado por frontend: ya hay un holistor-procesar en curso para este cliente/período.' });
-      state.inFlight = true; state.activeKey = key; state.finalizado = false; state.requestId = state.requestId || `${Date.now()}_${Math.random().toString(36).slice(2,10)}`;
+      // Identificador nuevo por cada corrida (antes se generaba una sola vez por pestaña y nunca
+      // distinguía una corrida de la anterior).
+      state.inFlight = true; state.activeKey = key; state.finalizado = false; state.requestId = `${Date.now()}_${Math.random().toString(36).slice(2,10)}`;
       window.__holistorActiveRunId = state.requestId;
       setProcesarDisabled(true);
       if (init && typeof init.body === 'string') init = { ...init, body: JSON.stringify({ ...body, request_id: state.requestId, frontend_run_id: state.requestId }) };
@@ -2468,7 +2555,7 @@ console.log('Holistor uploader inline JS cargado OK');
   document.addEventListener('click', function(e){
     const btn = e.target.closest && e.target.closest('#btnSubir,#btnProcesar'); if(!btn) return;
         const key = clienteActual() + '|' + periodoActual();
-    if ((state.inFlight || state.finalizado) && state.activeKey === key) { e.preventDefault(); e.stopPropagation(); alert(state.finalizado ? 'Este período ya generó PRN. Usá "Liberar proceso" si necesitás rehacerlo.' : 'Ya hay un procesamiento en curso. Si creés que quedó trabado, usá "Liberar proceso" antes de reintentar.'); }
+    if (state.inFlight && state.activeKey === key) { e.preventDefault(); e.stopPropagation(); alert('Ya hay un procesamiento en curso. Si creés que quedó trabado, usá "Liberar proceso" antes de reintentar.'); }
   }, true);
 })();
 </script>

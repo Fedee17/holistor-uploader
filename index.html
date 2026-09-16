@@ -2425,13 +2425,14 @@ console.log('Holistor uploader inline JS cargado OK');
       if (init && typeof init.body === 'string') init = { ...init, body: JSON.stringify({ ...body, request_id: state.requestId, frontend_run_id: state.requestId }) };
       try {
         const res = await originalFetch(input, init);
-        res.clone().json().then(data => {
-          if (data?.proceso_ya_finalizado === true || (data?.listo === true && data?.prn_guardado === true)) { state.finalizado=true; state.inFlight=false; setProcesarDisabled(false); }
-          else if (data?.listo === true) { state.inFlight=false; setProcesarDisabled(false); }
-          else if (data?.proceso_ya_activo === true) { state.inFlight=true; setProcesarDisabled(true); }
-          else if (data?.ok === false) { state.inFlight=false; setProcesarDisabled(false); }
-        }).catch(()=>{});
-        return res;
+       try {
+         const data = await res.clone().json();
+         if (data?.proceso_ya_finalizado === true || (data?.listo === true && data?.prn_guardado === true)) { state.finalizado=true; state.inFlight=false; setProcesarDisabled(false); }
+         else if (data?.listo === true) { state.inFlight=false; setProcesarDisabled(false); }
+         else if (data?.proceso_ya_activo === true) { state.inFlight=true; setProcesarDisabled(true); }
+         else if (data?.ok === false) { state.inFlight=false; setProcesarDisabled(false); }
+       } catch(e) {}
+       return res;
       } catch(e) { state.inFlight=false; setProcesarDisabled(false); throw e; }
     }
     if (url.includes('/holistor-estado')) {

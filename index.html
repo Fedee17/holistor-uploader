@@ -454,9 +454,14 @@ const BATCH_FRONTEND_SIZE = 40;
 // Promesa que se resuelve cuando la corrida en curso terminó (resultado mostrado,
 // escaneo cerrado sin reprocesar, o tiempo agotado). La usa startUpload() para
 // encadenar tandas sin pisarse.
+// FIX 18/09/2026: la promesa ahora resuelve con true (la corrida terminó) o
+// false (la orden de procesar ni siquiera pudo salir). startUpload() corta la
+// cadena de tandas cuando recibe false: antes seguía con la tanda siguiente
+// como si la anterior hubiera terminado, y así se subieron 25 PDF más sobre
+// 40 que nunca se habían procesado.
 let _resolverCorridaActual = null;
-function _corridaTerminada() {
-  if (typeof _resolverCorridaActual === 'function') { const r = _resolverCorridaActual; _resolverCorridaActual = null; r(); }
+function _corridaTerminada(ok) {
+  if (typeof _resolverCorridaActual === 'function') { const r = _resolverCorridaActual; _resolverCorridaActual = null; r(ok !== false); }
 }
 function esperarFinDeCorrida() {
   return new Promise(resolve => { _resolverCorridaActual = resolve; });
@@ -1419,6 +1424,15 @@ function iniciarPolling() {
         _resultadoYaMostrado = true;
         stopPolling();
         if (data.solo_escaneo === true) {
+          // FIX 18/09/2026: el escaneo terminó, así que el candado local
+          // anti-doble-orden (bloque v19 al final del archivo) se abre ACÁ,
+          // de forma explícita, antes de decidir si se manda la orden real.
+          // Antes se confiaba en que el interceptor de fetch de /holistor-estado
+          // (que lee la misma respuesta por su cuenta) abriera el candado
+          // primero; no hay garantía de ese orden, y el 18/09 (SUC. DE
+          // CASTELLANO, 65 PDF) la orden real salió con el candado cerrado dos
+          // veces seguidas: "Bloqueado por frontend", 0 facturas procesadas.
+          if (window.__holistorLiberarGuardaLocal) window.__holistorLiberarGuardaLocal();
           manejarResultadoEscaneo(data);
           return;
         }
@@ -2183,7 +2197,15 @@ async function startUpload() {
     await sleep(calcularEsperaIndexacion(pending.length));
     const finDeCorrida = esperarFinDeCorrida();
     await escanearYProcesar();
-    await finDeCorrida;
+    const corridaOk = await finDeCorrida;
+    if (corridaOk === false) {
+      // FIX 18/09/2026: la orden de procesar no salió. Los PDF de esta tanda ya
+      // están en Drive pero nadie los procesó: cortar acá, no subir más tandas.
+      const restantes = tandas.length - (t + 1);
+      logProceso(`Tanda ${t + 1} de ${tandas.length}: la orden de procesar no pudo salir. Se corta acá${restantes > 0 ? ` (quedan ${restantes} ${pluralizar(restantes, 'tanda', 'tandas')} sin subir)` : ''}.`);
+      showAlert(`No se pudo iniciar el procesamiento de la tanda ${t + 1}. Los PDF ya subidos quedaron en Drive sin procesar: no los vuelvas a subir (se duplicarían en Drive). Usá "Liberar proceso" y avisá para que se dispare el procesamiento de lo que ya está en Drive.`, 'error');
+      return;
+    }
     if (tandas.length > 1) logProceso(`Tanda ${t + 1} de ${tandas.length} terminada.`);
   }
   if (tandas.length > 1) showAlert(`Listo: se procesaron ${tandas.length} tandas. Hay un archivo PRN por tanda en Drive.`, 'success');
@@ -2374,7 +2396,7 @@ async function sendFlush(forzar, soloEscanear) {
     updateProcesoUX('ia', procesoActual.pct || 60, 'Error al iniciar', `No se pudo iniciar n8n: ${detalle}`, { error:true, progressText:'Revisar webhook holistor-procesar' });
     logProceso(`Error iniciando procesamiento: ${detalle}`);
     showAlert(`No se pudo iniciar el procesamiento: ${escapeHtml(detalle)}`, 'error');
-    _corridaTerminada();
+    _corridaTerminada(false);
   }
 }
 

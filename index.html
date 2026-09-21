@@ -336,7 +336,9 @@ const WEBHOOK = {
   registro:  () => BASE_WEBHOOK + '/holistor-registro',
   reset:     () => BASE_WEBHOOK + '/holistor-reset',
   syncProv:  () => BASE_WEBHOOK + '/holistor-sync-proveedores-pendientes',
-  proveedores: () => BASE_WEBHOOK + '/holistor-proveedores'
+  proveedores: () => BASE_WEBHOOK + '/holistor-proveedores',
+  // 21/09/2026: une los PRN por tanda en un solo archivo CONSOLIDADO (workflow aparte en n8n).
+  consolidar: () => BASE_WEBHOOK + '/holistor-prn-consolidar'
 };
 
 const DRIVE_INDEX_DELAY_MS = 6000;
@@ -445,6 +447,9 @@ let pollingTimeoutMax = null;
 let countdownInterval = null;
 let _procesoInicioTs = null;
 let _procesoTimeoutTotalMs = null;
+// 21/09/2026: PRN generados por cada tanda de la corrida actual (id y nombre en Drive),
+// para pedirle a n8n el archivo consolidado cuando terminan todas las tandas.
+let _prnDeTandas = [];
 let _resultadoYaMostrado = false;
 // Tamaño de tanda (auditoría 16/09/2026, H-06): n8n Cloud corta cada ejecución a
 // los 40 minutos y una factura nueva tarda ~28 s → ~80 facturas por corrida
@@ -1459,6 +1464,7 @@ function iniciarPolling() {
         // sin ARCA o con totales "a revisar", facturas_finales_generadas daba 0 aunque el PRN tuviera líneas.
         const _facturasEnPrn = (data.verificacion && data.verificacion.resumen && Number(data.verificacion.resumen.en_prn)) || data.facturas_finales_generadas;
         mostrarEstadoProceso('listo', fallidosVisibles, prnReal, naCount, data.prn_file_id, data.prn_file_name, data.lineas_finales_generadas, manuales, otrosCliente, _facturasEnPrn);
+        if (prnReal && data.prn_file_id) _prnDeTandas.push({ id: String(data.prn_file_id), name: String(data.prn_file_name || '') });
         mostrarDiagnostico(data);
         if (fallidosVisibles.length > 0) mostrarFallidos(fallidosVisibles);
         else { const cf = document.getElementById('cardFallidos'); if (cf) cf.style.display = 'none'; }
@@ -2122,6 +2128,7 @@ async function startUpload() {
     logProceso(`Lote grande: ${tandas.length} tandas de hasta ${BATCH_FRONTEND_SIZE} archivos.`);
   }
 
+  _prnDeTandas = [];
   for (let t = 0; t < tandas.length; t++) {
     const pending = tandas[t];
     const etiquetaTanda = tandas.length > 1 ? ` (tanda ${t + 1} de ${tandas.length})` : '';
@@ -2208,7 +2215,49 @@ async function startUpload() {
     }
     if (tandas.length > 1) logProceso(`Tanda ${t + 1} de ${tandas.length} terminada.`);
   }
-  if (tandas.length > 1) showAlert(`Listo: se procesaron ${tandas.length} tandas. Hay un archivo PRN por tanda en Drive.`, 'success');
+  if (tandas.length > 1) {
+    showAlert(`Listo: se procesaron ${tandas.length} tandas. Hay un archivo PRN por tanda en Drive.`, 'success');
+    await consolidarPrnTandas(tandas.length);
+  }
+}
+
+// 21/09/2026: cuando la corrida se partió en tandas, cada tanda dejó su propio PRN
+// en Drive. Se le pide a n8n (webhook holistor-prn-consolidar, workflow aparte)
+// que una las líneas de todos en un solo archivo CONSOLIDADO. Los PRN por tanda
+// quedan como respaldo. Si falla, se avisa y se sigue: no bloquea nada.
+async function consolidarPrnTandas(cantTandas) {
+  const prns = _prnDeTandas.slice();
+  if (prns.length === 0) { logProceso('Consolidado: ninguna tanda generó PRN, no hay nada que unir.'); return; }
+  if (prns.length === 1) { logProceso(`Consolidado: solo 1 de ${cantTandas} tandas generó PRN (${prns[0].name}); ese archivo ya es el único, no hace falta unir.`); return; }
+  logProceso(`Consolidado: pidiendo a n8n que una ${prns.length} PRN en un solo archivo…`);
+  showAlert(`Armando el PRN consolidado con las ${prns.length} tandas…`, 'info');
+  try {
+    const res = await fetchConTimeout(WEBHOOK.consolidar(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cliente_cuit: clienteSeleccionado.cuit,
+        cliente_nombre: clienteSeleccionado.nombre || '',
+        periodo: periodoStr(),
+        prn_file_ids: prns.map(p => p.id)
+      })
+    }, FETCH_TIMEOUT_MS);
+    const data = await jsonSeguro(res);
+    if (!res.ok || data.ok !== true || !data.prn_file_id) {
+      throw new Error(data.mensaje || `HTTP ${res.status}`);
+    }
+    const avisos = Array.isArray(data.avisos) ? data.avisos : [];
+    logProceso(`Consolidado listo: ${data.prn_file_name} (${data.lineas} líneas de ${data.archivos_unidos} archivos).` + (avisos.length ? ' Avisos: ' + avisos.join(' | ') : ''));
+    showAlert(`✓ PRN consolidado listo: ${data.lineas} líneas de ${data.archivos_unidos} tandas.` + (avisos.length ? ' Revisá los avisos en el detalle.' : ''), avisos.length ? 'warn' : 'success');
+    const el = document.getElementById('estadoProceso');
+    if (el) {
+      el.insertAdjacentHTML('beforeend', ` <a href="https://drive.google.com/file/d/${escapeHtml(data.prn_file_id)}/view" target="_blank" rel="noopener" style="color:#1a6e38;font-weight:700;margin-left:6px;text-decoration:underline;"><i class="ti ti-files" style="font-size:13px;"></i> PRN consolidado (${escapeHtml(String(data.lineas))} líneas)</a>`);
+    }
+  } catch (err) {
+    const detalle = err.name === 'AbortError' ? 'tiempo de espera agotado' : err.message;
+    logProceso(`Consolidado: no se pudo armar el archivo único (${detalle}). Los PRN por tanda siguen en Drive: ${prns.map(p => p.name || p.id).join(', ')}.`);
+    showAlert(`No se pudo armar el PRN consolidado: ${escapeHtml(detalle)}. Los ${prns.length} PRN por tanda están en Drive y se pueden importar uno por uno.`, 'warn');
+  }
 }
 
 async function autoSyncProveedores() {

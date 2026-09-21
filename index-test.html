@@ -456,6 +456,37 @@ let _procesoTimeoutTotalMs = null;
 // 21/09/2026: PRN generados por cada tanda de la corrida actual (id y nombre en Drive),
 // para pedirle a n8n el archivo consolidado cuando terminan todas las tandas.
 let _prnDeTandas = [];
+// FIX 21/09/2026 ("24 facturas"): cuando una corrida se parte en varias tandas,
+// cada tanda mostraba SOLO sus propios resultados en el cartel final y en los
+// paneles de errores/carga manual/otro cliente/discrepancias — al pasar a la
+// tanda siguiente, resetProcesoUX() borraba esa pantalla y lo de la tanda
+// anterior se perdía para siempre. Este acumulador junta los resultados de
+// TODAS las tandas de la corrida actual, para que el cartel final siempre se
+// arme con el total real (todas las tandas juntas), no solo la última.
+// Se vacía en cada startUpload() nueva, junto con _prnDeTandas.
+function crearResumenTandasVacio() {
+  return {
+    facturasCount: 0,
+    naCount: 0,
+    prnReal: false,
+    fallidos: [],
+    manuales: [],
+    otrosCliente: [],
+    discrepancias: [],
+    bajaConfianza: [],
+    noEnArca: [],
+    yaProcesadas: [],
+    duplicadosEnLote: [],
+    // Conciliación (verificacion.resumen + sus listas) — se suman/concatenan tanda a tanda.
+    verifResumen: { conciliadas:0, total_a_revisar:0, falta_procesar:0, fuera_de_arca:0 },
+    verifConciliadas: [],
+    verifTotalARevisar: [],
+    verifFaltaProcesar: [],
+    verifFueraDeArca: [],
+    hayVerif: false
+  };
+}
+let _resumenTandas = crearResumenTandasVacio();
 let _resultadoYaMostrado = false;
 // Tamaño de tanda (auditoría 16/09/2026, H-06): n8n Cloud corta cada ejecución a
 // los 40 minutos y una factura nueva tarda ~28 s → ~80 facturas por corrida
@@ -1469,16 +1500,62 @@ function iniciarPolling() {
         // Cantidad real de facturas en el archivo (en_prn), no solo las conciliadas exactas contra ARCA:
         // sin ARCA o con totales "a revisar", facturas_finales_generadas daba 0 aunque el PRN tuviera líneas.
         const _facturasEnPrn = (data.verificacion && data.verificacion.resumen && Number(data.verificacion.resumen.en_prn)) || data.facturas_finales_generadas;
-        mostrarEstadoProceso('listo', fallidosVisibles, prnReal, naCount, data.prn_file_id, data.prn_file_name, data.lineas_finales_generadas, manuales, otrosCliente, _facturasEnPrn);
+
+        // FIX 21/09/2026 ("24 facturas"): sumar/concatenar el resultado de ESTA tanda
+        // al acumulado de toda la corrida, y armar el cartel final y los paneles con
+        // el acumulado completo — no solo con lo de esta tanda. Así, si la tanda 2
+        // borra la pantalla al arrancar (resetProcesoUX), cuando la tanda 2 termina
+        // el cartel vuelve a aparecer mostrando tanda 1 + tanda 2 juntas.
+        const R = _resumenTandas;
+        R.facturasCount += Number(_facturasEnPrn) || 0;
+        R.naCount += naCount;
+        R.prnReal = R.prnReal || prnReal === true;
+        R.fallidos = R.fallidos.concat(fallidosVisibles);
+        R.manuales = R.manuales.concat(manuales);
+        R.otrosCliente = R.otrosCliente.concat(otrosCliente);
+        R.discrepancias = R.discrepancias.concat(Array.isArray(data.discrepancias) ? data.discrepancias : []);
+        R.bajaConfianza = R.bajaConfianza.concat(Array.isArray(data.baja_confianza) ? data.baja_confianza : []);
+        R.noEnArca = R.noEnArca.concat(Array.isArray(data.no_en_arca) ? data.no_en_arca : []);
+        R.yaProcesadas = R.yaProcesadas.concat(Array.isArray(data.ya_procesadas) ? data.ya_procesadas : []);
+        R.duplicadosEnLote = R.duplicadosEnLote.concat(Array.isArray(data.duplicados_en_lote) ? data.duplicados_en_lote : []);
+        if (data.verificacion && data.verificacion.resumen) {
+          R.hayVerif = true;
+          const vr = data.verificacion.resumen;
+          R.verifResumen.conciliadas += Number(vr.conciliadas) || 0;
+          R.verifResumen.total_a_revisar += Number(vr.total_a_revisar) || 0;
+          R.verifResumen.falta_procesar += Number(vr.falta_procesar) || 0;
+          R.verifResumen.fuera_de_arca += Number(vr.fuera_de_arca) || 0;
+          R.verifConciliadas = R.verifConciliadas.concat(data.verificacion.conciliadas || []);
+          R.verifTotalARevisar = R.verifTotalARevisar.concat(data.verificacion.total_a_revisar || []);
+          R.verifFaltaProcesar = R.verifFaltaProcesar.concat(data.verificacion.falta_procesar || []);
+          R.verifFueraDeArca = R.verifFueraDeArca.concat(data.verificacion.fuera_de_arca || []);
+        }
+
+        // 'prnReal' del cartel final: null solo puede venir del caso "incierto" (timeout,
+        // ver mostrarEstadoProceso más abajo) — acá siempre es true/false, así que una vez
+        // acumulado alcanza con R.prnReal (true si CUALQUIER tanda generó PRN real).
+        mostrarEstadoProceso('listo', R.fallidos, R.prnReal, R.naCount, data.prn_file_id, data.prn_file_name, data.lineas_finales_generadas, R.manuales, R.otrosCliente, R.facturasCount);
         if (prnReal && data.prn_file_id) _prnDeTandas.push({ id: String(data.prn_file_id), name: String(data.prn_file_name || '') });
         mostrarDiagnostico(data);
-        if (fallidosVisibles.length > 0) mostrarFallidos(fallidosVisibles);
+        if (R.fallidos.length > 0) mostrarFallidos(R.fallidos);
         else { const cf = document.getElementById('cardFallidos'); if (cf) cf.style.display = 'none'; }
-        mostrarCargaManual(manuales);
-        mostrarOtroCliente(otrosCliente);
-        mostrarDiscrepancias(data.discrepancias);
-        mostrarBajaConfianza(data.baja_confianza);
-        if (data.verificacion || data.conciliacion || (data.no_en_arca && data.no_en_arca.length) || (data.ya_procesadas && data.ya_procesadas.length) || (data.duplicados_en_lote && data.duplicados_en_lote.length)) mostrarConciliacion(data.verificacion, data.conciliacion, data.no_en_arca, data.ya_procesadas, data.duplicados_en_lote);
+        mostrarCargaManual(R.manuales);
+        mostrarOtroCliente(R.otrosCliente);
+        mostrarDiscrepancias(R.discrepancias);
+        mostrarBajaConfianza(R.bajaConfianza);
+        if (R.hayVerif || data.conciliacion || R.noEnArca.length || R.yaProcesadas.length || R.duplicadosEnLote.length) {
+          // data.conciliacion es el formato viejo (legacy, previo a 'verificacion'):
+          // se deja tal cual, sin acumular entre tandas -- por alcance, no vale la
+          // pena sumarle complejidad a un formato que ya no debería estar en uso.
+          const _verifAcumulado = R.hayVerif ? {
+            resumen: R.verifResumen,
+            conciliadas: R.verifConciliadas,
+            total_a_revisar: R.verifTotalARevisar,
+            falta_procesar: R.verifFaltaProcesar,
+            fuera_de_arca: R.verifFueraDeArca
+          } : data.verificacion;
+          mostrarConciliacion(_verifAcumulado, data.conciliacion, R.noEnArca, R.yaProcesadas, R.duplicadosEnLote);
+        }
         files = files.filter(f => !['done','en_cola','al_prn'].includes(f.status));
         renderQueue();
         _corridaTerminada();
@@ -2135,6 +2212,7 @@ async function startUpload() {
   }
 
   _prnDeTandas = [];
+  _resumenTandas = crearResumenTandasVacio();
   for (let t = 0; t < tandas.length; t++) {
     const pending = tandas[t];
     const etiquetaTanda = tandas.length > 1 ? ` (tanda ${t + 1} de ${tandas.length})` : '';

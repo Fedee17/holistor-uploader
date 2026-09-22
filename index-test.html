@@ -2227,14 +2227,18 @@ async function subirUnPDF(item) {
   fd.append('anio', String(periodo.anio));
   fd.append('periodo', periodoStr());
 
-  // Reintento automático: los 403/timeouts que vimos hoy fueron picos cortos
+  // Reintento automático: los 403/timeouts que vimos fueron picos cortos
   // de la API de Google (confirmado -- la misma subida funcionaba perfecto
   // segundos después, sin cambiar nada). Antes esto quedaba en manos del
   // usuario ("volvé a subir este archivo a mano") -- no hay motivo para no
-  // resolverlo solo: 3 intentos con una pausa corta entre cada uno alcanza
-  // para superar un pico transitorio sin intervención humana.
-  const INTENTOS_MAX = 3;
-  const ESPERA_ENTRE_INTENTOS_MS = 2500;
+  // resolverlo solo.
+  // FIX 22/09/2026: con 3 intentos y 2,5 s de pausa, los tres pedidos entraban
+  // en unos 6 segundos, y un rechazo de Drive de 18 segundos seguidos (caso
+  // real: SUC. DE CASTELLANO, dos PDF perdidos) se los comía enteros. Ahora la
+  // espera crece entre intentos (5 s, 15 s, 40 s): cuatro intentos que cubren
+  // un minuto entero de rechazo antes de darlo por perdido.
+  const ESPERAS_ENTRE_INTENTOS_MS = [5000, 15000, 40000];
+  const INTENTOS_MAX = ESPERAS_ENTRE_INTENTOS_MS.length + 1;
   let ultimoError = null;
 
   for (let intento = 1; intento <= INTENTOS_MAX; intento++) {
@@ -2249,8 +2253,9 @@ async function subirUnPDF(item) {
     } catch (err) {
       ultimoError = err;
       if (intento < INTENTOS_MAX) {
-        logProceso(`Intento ${intento}/${INTENTOS_MAX} de subir ${item.name} falló (${err.message}). Reintentando...`);
-        await sleep(ESPERA_ENTRE_INTENTOS_MS);
+        const esperaMs = ESPERAS_ENTRE_INTENTOS_MS[intento - 1];
+        logProceso(`Intento ${intento}/${INTENTOS_MAX} de subir ${item.name} falló (${err.message}). Reintentando en ${Math.round(esperaMs / 1000)} s...`);
+        await sleep(esperaMs);
       }
     }
   }

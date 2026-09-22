@@ -181,7 +181,7 @@
     <div class="stat"><div class="stat-label">Errores</div><div class="stat-value" id="statErrores">0</div></div>
   </div>
   <div class="card">
-    <div class="card-header"><i class="ti ti-cloud-upload"></i> Subir facturas</div>
+    <div class="card-header"><i class="ti ti-file-invoice"></i> Subir facturas</div>
     <div class="form-row">
       <label class="field-label">Cliente</label>
       <select id="selCliente" class="field-select" onchange="onClienteChange()">
@@ -450,12 +450,48 @@ let _procesoTimeoutTotalMs = null;
 // 21/09/2026: PRN generados por cada tanda de la corrida actual (id y nombre en Drive),
 // para pedirle a n8n el archivo consolidado cuando terminan todas las tandas.
 let _prnDeTandas = [];
+// FIX 21/09/2026 ("24 facturas"): cuando una corrida se parte en varias tandas,
+// cada tanda mostraba SOLO sus propios resultados en el cartel final y en los
+// paneles de errores/carga manual/otro cliente/discrepancias — al pasar a la
+// tanda siguiente, resetProcesoUX() borraba esa pantalla y lo de la tanda
+// anterior se perdía para siempre. Este acumulador junta los resultados de
+// TODAS las tandas de la corrida actual, para que el cartel final siempre se
+// arme con el total real (todas las tandas juntas), no solo la última.
+// Se vacía en cada startUpload() nueva, junto con _prnDeTandas.
+function crearResumenTandasVacio() {
+  return {
+    facturasCount: 0,
+    naCount: 0,
+    prnReal: false,
+    fallidos: [],
+    manuales: [],
+    otrosCliente: [],
+    discrepancias: [],
+    bajaConfianza: [],
+    noEnArca: [],
+    yaProcesadas: [],
+    duplicadosEnLote: [],
+    // Conciliación (verificacion.resumen + sus listas) — se suman/concatenan tanda a tanda.
+    verifResumen: { conciliadas:0, total_a_revisar:0, falta_procesar:0, fuera_de_arca:0 },
+    verifConciliadas: [],
+    verifTotalARevisar: [],
+    verifFaltaProcesar: [],
+    verifFueraDeArca: [],
+    hayVerif: false
+  };
+}
+let _resumenTandas = crearResumenTandasVacio();
 let _resultadoYaMostrado = false;
 // Tamaño de tanda (auditoría 16/09/2026, H-06): n8n Cloud corta cada ejecución a
 // los 40 minutos y una factura nueva tarda ~28 s → ~80 facturas por corrida
 // como máximo. Se procesan de a 40 para dejar margen. Cada tanda genera su
 // propio archivo PRN.
 const BATCH_FRONTEND_SIZE = 40;
+// FIX 22/09/2026: cuántas verificaciones de "¿ya está procesada?" se mandan a
+// n8n al mismo tiempo al arrastrar PDFs. Cada una lee la planilla de registro
+// completa en el servidor; mandarlas todas juntas (40-66 a la vez) tiró abajo
+// el servidor de n8n dos veces el 22/09. Ver addFilesInner().
+const VERIFICACION_CONCURRENCIA = 3;
 // Promesa que se resuelve cuando la corrida en curso terminó (resultado mostrado,
 // escaneo cerrado sin reprocesar, o tiempo agotado). La usa startUpload() para
 // encadenar tandas sin pisarse.
@@ -561,7 +597,7 @@ async function loadClientes(forzar = false) {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const lista = await res.json();
     if (!Array.isArray(lista) || !lista.length) throw new Error('Lista vacía');
-    const listaValida = lista.filter(c => 
+    const listaValida = lista.filter(c =>
       c && String(c.cuit||'').replace(/[^0-9]/g,'').length >= 8 && String(c.nombre||'').trim()
     );
     if (!listaValida.length) throw new Error('Lista sin clientes válidos');
@@ -601,7 +637,7 @@ function onClienteChange() {
   const sel = document.getElementById('selCliente');
   const opt = sel.options[sel.selectedIndex];
   const pdfsEnCola = files.filter(f => f.status === 'pending').length;
-  
+
   if (pdfsEnCola > 0) {
     const ok = confirm(`Hay ${pdfsEnCola} PDF${pluralizar(pdfsEnCola, '', 's')} en cola. ¿Limpiar y cambiar?`);
     if (!ok) {
@@ -611,7 +647,7 @@ function onClienteChange() {
     files = files.filter(f => f.status !== 'pending');
     renderQueue();
   }
-  
+
   if (sel.value) {
     clienteSeleccionado = { cuit: sel.value, nombre: opt.dataset.nombre };
     if (_archivoExcelPendiente) {
@@ -813,7 +849,7 @@ async function guardarRegistroEnN8n(zone, registros, receptorCuit) {
 
 async function handleExcelFile(file) {
   if (!validarArchivoExcel(file)) return;
-  
+
   if (!clienteSeleccionado) {
     _archivoExcelPendiente = file;
     showAlert('El Excel se guardará automáticamente cuando selecciones cliente', 'warn');
@@ -821,12 +857,12 @@ async function handleExcelFile(file) {
     setTimeout(() => document.getElementById('excelZone').classList.remove('highlight'), 3000);
     return;
   }
-  
+
   if (!periodo) {
     showAlert('Seleccioná el período antes', 'warn');
     return;
   }
-  
+
   const zone = document.getElementById('excelZone');
   mostrarCargando(zone, file);
 
@@ -969,25 +1005,25 @@ function parsearRegistroARCA(file) {
 
         const headers = (rows[1] || []).map(h => String(h||'').trim().toLowerCase());
         const receptoresSet = new Set();
-        
+
         for (let i = 2; i < rows.length; i++) {
           const r = rows[i];
           if (!r || r[0] === null) continue;
           const rc = String(r[10]||'').replace(/[^0-9]/g,'').padStart(11,'0');
           if (rc && rc !== '00000000000') receptoresSet.add(rc);
         }
-        
+
         // CUITs argentinos válidos nunca empiezan con '0'.
         // ARCA a veces exporta el CUIT truncado (ej: '22423064' en vez de '20224230649')
         // que al padear a 11 dígitos queda '00022423064'. Los filtramos.
         const validReceptores = new Set([...receptoresSet].filter(rc => !rc.startsWith('0')));
         const filasCorregidas = [...receptoresSet].filter(rc => rc.startsWith('0')).length;
-        
+
         if (validReceptores.size > 1) {
           reject(new Error(`Múltiples receptores: ${[...validReceptores].join(', ')}`));
           return;
         }
-        
+
         const receptorCuit = validReceptores.size === 1 ? [...validReceptores][0] : '00000000000';
         if (filasCorregidas > 0) {
           console.warn(`ARCA exportó ${filasCorregidas} filas con CUIT receptor truncado — corregido a ${receptorCuit}`);
@@ -995,7 +1031,7 @@ function parsearRegistroARCA(file) {
         const registros = [];
         const periodoMM = String(periodo.mes).padStart(2,'0');
         const periodoYY = String(periodo.anio);
-        
+
         for (let i = 2; i < rows.length; i++) {
           const r = rows[i];
           if (!r || r[0] === null) continue;
@@ -1072,7 +1108,7 @@ function parsearRegistroARCA(file) {
             desglose_arca: desgloseArca
           });
         }
-        
+
         if (!registros.length) throw new Error('Sin comprobantes');
 
         // Detectar período del Excel a partir de las fechas de los comprobantes.
@@ -1118,22 +1154,22 @@ function handleSubir() {
   }
   const pending = files.filter(f => f.status === 'pending');
   const duplicates = files.filter(f => f.status === 'duplicate');
-  
+
   if (!pending.length && !duplicates.length) {
     showAlert('No hay archivos', 'warn');
     return;
   }
-  
+
   if (!pending.length && duplicates.length > 0) {
     duplicates.forEach(f => { f.status = 'pending'; });
     renderQueue();
   }
-  
+
   if (!registroSubido) {
     document.getElementById('registryWarn').style.display = 'block';
     return;
   }
-  
+
   startUpload();
 }
 
@@ -1463,16 +1499,62 @@ function iniciarPolling() {
         // Cantidad real de facturas en el archivo (en_prn), no solo las conciliadas exactas contra ARCA:
         // sin ARCA o con totales "a revisar", facturas_finales_generadas daba 0 aunque el PRN tuviera líneas.
         const _facturasEnPrn = (data.verificacion && data.verificacion.resumen && Number(data.verificacion.resumen.en_prn)) || data.facturas_finales_generadas;
-        mostrarEstadoProceso('listo', fallidosVisibles, prnReal, naCount, data.prn_file_id, data.prn_file_name, data.lineas_finales_generadas, manuales, otrosCliente, _facturasEnPrn);
+
+        // FIX 21/09/2026 ("24 facturas"): sumar/concatenar el resultado de ESTA tanda
+        // al acumulado de toda la corrida, y armar el cartel final y los paneles con
+        // el acumulado completo — no solo con lo de esta tanda. Así, si la tanda 2
+        // borra la pantalla al arrancar (resetProcesoUX), cuando la tanda 2 termina
+        // el cartel vuelve a aparecer mostrando tanda 1 + tanda 2 juntas.
+        const R = _resumenTandas;
+        R.facturasCount += Number(_facturasEnPrn) || 0;
+        R.naCount += naCount;
+        R.prnReal = R.prnReal || prnReal === true;
+        R.fallidos = R.fallidos.concat(fallidosVisibles);
+        R.manuales = R.manuales.concat(manuales);
+        R.otrosCliente = R.otrosCliente.concat(otrosCliente);
+        R.discrepancias = R.discrepancias.concat(Array.isArray(data.discrepancias) ? data.discrepancias : []);
+        R.bajaConfianza = R.bajaConfianza.concat(Array.isArray(data.baja_confianza) ? data.baja_confianza : []);
+        R.noEnArca = R.noEnArca.concat(Array.isArray(data.no_en_arca) ? data.no_en_arca : []);
+        R.yaProcesadas = R.yaProcesadas.concat(Array.isArray(data.ya_procesadas) ? data.ya_procesadas : []);
+        R.duplicadosEnLote = R.duplicadosEnLote.concat(Array.isArray(data.duplicados_en_lote) ? data.duplicados_en_lote : []);
+        if (data.verificacion && data.verificacion.resumen) {
+          R.hayVerif = true;
+          const vr = data.verificacion.resumen;
+          R.verifResumen.conciliadas += Number(vr.conciliadas) || 0;
+          R.verifResumen.total_a_revisar += Number(vr.total_a_revisar) || 0;
+          R.verifResumen.falta_procesar += Number(vr.falta_procesar) || 0;
+          R.verifResumen.fuera_de_arca += Number(vr.fuera_de_arca) || 0;
+          R.verifConciliadas = R.verifConciliadas.concat(data.verificacion.conciliadas || []);
+          R.verifTotalARevisar = R.verifTotalARevisar.concat(data.verificacion.total_a_revisar || []);
+          R.verifFaltaProcesar = R.verifFaltaProcesar.concat(data.verificacion.falta_procesar || []);
+          R.verifFueraDeArca = R.verifFueraDeArca.concat(data.verificacion.fuera_de_arca || []);
+        }
+
+        // 'prnReal' del cartel final: null solo puede venir del caso "incierto" (timeout,
+        // ver mostrarEstadoProceso más abajo) — acá siempre es true/false, así que una vez
+        // acumulado alcanza con R.prnReal (true si CUALQUIER tanda generó PRN real).
+        mostrarEstadoProceso('listo', R.fallidos, R.prnReal, R.naCount, data.prn_file_id, data.prn_file_name, data.lineas_finales_generadas, R.manuales, R.otrosCliente, R.facturasCount);
         if (prnReal && data.prn_file_id) _prnDeTandas.push({ id: String(data.prn_file_id), name: String(data.prn_file_name || '') });
         mostrarDiagnostico(data);
-        if (fallidosVisibles.length > 0) mostrarFallidos(fallidosVisibles);
+        if (R.fallidos.length > 0) mostrarFallidos(R.fallidos);
         else { const cf = document.getElementById('cardFallidos'); if (cf) cf.style.display = 'none'; }
-        mostrarCargaManual(manuales);
-        mostrarOtroCliente(otrosCliente);
-        mostrarDiscrepancias(data.discrepancias);
-        mostrarBajaConfianza(data.baja_confianza);
-        if (data.verificacion || data.conciliacion || (data.no_en_arca && data.no_en_arca.length) || (data.ya_procesadas && data.ya_procesadas.length) || (data.duplicados_en_lote && data.duplicados_en_lote.length)) mostrarConciliacion(data.verificacion, data.conciliacion, data.no_en_arca, data.ya_procesadas, data.duplicados_en_lote);
+        mostrarCargaManual(R.manuales);
+        mostrarOtroCliente(R.otrosCliente);
+        mostrarDiscrepancias(R.discrepancias);
+        mostrarBajaConfianza(R.bajaConfianza);
+        if (R.hayVerif || data.conciliacion || R.noEnArca.length || R.yaProcesadas.length || R.duplicadosEnLote.length) {
+          // data.conciliacion es el formato viejo (legacy, previo a 'verificacion'):
+          // se deja tal cual, sin acumular entre tandas -- por alcance, no vale la
+          // pena sumarle complejidad a un formato que ya no debería estar en uso.
+          const _verifAcumulado = R.hayVerif ? {
+            resumen: R.verifResumen,
+            conciliadas: R.verifConciliadas,
+            total_a_revisar: R.verifTotalARevisar,
+            falta_procesar: R.verifFaltaProcesar,
+            fuera_de_arca: R.verifFueraDeArca
+          } : data.verificacion;
+          mostrarConciliacion(_verifAcumulado, data.conciliacion, R.noEnArca, R.yaProcesadas, R.duplicadosEnLote);
+        }
         files = files.filter(f => !['done','en_cola','al_prn'].includes(f.status));
         renderQueue();
         _corridaTerminada();
@@ -1575,7 +1657,7 @@ function toggleAdvertenciasTecnicas() {
 function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prnFileName, lineasCount, manuales, otrosCliente, facturasCount) {
   const el = document.getElementById('estadoProceso');
   if (!el) return;
-  
+
     if (estado === 'procesando') {
     el.style.display = 'flex';
     el.className = 'alert a-info';
@@ -1615,8 +1697,11 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prn
       if (btnAud) btnAud.style.display = 'inline-flex';
       el.className = 'alert a-success';
      const _facturasTxt = (facturasCount && Number(facturasCount) > 0) ? ` · ${facturasCount} ${pluralizar(Number(facturasCount),'factura','facturas')}` : '';
+      // id="_epDriveLink": cuando la corrida se parte en tandas, consolidarPrnTandas()
+      // pisa este link para que apunte al PRN CONSOLIDADO (todas las líneas), no al
+      // de la última tanda (parcial) -- ver comentario ahí.
       const _driveLinkHtml = prnFileId
-        ? ` <a href="https://drive.google.com/file/d/${escapeHtml(prnFileId)}/view" target="_blank" rel="noopener" style="color:#1a6e38;font-weight:600;margin-left:6px;text-decoration:underline;"><i class="ti ti-download" style="font-size:13px;"></i> Ver en Drive</a>`
+        ? ` <a id="_epDriveLink" href="https://drive.google.com/file/d/${escapeHtml(prnFileId)}/view" target="_blank" rel="noopener" style="color:#1a6e38;font-weight:600;margin-left:6px;text-decoration:underline;"><i class="ti ti-download" style="font-size:13px;"></i> Ver en Drive</a>`
         : '';
       el.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>' + _driveLinkHtml;
       const nm_ep = manuales && manuales.length > 0;
@@ -1927,7 +2012,7 @@ function renderQueue() {
   q.style.display = enProceso ? 'none' : 'block';
   const pending = files.filter(f => f.status === 'pending').length;
   document.getElementById('queueLabel').textContent = `${files.length} ${pluralizar(files.length, 'archivo', 'archivos')} — ${pending} pendiente${pending!==1?'s':''}`;
-  
+
   if (pending > 0) {
     const lotes = Math.ceil(pending / BATCH_FRONTEND_SIZE);
     document.getElementById('loteInfo').style.display = 'block';
@@ -1935,7 +2020,7 @@ function renderQueue() {
   } else {
     document.getElementById('loteInfo').style.display = 'none';
   }
-  
+
   document.getElementById('fileList').innerHTML = buildFileListHTML();
   updateStats();
 
@@ -1992,19 +2077,65 @@ async function addFilesInner(newFiles) {
     const cuit = clienteSeleccionado.cuit;
   const per = periodoStr();
 
+  // FIX 22/09/2026 (verificación por lote): antes se mandaba UNA llamada a n8n por
+  // cada PDF arrastrado (65 PDF = 65 llamadas, y cada una leía la planilla de
+  // registro entera). Ahora: 1) se calcula la firma de cada archivo acá en el
+  // navegador (eso no toca el servidor), 2) se manda UNA sola llamada con todas
+  // las firmas, 3) n8n lee la planilla una vez y responde por todas. Si el
+  // servidor todavía fuera el viejo (sin 'resultados' en la respuesta), se cae
+  // al modo anterior de a pocas por vez, así la página nunca queda sin verificar.
+  const _huellaPorItem = new Map();
   await Promise.all(nuevosItems.map(async (it) => {
-    try {
-      const huella = await calcularHuellaArchivo(it.file);
-      const res = await verificarHuellaArchivo(cuit, per, huella);
+    try { _huellaPorItem.set(it, await calcularHuellaArchivo(it.file)); }
+    catch(e) { _huellaPorItem.set(it, ''); }
+  }));
+  const _huellas = [...new Set([..._huellaPorItem.values()].filter(Boolean))];
+
+  let _resultadosLote = null;
+  if (_huellas.length) {
+    // De a 200 por llamada como tope prudente (n8n rechaza más de 500).
+    _resultadosLote = {};
+    for (let i = 0; i < _huellas.length; i += 200) {
+      const parcial = await verificarHuellasLote(cuit, per, _huellas.slice(i, i + 200));
+      if (!parcial) { _resultadosLote = null; break; }
+      Object.assign(_resultadosLote, parcial);
+    }
+  }
+
+  if (_resultadosLote) {
+    for (const it of nuevosItems) {
+      const r = _resultadosLote[_huellaPorItem.get(it)];
       // Solo identifica -- la decisión de reprocesar o no la hace el escaneo del backend,
       // que ya pregunta con el modal correspondiente. Acá nunca se excluye de la subida.
+      it._yaProcesadaAviso = !!(r && r.existe === true);
+      it.status = 'pending';
+    }
+    renderQueue();
+    return;
+  }
+
+  // Modo anterior (servidor viejo o la llamada por lote falló): una verificación
+  // por archivo, de a VERIFICACION_CONCURRENCIA por vez para no generar un pico.
+  let _siguiente = 0;
+  async function _verificarUno(it) {
+    try {
+      const huella = _huellaPorItem.get(it) || await calcularHuellaArchivo(it.file);
+      const res = await verificarHuellaArchivo(cuit, per, huella);
       it._yaProcesadaAviso = (res && res.existe === true);
     } catch(e) {
       it._yaProcesadaAviso = false;
     }
     it.status = 'pending';
     renderQueue();
-  }));
+  }
+  async function _obreroVerificacion() {
+    while (_siguiente < nuevosItems.length) {
+      const it = nuevosItems[_siguiente++];
+      await _verificarUno(it);
+    }
+  }
+  const _cantObreros = Math.min(VERIFICACION_CONCURRENCIA, nuevosItems.length);
+  await Promise.all(Array.from({ length: _cantObreros }, () => _obreroVerificacion()));
 }
 
 async function addFiles(newFiles) {
@@ -2025,6 +2156,23 @@ async function calcularHuellaArchivo(file) {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// FIX 22/09/2026: verificación por lote -- todas las firmas en una sola llamada.
+// Devuelve el mapa firma -> {existe, clave, emisor, total, procesada_en}, o null
+// si el servidor no entendió el formato por lote (servidor viejo) o falló.
+async function verificarHuellasLote(cuit, periodo, huellas) {
+  try {
+    const res = await fetchConTimeout(WEBHOOK.verificar(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cliente_cuit: cuit, periodo, huellas })
+    }, 60000);
+    if (!res.ok) return null;
+    const data = await jsonSeguro(res);
+    if (!data || data.ok !== true || !data.resultados || typeof data.resultados !== 'object') return null;
+    return data.resultados;
+  } catch(e) { return null; }
+}
+
 async function verificarHuellaArchivo(cuit, periodo, huella) {
   try {
     const res = await fetchConTimeout(WEBHOOK.verificar(), {
@@ -2041,7 +2189,7 @@ function removeFile(idx) {
   files.splice(idx, 1);
   renderQueue();
 }
- 
+
 function incluirIgual(i) {
   if (files[i]) {
     files[i].status = 'pending';
@@ -2129,6 +2277,7 @@ async function startUpload() {
   }
 
   _prnDeTandas = [];
+  _resumenTandas = crearResumenTandasVacio();
   for (let t = 0; t < tandas.length; t++) {
     const pending = tandas[t];
     const etiquetaTanda = tandas.length > 1 ? ` (tanda ${t + 1} de ${tandas.length})` : '';
@@ -2249,9 +2398,23 @@ async function consolidarPrnTandas(cantTandas) {
     const avisos = Array.isArray(data.avisos) ? data.avisos : [];
     logProceso(`Consolidado listo: ${data.prn_file_name} (${data.lineas} líneas de ${data.archivos_unidos} archivos).` + (avisos.length ? ' Avisos: ' + avisos.join(' | ') : ''));
     showAlert(`✓ PRN consolidado listo: ${data.lineas} líneas de ${data.archivos_unidos} tandas.` + (avisos.length ? ' Revisá los avisos en el detalle.' : ''), avisos.length ? 'warn' : 'success');
-    const el = document.getElementById('estadoProceso');
-    if (el) {
-      el.insertAdjacentHTML('beforeend', ` <a href="https://drive.google.com/file/d/${escapeHtml(data.prn_file_id)}/view" target="_blank" rel="noopener" style="color:#1a6e38;font-weight:700;margin-left:6px;text-decoration:underline;"><i class="ti ti-files" style="font-size:13px;"></i> PRN consolidado (${escapeHtml(String(data.lineas))} líneas)</a>`);
+    // FIX 21/09/2026: antes esto AGREGABA un segundo link al lado del "Ver en
+    // Drive" que ya había dejado la última tanda (que apunta al PRN parcial de
+    // esa tanda sola) -- quedaban los dos juntos y no quedaba claro cuál abrir.
+    // Ahora se REEMPLAZA ese link para que "Ver en Drive" apunte siempre al PRN
+    // consolidado (el que tiene TODAS las líneas de todas las tandas), no al
+    // parcial. Si por algún motivo el link no existe en el cartel, se agrega.
+    const _consolidadoHref = `https://drive.google.com/file/d/${escapeHtml(data.prn_file_id)}/view`;
+    const _consolidadoLabel = `<i class="ti ti-files" style="font-size:13px;"></i> Ver PRN consolidado en Drive (${escapeHtml(String(data.lineas))} líneas)`;
+    const linkExistente = document.getElementById('_epDriveLink');
+    if (linkExistente) {
+      linkExistente.href = _consolidadoHref;
+      linkExistente.innerHTML = _consolidadoLabel;
+    } else {
+      const el = document.getElementById('estadoProceso');
+      if (el) {
+        el.insertAdjacentHTML('beforeend', ` <a id="_epDriveLink" href="${_consolidadoHref}" target="_blank" rel="noopener" style="color:#1a6e38;font-weight:700;margin-left:6px;text-decoration:underline;">${_consolidadoLabel}</a>`);
+      }
     }
   } catch (err) {
     const detalle = err.name === 'AbortError' ? 'tiempo de espera agotado' : err.message;
@@ -2290,7 +2453,7 @@ function finalizarPantallaEscaneo(mensaje) {
 async function escanearYProcesar() {
   await sendFlush(false, true);
 }
- 
+
 function manejarResultadoEscaneo(data) {
   const nuevas = Array.isArray(data.nuevas_en_escaneo) ? data.nuevas_en_escaneo.length : 0;
   const yaProcesadas = Array.isArray(data.ya_procesadas) ? data.ya_procesadas : [];
@@ -2402,7 +2565,7 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
     }
   });
 }
- 
+
 async function sendFlush(forzar, soloEscanear) {
   actualizarPeriodo(); // releer el desplegable antes de mandar nada a n8n, por la misma razón que en el Excel
   if (!validarPrecondiciones()) return;
@@ -2495,7 +2658,7 @@ function initApp() {
   // Drop zone - PDFs
   const dropZone = document.getElementById('dropZone');
   const fileInput = document.getElementById('fileInput');
-  
+
   dropZone.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', (e) => {
     // Sin esto, el navegador no dispara 'change' si se vuelve a elegir
@@ -2505,7 +2668,7 @@ function initApp() {
     addFiles(e.target.files);
     e.target.value = '';
   });
-  
+
   ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
     dropZone.addEventListener(evt, (e) => e.preventDefault());
   });
@@ -2519,7 +2682,7 @@ function initApp() {
   // Excel zone
   const excelZone = document.getElementById('excelZone');
   const excelInput = document.getElementById('excelInput');
-  
+
   excelZone.addEventListener('click', () => {
     if (!registroSubido) excelInput.click();
   });
@@ -2527,7 +2690,7 @@ function initApp() {
     if (e.target.files[0]) handleExcelFile(e.target.files[0]);
     e.target.value = '';  // mismo fix que fileInput: permite re-elegir el mismo Excel
   });
-  
+
   ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
     excelZone.addEventListener(evt, (e) => e.preventDefault());
   });

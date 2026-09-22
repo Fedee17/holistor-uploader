@@ -984,6 +984,37 @@ async function cargarXLSX() {
   });
 }
 
+// FIX 22/09/2026: revisa que el Excel tenga la estructura de "Mis
+// Comprobantes Recibidos" de ARCA (título en la fila 1, títulos de columna en
+// la fila 2, datos desde la fila 3) antes de leer cualquier comprobante.
+// Devuelve null si está bien, o el texto del aviso para el usuario si no.
+// Solo se revisan las columnas que la página realmente usa (ver
+// parsearRegistroARCA), comparadas sin tildes ni mayúsculas.
+const COLUMNAS_ESPERADAS_ARCA = [
+  [0, 'fecha'], [1, 'tipo'], [2, 'punto de venta'], [4, 'numero hasta'],
+  [7, 'nro. doc. emisor'], [8, 'denominacion emisor'], [10, 'nro. doc. receptor'],
+  [11, 'tipo cambio'], [12, 'moneda'], [29, 'imp. total']
+];
+function normalizarTituloColumna(v) {
+  return String(v == null ? '' : v).normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+}
+function validarEstructuraExcelARCA(rows) {
+  const fila2 = rows[1] || [];
+  const faltan = COLUMNAS_ESPERADAS_ARCA.filter(([idx, nombre]) => normalizarTituloColumna(fila2[idx]) !== nombre);
+  if (faltan.length === 0) return null;
+
+  const base = 'Este Excel no tiene el formato de "Mis Comprobantes Recibidos" de ARCA y no se cargó nada.';
+  const pedido = ' Descargá de ARCA el Excel de "Mis Comprobantes Recibidos": el que en la primera fila dice "Mis Comprobantes Recibidos - CUIT ..." y en la segunda tiene los títulos (Fecha, Tipo, Punto de Venta...).';
+  // Caso real (22/09): exportación con los títulos ya en la fila 1.
+  const fila1 = rows[0] || [];
+  const t0 = normalizarTituloColumna(fila1[0]);
+  if (t0.startsWith('fecha') && normalizarTituloColumna(fila1[29]).includes('total')) {
+    return base + ' Tiene los títulos de columna en la primera fila (es otra descarga de ARCA, con fechas del tipo 8/1/26).' + pedido;
+  }
+  const detalle = faltan.slice(0, 3).map(([idx, nombre]) => `columna ${idx + 1}: se esperaba "${nombre}" y dice "${String(fila2[idx] == null ? '' : fila2[idx]).trim() || '(vacía)'}"`).join('; ');
+  return base + ` No coinciden los títulos de la fila 2 (${detalle}${faltan.length > 3 ? '; y otras' : ''}).` + pedido;
+}
+
 function parsearRegistroARCA(file) {
   return new Promise((resolve, reject) => {
     cargarXLSX().then(() => {
@@ -1002,6 +1033,14 @@ function parsearRegistroARCA(file) {
         const rowsRaw = XLSX.utils.sheet_to_json(ws, { header:1, defval:null, raw:true });
 
         if (rows.length < 3) throw new Error('Archivo vacío');
+
+        // FIX 22/09/2026: rechazar un Excel que no tenga la estructura de
+        // "Mis Comprobantes Recibidos" ANTES de leer nada (ver
+        // validarEstructuraExcelARCA). Caso real: un Excel con los títulos en
+        // la fila 1 se cargó sin aviso, perdió el primer comprobante y salteó
+        // el control de período.
+        const _errorEstructura = validarEstructuraExcelARCA(rows);
+        if (_errorEstructura) throw new Error(_errorEstructura);
 
         const headers = (rows[1] || []).map(h => String(h||'').trim().toLowerCase());
         const receptoresSet = new Set();
@@ -1134,6 +1173,19 @@ function parsearRegistroARCA(file) {
         const _periodoEntries = Object.entries(_periodoContador).sort((a,b) => b[1]-a[1]);
         const periodoPrincipal = _periodoEntries[0]?.[0] || '';  // ej: "2026-05"
         const totalFechas      = _periodoEntries.reduce((s,[,c]) => s+c, 0);
+
+        // FIX 22/09/2026: si alguna fecha no se pudo leer (ej. "8/1/26", mes
+        // primero y año corto), el control de período de más abajo no se
+        // puede hacer bien y la fecha se guardaría mal. Antes se seguía sin
+        // avisar; ahora se rechaza el archivo sin guardar nada.
+        if (totalFechas < registros.length) {
+          const _malas = registros.filter(reg => {
+            const f = String(reg.fecha || '');
+            return !/^(\d{1,2})\/(\d{1,2})\/(\d{4})/.test(f) && !/^(\d{4})-(\d{2})-(\d{2})/.test(f);
+          });
+          const _ej = _malas.slice(0, 3).map(reg => `"${reg.fecha}"`).join(', ');
+          throw new Error(`${_malas.length} de ${registros.length} comprobantes tienen una fecha que no se puede leer (por ejemplo ${_ej}). Se espera el formato día/mes/año con el año completo, como viene en "Mis Comprobantes Recibidos" de ARCA. No se cargó nada.`);
+        }
 
         resolve({ registros, receptorCuit, periodoPrincipal, totalFechas, periodoContador: _periodoContador });
       } catch(err) { reject(err); }

@@ -364,7 +364,7 @@ function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 // Drive y arranque. Piso de 5 min y techo de 45 min para no quedar ni muy
 // ajustado ni esperando indefinidamente.
 function calcularTimeoutProceso(cantidadFacturas) {
-  const SEG_POR_FACTURA = 25;
+  const SEG_POR_FACTURA = 40;   // antes 25 — medido 25,5 s/factura real, sin margen
   const OVERHEAD_SEG = 90;
   const MIN_MS = 5 * 60 * 1000;
   const MAX_MS = 45 * 60 * 1000;
@@ -1420,7 +1420,14 @@ function iniciarPolling() {
   // hay nada calculado (ej. "Procesar ahora" directo, sin pasar por
   // startUpload), se calcula de cero acá mismo.
   let _timeoutProcesoMs;
-  if (_procesoInicioTs && _procesoTimeoutTotalMs) {
+  if (!escaneoEnCurso) {
+    // Procesamiento real: reiniciar el presupuesto de tiempo desde cero.
+    // Lo consumido por la subida y el escaneo previo no debe restarle
+    // tiempo a la lectura real de Gemini, que es la parte larga.
+    _procesoInicioTs = Date.now();
+    _procesoTimeoutTotalMs = calcularTimeoutProceso(files.length);
+    _timeoutProcesoMs = _procesoTimeoutTotalMs;
+  } else if (_procesoInicioTs && _procesoTimeoutTotalMs) {
     const _transcurrido = Date.now() - _procesoInicioTs;
     _timeoutProcesoMs = Math.max(30000, _procesoTimeoutTotalMs - _transcurrido); // piso de 30s
   } else {

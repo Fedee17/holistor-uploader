@@ -507,6 +507,7 @@ const VERIFICACION_CONCURRENCIA = 3;
 // como si la anterior hubiera terminado, y así se subieron 25 PDF más sobre
 // 40 que nunca se habían procesado.
 let _resolverCorridaActual = null;
+let _ultimoRechazoProceso = null; // {yaActivo:true, mensaje} si el servidor rechazó por proceso en curso
 function _corridaTerminada(ok) {
   if (typeof _resolverCorridaActual === 'function') { const r = _resolverCorridaActual; _resolverCorridaActual = null; r(ok !== false); }
 }
@@ -2425,6 +2426,13 @@ async function startUpload() {
     await escanearYProcesar();
     const corridaOk = await finDeCorrida;
     if (corridaOk === false) {
+      if (_ultimoRechazoProceso && _ultimoRechazoProceso.yaActivo) {
+        const msjServidor = _ultimoRechazoProceso.mensaje || 'Este cliente/período ya se está procesando en otra sesión.';
+        _ultimoRechazoProceso = null;
+        logProceso(`Tanda ${t + 1}: el servidor rechazó la orden porque este cliente/período ya lo está procesando otra persona.`);
+        showAlert(`${escapeHtml(msjServidor)}<br><br>Los PDF que subiste quedaron en Drive: <b>no los vuelvas a subir</b> y <b>no uses "Liberar proceso"</b> (cortaría la corrida de la otra persona). Cuando esa corrida termine, volvé a tocar Procesar: lo que ya esté hecho se reconoce como repetido y lo nuevo se procesa.`, 'error');
+        return;
+      }
       // FIX 18/09/2026: la orden de procesar no salió. Los PDF de esta tanda ya
       // están en Drive pero nadie los procesó: cortar acá, no subir más tandas.
       const restantes = tandas.length - (t + 1);
@@ -2663,8 +2671,12 @@ async function sendFlush(forzar, soloEscanear) {
     const data = await jsonSeguro(res);
 
     if (!res.ok || data.ok === false) {
+      // Guardar si el rechazo fue "ya hay un proceso en curso" para que startUpload
+      // muestre el mensaje correcto en vez del cartel genérico de "n8n no respondió".
+      _ultimoRechazoProceso = (data && data.proceso_ya_activo === true) ? { yaActivo: true, mensaje: data.mensaje || '' } : null;
       throw new Error(data.mensaje || `HTTP ${res.status}`);
     }
+    _ultimoRechazoProceso = null;
 
     if (data.proceso_ya_activo === true) {
       showAlert(data.mensaje || 'Ya hay un proceso activo para este cliente y período.', 'warn');

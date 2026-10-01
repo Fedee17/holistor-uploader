@@ -563,10 +563,39 @@ function showAlert(msg, type) {
   // y un error de subida podía pasar desapercibido). Éxito y advertencia sí se ocultan solos.
   if (type !== 'info' && type !== 'error') setTimeout(() => el.style.display = 'none', 6000);
   // FIX 02/10/2026: el cartel vive arriba de todo, pero "Subir y procesar" está
-  // mucho más abajo en la página. Un error se mostraba fuera de la vista si la
-  // persona ya había scrolleado hasta el botón, y el click parecía no hacer nada.
-  // Los errores ahora se traen a la vista.
-  if (type === 'error') el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // mucho más abajo en la página. Un error quedaba fuera de la vista si la persona
+  // ya había scrolleado hasta el botón, y el click parecía no hacer nada. El cartel
+  // de arriba queda como respaldo/historial, pero un error ahora también se
+  // muestra como popup modal — imposible de pasar por alto sin importar el scroll.
+  if (type === 'error') mostrarAlertaPopup(msg);
+}
+
+function mostrarAlertaPopup(msg) {
+  const existente = document.getElementById('alertaPopupFondo');
+  if (existente) existente.remove();
+
+  const fondo = document.createElement('div');
+  fondo.id = 'alertaPopupFondo';
+  fondo.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,20,18,.5);display:flex;align-items:center;justify-content:center;z-index:10001;padding:1rem;';
+
+  const modal = document.createElement('div');
+  modal.className = 'card';
+  modal.style.cssText = 'max-width:420px;width:100%;padding:0;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.3);';
+  modal.innerHTML = `
+    <div style="padding:1.25rem 1.25rem .5rem;font-size:14px;line-height:1.5;display:flex;gap:10px;align-items:flex-start;">
+      <i class="ti ti-alert-circle" style="color:#c5221f;font-size:20px;flex-shrink:0;margin-top:1px;"></i>
+      <span>${msg}</span>
+    </div>
+    <div style="padding:1rem 1.25rem;display:flex;justify-content:flex-end;">
+      <button id="btnAlertaPopupCerrar" class="btn-primary">Entendido</button>
+    </div>
+  `;
+  fondo.appendChild(modal);
+  document.body.appendChild(fondo);
+
+  const cerrar = () => fondo.remove();
+  document.getElementById('btnAlertaPopupCerrar').addEventListener('click', cerrar);
+  fondo.addEventListener('click', (e) => { if (e.target === fondo) cerrar(); });
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

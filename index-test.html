@@ -1515,6 +1515,22 @@ function iniciarPolling() {
       const cuit = clienteSeleccionado?.cuit || '';
       const per = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
       const res = await fetchConTimeout(`${WEBHOOK.estado()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`, {}, 30000);
+      // FIX 02/10/2026: si la clave de acceso dejó de ser válida a mitad de la
+      // espera (caso real: AGUIRRE SELVA BELEN 2026-09 — el proceso en realidad
+      // había terminado bien, pero la página se quedó sin poder preguntar y
+      // mostró "Demorado" como si algo se hubiera roto). fetchConTimeout() ya
+      // avisa con un cartel claro ("recargá la página e ingresá la clave de
+      // nuevo"); acá solo hace falta dejar de insistir cada 5 s (todos los
+      // intentos van a fallar igual) y no dejar la pantalla en un estado
+      // ambiguo de "no se pudo confirmar".
+      if (res.status === 401 || res.status === 403) {
+        stopPolling();
+        logProceso('Sondeo interrumpido: hay que volver a ingresar la clave de acceso.');
+        mostrarEstadoProceso('listo', [], null);
+        _corridaTerminada();
+        if (window.__holistorLiberarGuardaLocal) window.__holistorLiberarGuardaLocal();
+        return;
+      }
       if (!res.ok) return;
       const data = await jsonSeguro(res);
             if (!data) return;

@@ -343,8 +343,9 @@ const WEBHOOK = {
   reset:     () => BASE_WEBHOOK + '/holistor-reset-test',
   syncProv:  () => BASE_WEBHOOK + '/holistor-sync-proveedores-pendientes-test',
   proveedores: () => BASE_WEBHOOK + '/holistor-proveedores-test',
-  // 21/09/2026: une los PRN por tanda en un solo archivo CONSOLIDADO (workflow aparte en n8n, TEST).
-  consolidar: () => BASE_WEBHOOK + '/holistor-prn-consolidar-test'
+  consolidar: () => BASE_WEBHOOK + '/holistor-prn-consolidar-test',
+  // 01/10/2026: consulta del candado compartido, se llama ANTES de subir PDFs.
+  candado:   () => BASE_WEBHOOK + '/holistor-candado-test'
 };
 
 const DRIVE_INDEX_DELAY_MS = 6000;
@@ -2335,6 +2336,14 @@ async function startUpload() {
     return;
   }
 
+  // 01/10/2026: consultar el candado compartido ANTES de subir nada.
+  showAlert('Verificando que nadie más esté procesando este cliente…', 'info');
+  const candado = await consultarCandado();
+  if (candado && candado.bloqueado === true) {
+    logProceso('Subida cancelada: este cliente/período ya lo está procesando otra sesión.');
+    showAlert(`${escapeHtml(candado.mensaje)}<br><br>No se subió ningún PDF. Volvé a intentar cuando esa corrida termine.`, 'error');
+    return;
+  }
   // Se sube y procesa de a tandas de BATCH_FRONTEND_SIZE archivos: cada tanda
   // se sube, se escanea/procesa y se espera su resultado antes de subir la
   // siguiente. Motivo: el backend procesa TODO lo que haya en la carpeta de

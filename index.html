@@ -388,6 +388,9 @@ function obtenerToken() {
 }
 function guardarToken(t) {
   try { if (t) sessionStorage.setItem(TOKEN_STORAGE_KEY, t); else sessionStorage.removeItem(TOKEN_STORAGE_KEY); } catch(e) {}
+  // FIX 02/10/2026: al guardar una clave nueva (no al borrarla) se habilita
+  // de nuevo el cartel de "clave vencida" para la próxima vez que haga falta.
+  if (t) _claveRechazada = false;
 }
 function pedirToken(mensaje) {
   const actual = obtenerToken();
@@ -411,7 +414,14 @@ async function fetchConTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) 
     const res = await fetch(url, { ...options, headers, signal: ctrl.signal });
     if (res.status === 401 || res.status === 403) {
       guardarToken('');
-      showAlert('La clave de acceso no es válida o venció. Recargá la página e ingresala de nuevo.', 'error');
+      // FIX 02/10/2026: este cartel es el único que debe verse cuando la clave
+      // vence a mitad de un proceso (subida de PDFs, disparo del procesamiento,
+      // sondeo). Sin esta bandera, cada llamado que sigue fallando (reintentos,
+      // la siguiente tanda, etc.) mostraba el mismo cartel una y otra vez.
+      if (!_claveRechazada) {
+        _claveRechazada = true;
+        showAlert('La clave de acceso no es válida o venció. Recargá la página e ingresala de nuevo.', 'error');
+      }
     }
     return res;
   } finally {
@@ -510,6 +520,12 @@ function esperarFinDeCorrida() {
   return new Promise(resolve => { _resolverCorridaActual = resolve; });
 }
 let _ultimoRechazoProceso = null; // {yaActivo:true, mensaje} si el servidor rechazó por proceso en curso
+// FIX 02/10/2026: se pone en true apenas fetchConTimeout() detecta una clave
+// inválida/vencida (401/403) y muestra el cartel único para eso. El resto del
+// código la consulta para no reintentar en vano ni mostrar carteles repetidos
+// mientras dura el mismo problema. Se vuelve a false cuando se guarda una
+// clave nueva (ver guardarToken()).
+let _claveRechazada = false;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -2358,6 +2374,11 @@ async function subirUnPDF(item) {
       return data;
     } catch (err) {
       ultimoError = err;
+      // FIX 02/10/2026: si lo que falló fue la clave de acceso (vencida o
+      // inválida), reintentar no sirve de nada -- va a fallar igual las
+      // veces que haga falta. Cortar acá evita quemar hasta 1 minuto de
+      // esperas inútiles antes de avisarle al usuario.
+      if (_claveRechazada) break;
       if (intento < INTENTOS_MAX) {
         const esperaMs = ESPERAS_ENTRE_INTENTOS_MS[intento - 1];
         logProceso(`Intento ${intento}/${INTENTOS_MAX} de subir ${item.name} falló (${err.message}). Reintentando en ${Math.round(esperaMs / 1000)} s...`);
@@ -2405,6 +2426,13 @@ async function startUpload() {
   // 02/10/2026: consultar el candado compartido ANTES de subir nada.
   showAlert('Verificando que nadie más esté procesando este cliente…', 'info');
   const candado = await consultarCandado();
+  // FIX 02/10/2026: si la clave ya venció, fetchConTimeout() ya mostró el
+  // cartel único de "clave vencida" durante esta misma consulta. Cortar acá
+  // evita arrancar a subir PDFs que van a fallar todos por el mismo motivo.
+  if (_claveRechazada) {
+    logProceso('Subida cancelada: la clave de acceso venció.');
+    return;
+  }
   if (candado && candado.bloqueado === true) {
     logProceso('Subida cancelada: este cliente/período ya lo está procesando otra sesión.');
     showAlert(`${escapeHtml(candado.mensaje)}<br><br>No se subió ningún PDF. Volvé a intentar cuando esa corrida termine.`, 'error');
@@ -2464,6 +2492,16 @@ async function startUpload() {
         item.status = 'error';
         errores++;
         history.unshift({ name: item.name, ok: false, time: new Date().toLocaleTimeString() });
+        // FIX 02/10/2026: si fue la clave de acceso, ya se mostró el cartel
+        // único al respecto (ver fetchConTimeout). Acá solo queda registrarlo
+        // en el log y cortar la subida del resto de los PDFs de esta tanda:
+        // todos van a fallar por lo mismo.
+        if (_claveRechazada) {
+          logProceso(`Subida interrumpida: la clave de acceso venció (quedaron sin subir ${item.name} y los siguientes).`);
+          renderQueue();
+          renderHistory();
+          break;
+        }
         const detalle = err.name === 'AbortError' ? 'timeout' : err.message;
         console.error('Error subiendo PDF', item.name, err);
         showAlert(`Error subiendo ${escapeHtml(item.name)}: ${escapeHtml(detalle)}`, 'error');
@@ -2477,6 +2515,13 @@ async function startUpload() {
     uploading = false;
     setUploadControlsDisabled(false);
     updateStats();
+
+    // FIX 02/10/2026: la clave venció a mitad de esta tanda -- no seguir con
+    // el resto del flujo (ni con las tandas siguientes, si las hay).
+    if (_claveRechazada) {
+      detenerCountdown();
+      return;
+    }
 
     const subidosOk = pending.some(f => f.status === 'done');
     if (!subidosOk) {
@@ -2502,6 +2547,15 @@ async function startUpload() {
     await escanearYProcesar();
     const corridaOk = await finDeCorrida;
     if (corridaOk === false) {
+      // FIX 02/10/2026: si lo que pasó fue que la clave venció, sendFlush()
+      // ya mostró el cartel único al respecto. Cortar acá sin mensajes
+      // adicionales en vez de mostrar el cartel genérico de "no se pudo
+      // iniciar el procesamiento".
+      if (_claveRechazada) {
+        logProceso(`Tanda ${t + 1}: se cortó porque la clave de acceso venció.`);
+        detenerCountdown();
+        return;
+      }
       if (_ultimoRechazoProceso && _ultimoRechazoProceso.yaActivo) {
         const msjServidor = _ultimoRechazoProceso.mensaje || 'Este cliente/período ya se está procesando en otra sesión.';
         _ultimoRechazoProceso = null;
@@ -2762,6 +2816,15 @@ async function sendFlush(forzar, soloEscanear) {
     }
     iniciarPolling();
   } catch (err) {
+    // FIX 02/10/2026: si la clave venció, fetchConTimeout() ya mostró el
+    // cartel único al respecto -- no repetirlo acá con el mensaje genérico
+    // de "no se pudo iniciar n8n", que además es menos claro para el usuario.
+    if (_claveRechazada) {
+      updateProcesoUX('ia', procesoActual.pct || 60, 'Error al iniciar', 'La clave de acceso venció.', { error:true, progressText:'Clave de acceso vencida' });
+      logProceso('No se pudo iniciar el procesamiento: la clave de acceso venció.');
+      _corridaTerminada(false);
+      return;
+    }
     const detalle = err.name === 'AbortError' ? 'timeout al iniciar procesamiento' : err.message;
     updateProcesoUX('ia', procesoActual.pct || 60, 'Error al iniciar', `No se pudo iniciar n8n: ${detalle}`, { error:true, progressText:'Revisar webhook holistor-procesar' });
     logProceso(`Error iniciando procesamiento: ${detalle}`);

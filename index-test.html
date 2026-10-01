@@ -570,6 +570,11 @@ function showAlert(msg, type) {
   // Los errores se quedan visibles hasta que la persona los cierra (antes desaparecían a los 6 s
   // y un error de subida podía pasar desapercibido). Éxito y advertencia sí se ocultan solos.
   if (type !== 'info' && type !== 'error') setTimeout(() => el.style.display = 'none', 6000);
+  // FIX 02/10/2026: el cartel vive arriba de todo, pero "Subir y procesar" está
+  // mucho más abajo en la página. Un error (ej. candado compartido ocupado) se
+  // mostraba fuera de la vista si la persona ya había scrolleado hasta el botón,
+  // y el click parecía no hacer nada. Los errores ahora se traen a la vista.
+  if (type === 'error') el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

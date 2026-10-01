@@ -2324,6 +2324,27 @@ async function subirUnPDF(item) {
   throw ultimoError;
 }
 
+// 01/10/2026: consulta el candado compartido (hoja PROCESOS_ACTIVOS, nodo
+// 'Webhook Candado' en n8n) antes de subir nada, para no pisar una corrida
+// que otra sesión/usuario ya tiene en curso para este mismo cliente/período.
+// Si la consulta en sí falla (red, timeout, backend caído) se deja seguir:
+// el candado compartido es un chequeo preventivo extra en el frontend, no la
+// única protección -- el backend igual rechaza el pedido en 'Resetear Estado'
+// si hay una corrida viva para este cliente/período.
+async function consultarCandado() {
+  try {
+    const cuit = clienteSeleccionado?.cuit || '';
+    const per = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
+    if (!cuit || !per) return null;
+    const res = await fetchConTimeout(`${WEBHOOK.candado()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`, {}, 20000);
+    if (!res.ok) return null;
+    return await jsonSeguro(res);
+  } catch (err) {
+    logProceso(`No se pudo consultar el candado compartido (${err.message}). Se sigue igual: el backend también valida esto al recibir el pedido.`);
+    return null;
+  }
+}
+
 async function startUpload() {
   actualizarPeriodo(); // mismo motivo
   if (uploading) return;

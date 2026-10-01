@@ -338,7 +338,9 @@ const WEBHOOK = {
   syncProv:  () => BASE_WEBHOOK + '/holistor-sync-proveedores-pendientes',
   proveedores: () => BASE_WEBHOOK + '/holistor-proveedores',
   // 21/09/2026: une los PRN por tanda en un solo archivo CONSOLIDADO (workflow aparte en n8n).
-  consolidar: () => BASE_WEBHOOK + '/holistor-prn-consolidar'
+  consolidar: () => BASE_WEBHOOK + '/holistor-prn-consolidar',
+  // 02/10/2026: consulta del candado compartido, se llama ANTES de subir PDFs.
+  candado:   () => BASE_WEBHOOK + '/holistor-candado'
 };
 
 const DRIVE_INDEX_DELAY_MS = 6000;
@@ -507,6 +509,7 @@ function _corridaTerminada(ok) {
 function esperarFinDeCorrida() {
   return new Promise(resolve => { _resolverCorridaActual = resolve; });
 }
+let _ultimoRechazoProceso = null; // {yaActivo:true, mensaje} si el servidor rechazó por proceso en curso
 
 // ──────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -2350,6 +2353,27 @@ async function subirUnPDF(item) {
   throw ultimoError;
 }
 
+// 02/10/2026: consulta el candado compartido (hoja PROCESOS_ACTIVOS, nodo
+// 'Webhook Candado' en n8n) antes de subir nada, para no pisar una corrida
+// que otra sesión/usuario ya tiene en curso para este mismo cliente/período.
+// Si la consulta en sí falla (red, timeout, backend caído) se deja seguir:
+// el candado compartido es un chequeo preventivo extra en el frontend, no la
+// única protección -- el backend igual rechaza el pedido en 'Resetear Estado'
+// si hay una corrida viva para este cliente/período.
+async function consultarCandado() {
+  try {
+    const cuit = clienteSeleccionado?.cuit || '';
+    const per = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
+    if (!cuit || !per) return null;
+    const res = await fetchConTimeout(`${WEBHOOK.candado()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`, {}, 20000);
+    if (!res.ok) return null;
+    return await jsonSeguro(res);
+  } catch (err) {
+    logProceso(`No se pudo consultar el candado compartido (${err.message}). Se sigue igual: el backend también valida esto al recibir el pedido.`);
+    return null;
+  }
+}
+
 async function startUpload() {
   actualizarPeriodo(); // mismo motivo
   if (uploading) return;
@@ -2359,6 +2383,15 @@ async function startUpload() {
   const pendingTotal = files.filter(f => f.status === 'pending');
   if (!pendingTotal.length) {
     showAlert('No hay PDFs pendientes para subir.', 'warn');
+    return;
+  }
+
+  // 02/10/2026: consultar el candado compartido ANTES de subir nada.
+  showAlert('Verificando que nadie más esté procesando este cliente…', 'info');
+  const candado = await consultarCandado();
+  if (candado && candado.bloqueado === true) {
+    logProceso('Subida cancelada: este cliente/período ya lo está procesando otra sesión.');
+    showAlert(`${escapeHtml(candado.mensaje)}<br><br>No se subió ningún PDF. Volvé a intentar cuando esa corrida termine.`, 'error');
     return;
   }
 
@@ -2453,6 +2486,13 @@ async function startUpload() {
     await escanearYProcesar();
     const corridaOk = await finDeCorrida;
     if (corridaOk === false) {
+      if (_ultimoRechazoProceso && _ultimoRechazoProceso.yaActivo) {
+        const msjServidor = _ultimoRechazoProceso.mensaje || 'Este cliente/período ya se está procesando en otra sesión.';
+        _ultimoRechazoProceso = null;
+        logProceso(`Tanda ${t + 1}: el servidor rechazó la orden porque este cliente/período ya lo está procesando otra persona.`);
+        showAlert(`${escapeHtml(msjServidor)}<br><br>Los PDF que subiste quedaron en Drive: <b>no los vuelvas a subir</b> y <b>no uses "Liberar proceso"</b> (cortaría la corrida de la otra persona). Cuando esa corrida termine, volvé a tocar Procesar: lo que ya esté hecho se reconoce como repetido y lo nuevo se procesa.`, 'error');
+        return;
+      }
       // FIX 18/09/2026: la orden de procesar no salió. Los PDF de esta tanda ya
       // están en Drive pero nadie los procesó: cortar acá, no subir más tandas.
       const restantes = tandas.length - (t + 1);
@@ -2691,8 +2731,12 @@ async function sendFlush(forzar, soloEscanear) {
     const data = await jsonSeguro(res);
 
     if (!res.ok || data.ok === false) {
+      // Guardar si el rechazo fue "ya hay un proceso en curso" para que startUpload
+      // muestre el mensaje correcto en vez del cartel genérico de "n8n no respondió".
+      _ultimoRechazoProceso = (data && data.proceso_ya_activo === true) ? { yaActivo: true, mensaje: data.mensaje || '' } : null;
       throw new Error(data.mensaje || `HTTP ${res.status}`);
     }
+    _ultimoRechazoProceso = null;
 
     if (data.proceso_ya_activo === true) {
       showAlert(data.mensaje || 'Ya hay un proceso activo para este cliente y período.', 'warn');

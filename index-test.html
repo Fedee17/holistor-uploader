@@ -2374,7 +2374,7 @@ async function subirUnPDF(item) {
       const res = await fetchConTimeout(WEBHOOK.upload(), { method: 'POST', body: fd }, FETCH_TIMEOUT_MS);
       const data = await jsonSeguro(res);
       if (!res.ok || data.ok === false) {
-        throw new Error(data.mensaje || `HTTP ${res.status}`);
+       const e = new Error(data.mensaje || `HTTP ${res.status}`); e.rechazado = (data.rechazado === true); throw e;
       }
       if (intento > 1) logProceso(`Subida de ${item.name} funcionó en el reintento ${intento}.`);
       return data;
@@ -2384,7 +2384,7 @@ async function subirUnPDF(item) {
       // inválida), reintentar no sirve de nada -- va a fallar igual las
       // veces que haga falta. Cortar acá evita quemar hasta 1 minuto de
       // esperas inútiles antes de avisarle al usuario.
-      if (_claveRechazada) break;
+      if (_claveRechazada || err.rechazado === true) break;
       if (intento < INTENTOS_MAX) {
         const esperaMs = ESPERAS_ENTRE_INTENTOS_MS[intento - 1];
         logProceso(`Intento ${intento}/${INTENTOS_MAX} de subir ${item.name} falló (${err.message}). Reintentando en ${Math.round(esperaMs / 1000)} s...`);
@@ -2673,6 +2673,13 @@ function manejarResultadoEscaneo(data) {
   const duplicadasLote = Array.isArray(data.duplicados_en_lote) ? data.duplicados_en_lote : [];
   const repetidas = yaProcesadas.length + duplicadasLote.length;
 
+  if (nuevas === 0 && repetidas === 0) {
+    logProceso('Escaneo: no hay facturas de este cliente/período en la carpeta de entrada.');
+    showAlert('No hay facturas para procesar: la carpeta de entrada no tiene PDFs de este cliente y período.', 'warn');
+    _corridaTerminada(false);
+    return;
+  }
+ 
   if (repetidas === 0) {
     logProceso('Escaneo: todo nuevo, procesando directo.');
     sendFlush(false, false);

@@ -2671,7 +2671,12 @@ function manejarResultadoEscaneo(data) {
   const nuevas = Array.isArray(data.nuevas_en_escaneo) ? data.nuevas_en_escaneo.length : 0;
   const yaProcesadas = Array.isArray(data.ya_procesadas) ? data.ya_procesadas : [];
   const duplicadasLote = Array.isArray(data.duplicados_en_lote) ? data.duplicados_en_lote : [];
-  const repetidas = yaProcesadas.length + duplicadasLote.length;
+  // Las copias repetidas dentro del lote no se preguntan: el servidor las descarta solo.
+  const repetidas = yaProcesadas.length;
+  if (duplicadasLote.length) {
+    logProceso(`Escaneo: ${duplicadasLote.length} copia(s) repetida(s) dentro del lote, se descartan automáticamente.`);
+    showAlert(`${duplicadasLote.length} ${pluralizar(duplicadasLote.length, 'archivo es copia repetida', 'archivos son copias repetidas')} dentro del mismo lote: se procesa una sola vez.`, 'warn');
+  }
 
   if (nuevas === 0 && repetidas === 0) {
     logProceso('Escaneo: no hay facturas de este cliente/período en la carpeta de entrada.');

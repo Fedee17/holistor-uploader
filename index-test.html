@@ -2872,19 +2872,23 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
   else descripcion = parteYa(nYa);
 
   let mensaje, primario, secundario;
-    if (nuevas === 0) {
-      // 07/10/2026: no se reprocesa nada, pero igual corre una pasada real sin Forzar:
-      // el servidor reconoce las repetidas por su huella (sin Gemini) y las saca de
-      // Entrada (borra la copia o la mueve a Procesados). Antes quedaban ahí.
-      logProceso('Escaneo: usuario eligió no reprocesar nada. Se limpian las repetidas de la carpeta de entrada.');
-      _procesoInicioTs = null;
-      _procesoTimeoutTotalMs = null;
-      sendFlush(false, false);
-    } else {
-    mensaje = `De este lote: ${descripcion}. ¿Querés reprocesarlas también, o solo las ${nuevas} nueva(s)?`;
-    primario = { id: 'btnEscaneoNo', texto: `Solo las nuevas (${nuevas})` };
-    secundario = { id: 'btnEscaneoSi', texto: `Reprocesar todas (${nuevas + repetidas})` };
+  if (nuevas === 0) {
+    // 07/10/2026: no hay nada nuevo que extraer, así que no tiene sentido
+    // preguntar -- pero igual hay que avisarle a n8n con una pasada real (sin
+    // Forzar): el servidor reconoce las repetidas por su huella (sin gastar
+    // Gemini) y recién ahí las saca de la carpeta Entrada (borra la copia o
+    // la mueve a Procesados). FIX: antes esto seguía de largo y armaba el
+    // cartel igual, con primario/secundario sin definir -- quedaba un cartel
+    // con botones rotos (id "undefined") que no hacían nada al tocarlos.
+    logProceso('Escaneo: todo repetido, se limpia la carpeta de entrada sin reprocesar.');
+    _procesoInicioTs = null;
+    _procesoTimeoutTotalMs = null;
+    sendFlush(false, false);
+    return;
   }
+  mensaje = `De este lote: ${descripcion}. ¿Querés reprocesarlas también, o solo las ${nuevas} nueva(s)?`;
+  primario = { id: 'btnEscaneoNo', texto: `Solo las nuevas (${nuevas})` };
+  secundario = { id: 'btnEscaneoSi', texto: `Reprocesar todas (${nuevas + repetidas})` };
 
   const fondo = document.createElement('div');
   fondo.id = 'modalEscaneoFondo';
@@ -2920,18 +2924,12 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
   });
    document.getElementById('btnEscaneoNo').addEventListener('click', () => {
     fondo.remove();
-    if (nuevas === 0) {
-      logProceso('Escaneo: usuario eligió no reprocesar nada.');
-      mostrarConciliacion(null, null, [], yaProcesadas, duplicadasLote);
-      updateProcesoUX('final', 100, 'Sin cambios', 'No se reprocesó nada.', { progressText: 'Listo.' });
-      finalizarPantallaEscaneo('Listo — no se reprocesó nada.');
-      _corridaTerminada();
-    } else {
-      logProceso('Escaneo: usuario eligió procesar solo las nuevas.');
-      _procesoInicioTs = null;
-      _procesoTimeoutTotalMs = null;
-      sendFlush(false, false);
-    }
+    // nuevas === 0 ya no llega acá: mostrarCartelEscaneo corta antes de armar
+    // este cartel en ese caso (ver más arriba).
+    logProceso('Escaneo: usuario eligió procesar solo las nuevas.');
+    _procesoInicioTs = null;
+    _procesoTimeoutTotalMs = null;
+    sendFlush(false, false);
   });
 }
 

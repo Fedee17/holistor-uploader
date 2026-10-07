@@ -1748,6 +1748,13 @@ function iniciarPolling() {
       const data = await jsonSeguro(res);
             if (!data) return;
 
+      // FIX 07/10/2026: fuente de datos para el link "Ver en Drive" de
+      // renderListaDetalle() (fallidas, carga manual, otro cliente). El campo
+      // pdfs_drive ya venía en la respuesta de /holistor-estado desde el
+      // backend, pero nada lo guardaba en ningún lado -- el link nunca se
+      // activaba. Guardar acá la respuesta completa del último sondeo.
+      window._ultimoEstado = data;
+
       // Si el total real que devuelve el servidor es mayor al que se usó para
       // calcular el tiempo de espera (por ejemplo, había archivos de una sesión
       // anterior ya en la carpeta de Entrada que la página no sabía que existían),

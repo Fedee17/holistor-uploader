@@ -1934,7 +1934,7 @@ async function reintentar() {
     document.getElementById('cardFallidos').style.display = 'none';
     archivosFallidos = [];
     await sleep(calcularEsperaIndexacion(_cantidadReintentar));
-    await sendFlush(true);
+    await sendFlush(true, false, _cantidadReintentar ? archivosFallidos.map(x => splitNombreMotivo(x).pdf_nombre).filter(Boolean) : []);
   } catch(e) {
     showAlert('Error al reintentar.', 'error');
   } finally {
@@ -2000,6 +2000,8 @@ function normalizarListaResultado(data, claves) {
 function renderListaDetalle(containerId, items, badgeClass, badgeText, noteClass, defaultNote) {
   const el = document.getElementById(containerId);
   if (!el) return;
+  const mapaDrive = {};
+  ((window._ultimoEstado && window._ultimoEstado.pdfs_drive) || []).forEach(d => { if (d && d.pdf) mapaDrive[d.pdf] = d.drive_url; });
   el.innerHTML = (items || []).map(it => {
     const nom = it.pdf_nombre || it.pdf || it.nombre || String(it || '');
     const mot = it.motivo || '';
@@ -2008,6 +2010,7 @@ function renderListaDetalle(containerId, items, badgeClass, badgeText, noteClass
     return `<div class="history-item" style="align-items:flex-start;">
       <i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;margin-top:2px;"></i>
       <span class="history-name" style="white-space:normal;line-height:1.35;">${escapeHtml(nom)}${nota ? `<div class="${noteClass}">${escapeHtml(nota)}</div>` : ''}</span>
+      ${mapaDrive[nom] ? ` <a href="${escapeHtml(mapaDrive[nom])}" target="_blank" rel="noopener" style="font-size:12px;">Ver en Drive</a>` : ''}
       <span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span>
     </div>`;
   }).join('');
@@ -2791,7 +2794,7 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
   });
 }
 
-async function sendFlush(forzar, soloEscanear) {
+async function sendFlush(forzar, soloEscanear, reintentarPdfs) {
   actualizarPeriodo(); // releer el desplegable antes de mandar nada a n8n, por la misma razón que en el Excel
   if (!validarPrecondiciones()) return;
   if (!asegurarToken()) { showAlert('Sin clave de acceso no se puede procesar.', 'error'); return; }
@@ -2812,7 +2815,8 @@ async function sendFlush(forzar, soloEscanear) {
         cliente_nombre: clienteSeleccionado.nombre || '',
         tiene_registro: registroSubido,
         forzar: forzar === true,
-        soloEscanear: soloEscanear === true
+        soloEscanear: soloEscanear === true,
+        reintentar_pdfs: Array.isArray(reintentarPdfs) ? reintentarPdfs : []
       })
     }, FETCH_TIMEOUT_MS);
     const data = await jsonSeguro(res);

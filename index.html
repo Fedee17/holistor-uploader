@@ -222,7 +222,7 @@
         </div>
         <span class="ez-action" id="ezAction">Seleccionar</span>
       </div>
-      <input type="file" id="excelInput" accept=".xlsx,.xls" />
+      <input type="file" id="excelInput" accept=".xlsx,.xls,.csv" />
       <div class="registry-warn" id="registryWarn">
         <div class="registry-warn-head"><i class="ti ti-alert-triangle" style="font-size:14px;"></i> Sin registro de comprobantes</div>
         Podés procesar igual, pero no se realizará conciliación.
@@ -569,7 +569,7 @@ const statsCache = cacheElementos(['statCola', 'statSubidos', 'statErrores']);
 // ──────────────────────────────────────────────────────────────────────────────
 // ALERTS
 // ──────────────────────────────────────────────────────────────────────────────
-function showAlert(msg, type) {
+function showAlert(msg, type, sinPopup) {
   const el = document.getElementById('alert');
   const icons = { success:'circle-check', error:'alert-circle', info:'info-circle', warn:'alert-triangle' };
   el.className = 'alert a-' + type;
@@ -586,7 +586,10 @@ function showAlert(msg, type) {
   // ya había scrolleado hasta el botón, y el click parecía no hacer nada. El cartel
   // de arriba queda como respaldo/historial, pero un error ahora también se
   // muestra como popup modal — imposible de pasar por alto sin importar el scroll.
-  if (type === 'error') mostrarAlertaPopup(msg);
+  // FIX 07/10/2026: sinPopup=true lo usa quien va a mostrar en su lugar el popup
+  // de mostrarAlertaPopupMultiple() (lista de archivos con problema, uno por
+  // uno) -- evita que salgan los dos popups superpuestos.
+  if (type === 'error' && !sinPopup) mostrarAlertaPopup(msg);
 }
 
 function mostrarAlertaPopup(msg) {
@@ -614,6 +617,65 @@ function mostrarAlertaPopup(msg) {
 
   const cerrar = () => fondo.remove();
   document.getElementById('btnAlertaPopupCerrar').addEventListener('click', cerrar);
+  fondo.addEventListener('click', (e) => { if (e.target === fondo) cerrar(); });
+}
+
+// FIX 07/10/2026: popup tipo "carrusel" para cuando hay VARIOS archivos con
+// problema (ej. subida de PDFs). Antes se mandaban todos amontonados en un
+// solo cartel ("Entendido" cerraba los N de una sola vez, difícil de leer
+// con más de 2-3 archivos). Ahora se ve un archivo a la vez, con
+// Anterior/Siguiente y un contador ("2 de 3") -- igual de imposible de
+// pasar por alto, pero más fácil de leer uno por uno.
+function mostrarAlertaPopupMultiple(items) {
+  const existente = document.getElementById('alertaPopupFondo');
+  if (existente) existente.remove();
+  if (!Array.isArray(items) || !items.length) return;
+
+  let idx = 0;
+
+  const fondo = document.createElement('div');
+  fondo.id = 'alertaPopupFondo';
+  fondo.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,20,18,.5);display:flex;align-items:center;justify-content:center;z-index:10001;padding:1rem;';
+
+  const modal = document.createElement('div');
+  modal.className = 'card';
+  modal.style.cssText = 'max-width:420px;width:100%;padding:0;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.3);';
+  fondo.appendChild(modal);
+  document.body.appendChild(fondo);
+
+  const cerrar = () => fondo.remove();
+
+  function render() {
+    const it = items[idx] || {};
+    const contador = items.length > 1
+      ? `<div style="font-size:12px;color:#888;margin-bottom:4px;">${idx + 1} de ${items.length}</div>`
+      : '';
+    const esUltimo = idx === items.length - 1;
+    modal.innerHTML = `
+      <div style="padding:1.25rem 1.25rem .5rem;font-size:14px;line-height:1.5;display:flex;gap:10px;align-items:flex-start;">
+        <i class="ti ti-alert-circle" style="color:#c5221f;font-size:20px;flex-shrink:0;margin-top:1px;"></i>
+        <div style="min-width:0;">
+          ${contador}
+          <div style="font-weight:600;word-break:break-word;">${escapeHtml(it.nombre || '')}</div>
+          <div style="color:#555;margin-top:2px;">${escapeHtml(it.motivo || '')}</div>
+        </div>
+      </div>
+      <div style="padding:1rem 1.25rem;display:flex;gap:8px;justify-content:flex-end;">
+        ${items.length > 1 ? `<button id="btnAlertaPopupAnterior" class="btn-secondary" ${idx === 0 ? 'disabled' : ''}>Anterior</button>` : ''}
+        ${items.length > 1 && !esUltimo
+          ? `<button id="btnAlertaPopupSiguiente" class="btn-primary">Siguiente</button>`
+          : `<button id="btnAlertaPopupCerrar" class="btn-primary">Entendido</button>`}
+      </div>
+    `;
+    const btnAnt = document.getElementById('btnAlertaPopupAnterior');
+    if (btnAnt) btnAnt.addEventListener('click', () => { if (idx > 0) { idx--; render(); } });
+    const btnSig = document.getElementById('btnAlertaPopupSiguiente');
+    if (btnSig) btnSig.addEventListener('click', () => { idx++; render(); });
+    const btnCerrar = document.getElementById('btnAlertaPopupCerrar');
+    if (btnCerrar) btnCerrar.addEventListener('click', cerrar);
+  }
+  render();
+
   fondo.addEventListener('click', (e) => { if (e.target === fondo) cerrar(); });
 }
 
@@ -826,8 +888,8 @@ function procesarSinRegistro() {
 }
 
 function validarArchivoExcel(file) {
-  if (!file || (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls'))) {
-    showAlert('El registro debe ser .xlsx de ARCA', 'error');
+  if (!file || !/\.(xlsx|xls|csv)$/i.test(file.name)) {
+    showAlert('El registro debe ser el Excel (.xlsx) o el CSV de comprobantes recibidos de ARCA', 'error');
     return false;
   }
   return true;
@@ -924,7 +986,7 @@ async function handleExcelFile(file) {
     ({ registros, receptorCuit, periodoPrincipal, totalFechas } = await parsearRegistroARCA(file));
   } catch(err) {
     ezCache.ezSub.textContent = 'Error: ' + err.message;
-    showAlert('Error al leer Excel: ' + err.message, 'error');
+    showAlert('Error al leer el registro: ' + err.message, 'error');
     return;
   }
 
@@ -1068,22 +1130,157 @@ function validarEstructuraExcelARCA(rows) {
   return base + ` No coinciden los títulos de la fila 2 (${detalle}${faltan.length > 3 ? '; y otras' : ''}).` + pedido;
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// CSV DE ARCA ("comprobantes_consulta_csv_recibidos_…") — 07/10/2026
+// Se convierte a la MISMA forma que el Excel "Mis Comprobantes Recibidos" (fila 1
+// título, fila 2 encabezados, datos desde la fila 3) para que validarEstructuraExcelARCA
+// y el resto de parsearRegistroARCA funcionen sin ningún cambio. El servidor (n8n)
+// recibe exactamente la misma lista de comprobantes que con el Excel.
+// Diferencias del CSV respecto del Excel: separador ';', coma decimal, fechas d/m/aaaa
+// sin ceros, tipo de comprobante como código (1 en vez de "1 - Factura A"), tipo de
+// documento como código (80 en vez de "CUIT") y CAE en notación científica (se pierde
+// precisión; la página no usa ese campo).
+// ──────────────────────────────────────────────────────────────────────────────
+const ENCABEZADOS_CSV_ARCA = [
+  'fecha de emision','tipo de comprobante','punto de venta','numero desde','numero hasta',
+  'cod. autorizacion','tipo doc. emisor','nro. doc. emisor','denominacion emisor',
+  'tipo doc. receptor','nro. doc. receptor','tipo cambio','moneda',
+  'imp. neto gravado iva 0%','iva 2,5%','imp. neto gravado iva 2,5%','iva 5%','imp. neto gravado iva 5%',
+  'iva 10,5%','imp. neto gravado iva 10,5%','iva 21%','imp. neto gravado iva 21%',
+  'iva 27%','imp. neto gravado iva 27%','imp. neto gravado total','imp. neto no gravado',
+  'imp. op. exentas','otros tributos','total iva','imp. total'
+];
+// Los mismos 30 títulos con los nombres que usa el Excel (así pasa la validación de estructura).
+const ENCABEZADOS_EXCEL_ARCA = [
+  'Fecha','Tipo','Punto de Venta','Número Desde','Número Hasta','Cód. Autorización',
+  'Tipo Doc. Emisor','Nro. Doc. Emisor','Denominación Emisor','Tipo Doc. Receptor','Nro. Doc. Receptor',
+  'Tipo Cambio','Moneda','Neto Grav. IVA 0%','IVA 2,5%','Neto Grav. IVA 2,5%','IVA 5%','Neto Grav. IVA 5%',
+  'IVA 10,5%','Neto Grav. IVA 10,5%','IVA 21%','Neto Grav. IVA 21%','IVA 27%','Neto Grav. IVA 27%',
+  'Neto Gravado Total','Neto No Gravado','Op. Exentas','Otros Tributos','Total IVA','Imp. Total'
+];
+
+// UTF-8 estricto; si el archivo no es UTF-8 válido (ARCA a veces lo baja en Windows-1252),
+// se decodifica como Windows-1252 para no estropear tildes ni la ñ.
+function decodificarCsvARCA(buf) {
+  const bytes = new Uint8Array(buf);
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/^\uFEFF/, ''); }
+  catch (e) { return new TextDecoder('windows-1252').decode(bytes); }
+}
+
+// Lector de CSV con ';' que respeta comillas ("a;b" y "" dentro de comillas).
+function leerCsvPuntoYComa(texto) {
+  const filas = []; let fila = []; let campo = ''; let enComillas = false;
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto[i];
+    if (enComillas) {
+      if (c === '"') { if (texto[i + 1] === '"') { campo += '"'; i++; } else enComillas = false; }
+      else campo += c;
+    } else if (c === '"') enComillas = true;
+    else if (c === ';') { fila.push(campo); campo = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && texto[i + 1] === '\n') i++;
+      fila.push(campo); campo = '';
+      if (fila.some(x => String(x).trim() !== '')) filas.push(fila);
+      fila = [];
+    } else campo += c;
+  }
+  fila.push(campo);
+  if (fila.some(x => String(x).trim() !== '')) filas.push(fila);
+  return filas;
+}
+
+function titNorm(v) { return String(v == null ? '' : v).normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase(); }
+
+// "15272,73" → 15272.73 · "1.234,56" → 1234.56 · "" → null. Devuelve NaN si no es un número.
+function numeroCsvARCA(v) {
+  let s = String(v == null ? '' : v).trim();
+  if (s === '') return null;
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+  const n = Number(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function csvARCAaFilas(texto) {
+  const tabla = leerCsvPuntoYComa(String(texto || ''));
+  const base = 'Este CSV no tiene el formato "comprobantes_consulta_csv_recibidos" de ARCA y no se cargó nada.';
+  const pedido = ' Descargá de ARCA el CSV de comprobantes recibidos (separado por punto y coma, con 30 columnas) o usá el Excel de "Mis Comprobantes Recibidos".';
+  if (tabla.length < 2) throw new Error(base + ' El archivo está vacío o no tiene comprobantes.' + pedido);
+  const enc = tabla[0].map(titNorm);
+  if (enc.length !== ENCABEZADOS_CSV_ARCA.length) {
+    throw new Error(base + ` Se esperaban ${ENCABEZADOS_CSV_ARCA.length} columnas separadas por punto y coma y se encontraron ${enc.length}.` + pedido);
+  }
+  const faltan = ENCABEZADOS_CSV_ARCA.map((n, i) => [i, n]).filter(([i, n]) => enc[i] !== n);
+  if (faltan.length) {
+    const det = faltan.slice(0, 3).map(([i, n]) => `columna ${i + 1}: se esperaba "${n}" y dice "${String(tabla[0][i] || '').trim() || '(vacío)'}"`).join('; ');
+    throw new Error(base + ` No coinciden los títulos (${det}${faltan.length > 3 ? '; y otras' : ''}).` + pedido);
+  }
+  const COL_NUM = new Set([11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]);
+  const rows = [], rowsRaw = [];
+  const datos = tabla.slice(1);
+  // CUIT receptor más frecuente (solo para el título de la fila 1; la página lo recalcula igual).
+  const cuentaRec = {};
+  for (const r of datos) { const rc = String(r[10] || '').replace(/\D/g, ''); if (rc.length === 11) cuentaRec[rc] = (cuentaRec[rc] || 0) + 1; }
+  const recTop = Object.entries(cuentaRec).sort((a, b) => b[1] - a[1])[0];
+  const titulo = 'Mis Comprobantes Recibidos - CUIT ' + (recTop ? recTop[0] : '');
+  rows.push([titulo]); rowsRaw.push([titulo]);
+  rows.push(ENCABEZADOS_EXCEL_ARCA.slice()); rowsRaw.push(ENCABEZADOS_EXCEL_ARCA.slice());
+
+  for (let n = 0; n < datos.length; n++) {
+    const f = datos[n];
+    const fmt = [], raw = [];
+    for (let c = 0; c < 30; c++) {
+      const crudo = String(f[c] == null ? '' : f[c]).trim();
+      if (c === 0) {                                   // fecha: d/m/aaaa → dd/mm/aaaa
+        const m = crudo.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        const v = crudo === '' ? null : (m ? `${m[1].padStart(2, '0')}/${m[2].padStart(2, '0')}/${m[3]}` : crudo);
+        fmt.push(v); raw.push(v);
+      } else if (c === 1) {                            // tipo: código numérico (1, 3, 11…)
+        const v = crudo === '' ? null : String(parseInt(crudo, 10) || crudo);
+        fmt.push(v); raw.push(v);
+      } else if (c === 6 || c === 9) {                 // tipo de documento: 80 = CUIT
+        const v = crudo === '80' ? 'CUIT' : (crudo === '' ? null : crudo);
+        fmt.push(v); raw.push(v);
+      } else if (c === 2 || c === 3 || c === 4) {      // punto de venta / números: enteros
+        const v = crudo === '' ? null : String(parseInt(crudo, 10));
+        fmt.push(v); raw.push(v === null ? null : Number(v));
+      } else if (COL_NUM.has(c)) {                     // importes y tipo de cambio
+        const num = numeroCsvARCA(crudo);
+        if (Number.isNaN(num)) throw new Error(`${base} Fila ${n + 2}, columna ${c + 1} ("${ENCABEZADOS_EXCEL_ARCA[c]}"): "${crudo}" no es un número.`);
+        fmt.push(num === null ? null : String(num)); raw.push(num);
+      } else {                                         // CUIT, denominación, CAE, moneda: texto
+        const v = crudo === '' ? null : crudo;
+        fmt.push(v); raw.push(v);
+      }
+    }
+    rows.push(fmt); rowsRaw.push(raw);
+  }
+  return { rows, rowsRaw };
+}
+
 function parsearRegistroARCA(file) {
   return new Promise((resolve, reject) => {
     cargarXLSX().then(() => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
+        let rows, rowsRaw;
+        if (/\.csv$/i.test(String((file && file.name) || ''))) {
+          // 07/10/2026: CSV de ARCA (comprobantes_consulta_csv_recibidos). Se convierte a
+          // la misma forma que el Excel; de acá en adelante el proceso es idéntico.
+          ({ rows, rowsRaw } = csvARCAaFilas(decodificarCsvARCA(e.target.result)));
+        } else {
         const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:null, raw:false });
+        rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:null, raw:false });
         // Segunda lectura en modo raw (valor numérico real de la celda, sin el
         // formato de visualización de Excel). La necesitamos solo para
         // tipo_cambio (col 11): algunas filas de ARCA traen esa celda con un
         // formato de Excel que le saca el punto decimal al mostrarla como texto
         // (ej. "1438.43498" → se lee como "143.843.498"). El valor crudo no
         // tiene ese problema porque no pasa por el formato de visualización.
-        const rowsRaw = XLSX.utils.sheet_to_json(ws, { header:1, defval:null, raw:true });
+        rowsRaw = XLSX.utils.sheet_to_json(ws, { header:1, defval:null, raw:true });
+        }
 
         if (rows.length < 3) throw new Error('Archivo vacío');
 
@@ -1925,10 +2122,16 @@ async function reintentar() {
   showAlert('Reintentando fallidas… esperando indexación de Drive', 'info');
    try {
     const _cantidadReintentar = archivosFallidos.length;
+    // FIX 07/10/2026: capturar los nombres ANTES de vaciar archivosFallidos --
+    // si se calculan después (como se hacía antes), siempre da una lista vacía
+    // y nunca se le dice a n8n qué PDFs puntuales reintentar.
+    const nombresReintentar = _cantidadReintentar
+      ? archivosFallidos.map(x => splitNombreMotivo(x).pdf_nombre).filter(Boolean)
+      : [];
     document.getElementById('cardFallidos').style.display = 'none';
     archivosFallidos = [];
     await sleep(calcularEsperaIndexacion(_cantidadReintentar));
-    await sendFlush(true);
+    await sendFlush(true, false, nombresReintentar);
   } catch(e) {
     showAlert('Error al reintentar.', 'error');
   } finally {
@@ -1994,6 +2197,8 @@ function normalizarListaResultado(data, claves) {
 function renderListaDetalle(containerId, items, badgeClass, badgeText, noteClass, defaultNote) {
   const el = document.getElementById(containerId);
   if (!el) return;
+  const mapaDrive = {};
+  ((window._ultimoEstado && window._ultimoEstado.pdfs_drive) || []).forEach(d => { if (d && d.pdf) mapaDrive[d.pdf] = d.drive_url; });
   el.innerHTML = (items || []).map(it => {
     const nom = it.pdf_nombre || it.pdf || it.nombre || String(it || '');
     const mot = it.motivo || '';
@@ -2002,6 +2207,7 @@ function renderListaDetalle(containerId, items, badgeClass, badgeText, noteClass
     return `<div class="history-item" style="align-items:flex-start;">
       <i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;margin-top:2px;"></i>
       <span class="history-name" style="white-space:normal;line-height:1.35;">${escapeHtml(nom)}${nota ? `<div class="${noteClass}">${escapeHtml(nota)}</div>` : ''}</span>
+      ${mapaDrive[nom] ? ` <a href="${escapeHtml(mapaDrive[nom])}" target="_blank" rel="noopener" style="font-size:12px;">Ver en Drive</a>` : ''}
       <span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span>
     </div>`;
   }).join('');
@@ -2368,7 +2574,7 @@ async function subirUnPDF(item) {
       const res = await fetchConTimeout(WEBHOOK.upload(), { method: 'POST', body: fd }, FETCH_TIMEOUT_MS);
       const data = await jsonSeguro(res);
       if (!res.ok || data.ok === false) {
-        throw new Error(data.mensaje || `HTTP ${res.status}`);
+        const e = new Error(data.mensaje || `HTTP ${res.status}`); e.rechazado = (data.rechazado === true); throw e;
       }
       if (intento > 1) logProceso(`Subida de ${item.name} funcionó en el reintento ${intento}.`);
       return data;
@@ -2378,7 +2584,10 @@ async function subirUnPDF(item) {
       // inválida), reintentar no sirve de nada -- va a fallar igual las
       // veces que haga falta. Cortar acá evita quemar hasta 1 minuto de
       // esperas inútiles antes de avisarle al usuario.
-      if (_claveRechazada) break;
+      // FIX 07/10/2026: lo mismo si el backend rechazó la subida de entrada
+      // (PDF vacío/inválido, ver 'Validar Subida' en n8n) -- es un rechazo
+      // definitivo, no un error transitorio de Drive.
+      if (_claveRechazada || err.rechazado === true) break;
       if (intento < INTENTOS_MAX) {
         const esperaMs = ESPERAS_ENTRE_INTENTOS_MS[intento - 1];
         logProceso(`Intento ${intento}/${INTENTOS_MAX} de subir ${item.name} falló (${err.message}). Reintentando en ${Math.round(esperaMs / 1000)} s...`);
@@ -2504,7 +2713,11 @@ async function startUpload() {
         }
         const detalle = err.name === 'AbortError' ? 'timeout' : err.message;
         console.error('Error subiendo PDF', item.name, err);
-        showAlert(`Error subiendo ${escapeHtml(item.name)}: ${escapeHtml(detalle)}`, 'error');
+        item.error = detalle;
+        // FIX 07/10/2026: si el backend rechazó el archivo (ver 'Validar Subida'
+        // en n8n), no mostrar acá el cartel individual -- se muestra uno solo
+        // al final de la tanda con el detalle de todos los rechazados (carrusel).
+        if (!(err && err.rechazado === true)) showAlert(`Error subiendo ${escapeHtml(item.name)}: ${escapeHtml(detalle)}`, 'error');
         logProceso(`Error subiendo ${item.name}: ${detalle}`);
       }
       renderQueue();
@@ -2532,7 +2745,12 @@ async function startUpload() {
 
     const fallidosNombres = pending.filter(f => f.status === 'error').map(f => f.name);
     if (fallidosNombres.length > 0) {
-      showAlert(`${pending.length - fallidosNombres.length}/${pending.length} PDFs subidos. Fallaron ${fallidosNombres.length}: ${fallidosNombres.join(', ')}`, 'warn');
+      // FIX 07/10/2026: el resumen corto va en el cartel de arriba (la página
+      // ya muestra el detalle en la cola de archivos); el popup, en vez de
+      // amontonar todos los errores en un solo bloque de texto, los muestra
+      // de a uno con Anterior/Siguiente -- mostrarAlertaPopupMultiple().
+      showAlert(`${pending.length - fallidosNombres.length}/${pending.length} PDFs subidos. No se subieron ${fallidosNombres.length}.`, 'error', true);
+      mostrarAlertaPopupMultiple(pending.filter(f => f.status === 'error').map(f => ({ nombre: f.name, motivo: f.error || '' })));
       logProceso(`Subida parcial: fallaron ${fallidosNombres.length} de ${pending.length} — ${fallidosNombres.join(', ')}`);
     }
 
@@ -2541,7 +2759,7 @@ async function startUpload() {
     logProceso(registroSubido ? 'Registro ARCA disponible para conciliación.' : 'Procesamiento sin registro ARCA.');
     updateProcesoUX('ia', 58, 'Esperando Drive', 'PDFs subidos. Esperando indexación de Google Drive antes de revisar qué ya está hecho.', { progressText:'Indexando archivos…' });
     setStepDetail('ia', 'Revisando qué ya está hecho');
-    showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
+    if (!fallidosNombres.length) showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
     await sleep(calcularEsperaIndexacion(pending.length));
     const finDeCorrida = esperarFinDeCorrida();
     await escanearYProcesar();
@@ -2666,7 +2884,19 @@ function manejarResultadoEscaneo(data) {
   const nuevas = Array.isArray(data.nuevas_en_escaneo) ? data.nuevas_en_escaneo.length : 0;
   const yaProcesadas = Array.isArray(data.ya_procesadas) ? data.ya_procesadas : [];
   const duplicadasLote = Array.isArray(data.duplicados_en_lote) ? data.duplicados_en_lote : [];
-  const repetidas = yaProcesadas.length + duplicadasLote.length;
+  // Las copias repetidas dentro del lote no se preguntan: el servidor las descarta solo.
+  const repetidas = yaProcesadas.length;
+  if (duplicadasLote.length) {
+    logProceso(`Escaneo: ${duplicadasLote.length} copia(s) repetida(s) dentro del lote, se descartan automáticamente.`);
+    showAlert(`${duplicadasLote.length} ${pluralizar(duplicadasLote.length, 'archivo es copia repetida', 'archivos son copias repetidas')} dentro del mismo lote: se procesa una sola vez.`, 'warn');
+  }
+
+  if (nuevas === 0 && repetidas === 0) {
+    logProceso('Escaneo: no hay facturas de este cliente/período en la carpeta de entrada.');
+    showAlert('No hay facturas para procesar: la carpeta de entrada no tiene PDFs de este cliente y período.', 'warn');
+    _corridaTerminada(false);
+    return;
+  }
 
   if (repetidas === 0) {
     logProceso('Escaneo: todo nuevo, procesando directo.');
@@ -2759,22 +2989,20 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
   });
    document.getElementById('btnEscaneoNo').addEventListener('click', () => {
     fondo.remove();
-    if (nuevas === 0) {
-      logProceso('Escaneo: usuario eligió no reprocesar nada.');
-      mostrarConciliacion(null, null, [], yaProcesadas, duplicadasLote);
-      updateProcesoUX('final', 100, 'Sin cambios', 'No se reprocesó nada.', { progressText: 'Listo.' });
-      finalizarPantallaEscaneo('Listo — no se reprocesó nada.');
-      _corridaTerminada();
-    } else {
-      logProceso('Escaneo: usuario eligió procesar solo las nuevas.');
-      _procesoInicioTs = null;
-      _procesoTimeoutTotalMs = null;
-      sendFlush(false, false);
-    }
+    // Aunque elija no reprocesar, se avisa igual a n8n con una pasada real
+    // (forzar=false): el servidor reconoce las repetidas por su huella/clave
+    // (sin gastar Gemini) y recién ahí las saca de Entrada (borra la copia o
+    // la mueve a Procesados).
+    logProceso(nuevas === 0
+      ? 'Escaneo: usuario eligió no reprocesar nada (se limpia Entrada igual).'
+      : 'Escaneo: usuario eligió procesar solo las nuevas.');
+    _procesoInicioTs = null;
+    _procesoTimeoutTotalMs = null;
+    sendFlush(false, false);
   });
 }
 
-async function sendFlush(forzar, soloEscanear) {
+async function sendFlush(forzar, soloEscanear, reintentarPdfs) {
   actualizarPeriodo(); // releer el desplegable antes de mandar nada a n8n, por la misma razón que en el Excel
   if (!validarPrecondiciones()) return;
   if (!asegurarToken()) { showAlert('Sin clave de acceso no se puede procesar.', 'error'); return; }
@@ -2795,7 +3023,8 @@ async function sendFlush(forzar, soloEscanear) {
         cliente_nombre: clienteSeleccionado.nombre || '',
         tiene_registro: registroSubido,
         forzar: forzar === true,
-        soloEscanear: soloEscanear === true
+        soloEscanear: soloEscanear === true,
+        reintentar_pdfs: Array.isArray(reintentarPdfs) ? reintentarPdfs : []
       })
     }, FETCH_TIMEOUT_MS);
     const data = await jsonSeguro(res);

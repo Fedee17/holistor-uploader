@@ -2737,11 +2737,15 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
   else descripcion = parteYa(nYa);
 
   let mensaje, primario, secundario;
-  if (nuevas === 0) {
-    mensaje = `De este lote: ${descripcion}. ¿Querés reprocesarlas de todos modos?`;
-    primario = { id: 'btnEscaneoNo', texto: 'No, dejar así' };
-    secundario = { id: 'btnEscaneoSi', texto: 'Sí, reprocesar' };
-  } else {
+    if (nuevas === 0) {
+      // 07/10/2026: no se reprocesa nada, pero igual corre una pasada real sin Forzar:
+      // el servidor reconoce las repetidas por su huella (sin Gemini) y las saca de
+      // Entrada (borra la copia o la mueve a Procesados). Antes quedaban ahí.
+      logProceso('Escaneo: usuario eligió no reprocesar nada. Se limpian las repetidas de la carpeta de entrada.');
+      _procesoInicioTs = null;
+      _procesoTimeoutTotalMs = null;
+      sendFlush(false, false);
+    } else {
     mensaje = `De este lote: ${descripcion}. ¿Querés reprocesarlas también, o solo las ${nuevas} nueva(s)?`;
     primario = { id: 'btnEscaneoNo', texto: `Solo las nuevas (${nuevas})` };
     secundario = { id: 'btnEscaneoSi', texto: `Reprocesar todas (${nuevas + repetidas})` };

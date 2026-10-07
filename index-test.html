@@ -2512,7 +2512,8 @@ async function startUpload() {
         }
         const detalle = err.name === 'AbortError' ? 'timeout' : err.message;
         console.error('Error subiendo PDF', item.name, err);
-        showAlert(`Error subiendo ${escapeHtml(item.name)}: ${escapeHtml(detalle)}`, 'error');
+        item.error = detalle;
+        if (!(err && err.rechazado === true)) showAlert(`Error subiendo ${escapeHtml(item.name)}: ${escapeHtml(detalle)}`, 'error');
         logProceso(`Error subiendo ${item.name}: ${detalle}`);
       }
       renderQueue();
@@ -2540,7 +2541,8 @@ async function startUpload() {
 
     const fallidosNombres = pending.filter(f => f.status === 'error').map(f => f.name);
     if (fallidosNombres.length > 0) {
-      showAlert(`${pending.length - fallidosNombres.length}/${pending.length} PDFs subidos. Fallaron ${fallidosNombres.length}: ${fallidosNombres.join(', ')}`, 'warn');
+      const detalleFallidos = pending.filter(f => f.status === 'error').map(f => `<b>${escapeHtml(f.name)}</b>${f.error ? ': ' + escapeHtml(f.error) : ''}`).join('<br>');
+      showAlert(`${pending.length - fallidosNombres.length}/${pending.length} PDFs subidos. No se subieron ${fallidosNombres.length}:<br>${detalleFallidos}`, 'error');
       logProceso(`Subida parcial: fallaron ${fallidosNombres.length} de ${pending.length} — ${fallidosNombres.join(', ')}`);
     }
 
@@ -2549,7 +2551,7 @@ async function startUpload() {
     logProceso(registroSubido ? 'Registro ARCA disponible para conciliación.' : 'Procesamiento sin registro ARCA.');
     updateProcesoUX('ia', 58, 'Esperando Drive', 'PDFs subidos. Esperando indexación de Google Drive antes de revisar qué ya está hecho.', { progressText:'Indexando archivos…' });
     setStepDetail('ia', 'Revisando qué ya está hecho');
-    showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
+    if (!fallidosNombres.length) showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
     await sleep(calcularEsperaIndexacion(pending.length));
     const finDeCorrida = esperarFinDeCorrida();
     await escanearYProcesar();

@@ -1,0 +1,56 @@
+--- a/n8n-prod/Analyze_document.prompt.txt	2026-10-07 16:11:13.870382532 +0000
++++ b/n8n-test/Analyze_document.prompt.txt	2026-10-07 16:11:13.874382533 +0000
+@@ -149,7 +149,7 @@
+ ▶ SEG (Seguros) — pólizas: auto, vida, incendio, ART, responsabilidad civil.
+ ▶ ALQ (Alquileres) — locación de inmueble.
+ ▶ HON (Honorarios) — contador, abogado, escribano, médico, arquitecto, consultoría profesional.
+-▶ FLT (Fletes y Transporte) — flete, transporte de cargas, logística. Incluye el flete de granos aunque la descripción diga SOJA/MAÍZ/TRIGO (ver REGLA — facturas de flete de granos, más abajo).
++▶ FLT (Fletes y Transporte) — flete, transporte de cargas, logística. Incluye el flete de granos aunque la descripción diga SOJA/MAÍZ/TRIGO, y cualquier factura cuya línea principal sea un flete aunque nombre fertilizantes, semillas u otro producto (ver las REGLAS de flete, más abajo).
+ ▶ GB (Gastos Bancarios) — banco emisor, comisiones, mantenimiento de cuenta.
+ ▶ GF (Gastos Financieros) — intereses, cargos por financiación, recargos por mora o pago fuera de término, costos de financiamiento facturados por proveedores no bancarios. NO comisiones bancarias (→ GB).
+ ▶ CMG (Compras Gravadas) — productos para reventa (repuestos, autopartes, insumos, packaging) y también materia prima para producción (granos, cereales, insumos agropecuarios, harina para fábrica, etc.). El estudio usa un solo código para ambos casos, no los separes.
+@@ -159,7 +159,7 @@
+ ▶ INP (Insumos Pecuarios) — alimento balanceado, sanidad animal, vacunas, productos veterinarios — insumos para producción ganadera/pecuaria.
+ ▶ "" (vacío) — si no podés determinar.
+ 
+-(INA/INP tienen prioridad sobre CGG y CMG cuando el insumo es específicamente agrícola o pecuario — no los clasifiques como gastos generales ni como materia prima/mercadería si encajan acá.)
++(INA/INP tienen prioridad sobre CGG y CMG cuando el insumo es específicamente agrícola o pecuario — no los clasifiques como gastos generales ni como materia prima/mercadería si encajan acá. Excepción: INA/INP NO tienen prioridad sobre FLT cuando la línea principal de la factura es un flete, aunque nombre un fertilizante o una semilla — ver la REGLA de flete más abajo.)
+ 
+ REGLA — facturas de FLETE DE GRANOS (transportistas): es FLT, NO CMG
+   Muchos transportistas de granos facturan así: en la descripción ponen el nombre del
+@@ -179,6 +179,17 @@
+   Ejemplo real: "SOJA — CTG N°10135088540 CPE N°00000-00000681 — 31,31 toneladas —
+   precio unit. 28.500,00 — subtotal 892.335,00" → cod_neto = "FLT".
+ 
++REGLA — factura cuya línea principal es un FLETE (aunque nombre el producto o el emisor venda insumos): es FLT
++  Si la factura cobra un flete, acarreo o transporte -- la descripción de la línea principal (o única)
++  contiene "FLETE", "FLETES", "ACARREO" o "TRANSPORTE" -- el cod_neto es "FLT", aunque a continuación
++  nombre el producto transportado (FERTILIZANTES, SEMILLAS, AGROQUÍMICOS, GRANOS) y aunque el emisor
++  sea una casa de insumos agropecuarios (INA/INP) o de mercadería. El producto que sigue a la palabra
++  FLETE es la CARGA transportada, no lo que se vende.
++  Si la factura mezcla productos con una línea de flete, el cod_neto es el del producto principal
++  (el de mayor importe): una línea de flete suelta no cambia el rubro de toda la factura.
++  Ejemplo: un proveedor de insumos agropecuarios factura una única línea "FLETES - FERTILIZANTES x Kg."
++  (kilos x precio por kilo, sin más ítems) → cod_neto = "FLT" (NO "INA").
++
+ REGLA — alic siempre es la alícuota IMPRESA en la factura, nunca inferida:
+   El campo "alic" tiene que ser la alícuota que la factura declara explícita
+   (ej: "IVA 21%", "Neto Grav. IVA 0%", "IVA 10,5%") — NUNCA la calcules
+@@ -365,7 +376,7 @@
+ El CUIT bajo "Nombre:" o "Cliente:" siempre es del receptor.
+ 
+ 
+-═══════════════════════════════════════════════════════════════
++═══════════════════════════════════════════════════════
+ REGLA 8 — Facturas en moneda extranjera (USD, EUR, etc.)
+ ═══════════════════════════════════════════════════════════════
+ Algunas facturas se emiten en dólares u otra moneda extranjera.
+@@ -426,7 +437,7 @@
+ 
+ ═══════════════════════════════════════════════════════════════
+ REGLA ANTI-TRUNCADO JSON — OBLIGATORIA
+-═══════════════════════════════════════════════════════════════
++═══════════════════════════════════════════════════════
+ Devolvé un JSON COMPACTO y VÁLIDO. No uses markdown ni ```json.
+ No agregues explicaciones. No incluyas saltos de línea dentro de strings.
+ No uses tabulaciones. No dejes comillas sin cerrar.

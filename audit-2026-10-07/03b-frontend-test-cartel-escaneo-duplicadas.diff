@@ -1,0 +1,19 @@
+--- a/index-test.html	2026-10-07 16:10:17.425033195 +0000
++++ b/index-test.html	2026-10-07 16:10:17.425392807 +0000
+@@ -2914,9 +2914,14 @@
+ 
+   const LIMITE = 6;
+   const todas = [...yaProcesadas.map(f => ({...f, tipo:'ya'})), ...duplicadasLote.map(f => ({...f, tipo:'dup'}))];
+-  const repetidas = todas.length;
++  const totalFilas = todas.length;
++  // FIX 07/10/2026 (auditoría): solo las "ya procesadas" cuentan como reprocesables.
++  // Las copias repetidas dentro del lote el servidor las descarta siempre (también
++  // con forzar) y manejarResultadoEscaneo ya las avisó aparte: no deben inflar el
++  // número del botón "Reprocesar todas (N)". Se siguen listando como filas informativas.
++  const repetidas = yaProcesadas.length;
+   const visibles = todas.slice(0, LIMITE);
+-  const resto = repetidas - visibles.length;
++  const resto = totalFilas - visibles.length;
+ 
+   function formatearFecha(iso) {
+     if (!iso) return '';

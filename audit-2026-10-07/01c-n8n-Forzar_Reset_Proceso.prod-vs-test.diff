@@ -1,0 +1,36 @@
+--- a/n8n-prod/Forzar_Reset_Proceso.js	2026-10-07 16:10:40.466380547 +0000
++++ b/n8n-test/Forzar_Reset_Proceso.js	2026-10-07 16:10:40.478380548 +0000
+@@ -1,18 +1,21 @@
+ const sd = $getWorkflowStaticData('global');
+ const body = $input.first().json.body || {};
+-const cuit  = String(body.cliente_cuit || '');
+-const per   = String(body.periodo || '');
+-const key   = cuit + '|' + per;
++const cuit  = String(body.cliente_cuit || '').replace(/\D/g, '');
++const per   = String(body.periodo || '').trim();
++// (06/10/2026) Sin cliente ni período la clave es 'todos' (antes quedaba "|", y el
++// candado compartido escribía una fila basura con esa clave en vez de liberar todas).
++const esGlobal = (!cuit && !per);
++const key   = esGlobal ? 'todos' : (cuit + '|' + per);
+ let liberados = 0;
+ if (!sd.procesos) sd.procesos = {};
+-if (key && sd.procesos[key]) {
++if (!esGlobal && sd.procesos[key]) {
+   sd.procesos[key].procesando     = false;
+   sd.procesos[key].proceso_listo  = true;
+   sd.procesos[key].proceso_timestamp = new Date().toISOString();
+   sd.procesos[key].fallidos_pendientes = sd.procesos[key].fallidos || [];
+   sd.procesos[key].conciliacion   = sd.procesos[key].conciliacion || { procesadas_registradas:[], procesadas_no_registro:[], registro_no_procesadas:[] };
+   liberados = 1;
+-} else if (!cuit && !per) {
++} else if (esGlobal) {
+   // Sin parámetros: resetear TODOS los procesos activos
+   for (const k of Object.keys(sd.procesos || {})) {
+     if (sd.procesos[k].procesando) {
+@@ -23,5 +26,5 @@
+     }
+   }
+ }
+-return [{ json: { ok: true, liberados, key: key || 'todos' } }];
++return [{ json: { ok: true, liberados, key } }];
+ 

@@ -1,0 +1,35 @@
+--- a/n8n-prod/Marcar_Error_Gemini.js	2026-10-07 16:10:40.502380549 +0000
++++ b/n8n-test/Marcar_Error_Gemini.js	2026-10-07 16:10:40.510380549 +0000
+@@ -14,13 +14,28 @@
+ }
+ if (!nombre || nombre === 'desconocido') nombre = $input.item.json.name || $input.item.json.fileName || 'desconocido';
+ const pdfNombreM = String(nombre).replace(/^\d{11}__/, '');
+-const accionManual = 'Acción requerida: cargar manualmente en Holistor. El PDF no se agregó al PRN automático porque Gemini no devolvió texto válido.';
+-const motivo = String($input.item.json.message || $input.item.json.errorMessage || $input.item.json.error || 'Gemini no devolvió texto válido') + ' | ' + accionManual;
++const errorCrudo = String($input.item.json.message || $input.item.json.errorMessage || $input.item.json.error || '');
++
++// (01/10/2026) Distinguir "Gemini no estuvo disponible" (caída o saturación temporal de
++// Google: 503, 429, timeout...) de "Gemini leyó y no devolvió nada útil". En el primer
++// caso la factura no tiene nada malo: hay que reintentarla, no cargarla a mano.
++const esTransitorio = /service unavailable|unavailable|overloaded|try again later|resource.?exhausted|rate limit|too many requests|quota|timeout|timed out|deadline|ECONNRESET|ETIMEDOUT|socket hang up|\b(429|500|502|503|504)\b/i.test(errorCrudo);
++
++let tipoError, accionManual, motivo;
++if (esTransitorio) {
++  tipoError = 'gemini_no_disponible';
++  accionManual = 'Gemini (Google) no estuvo disponible en ese momento. No es un problema de la factura: usá "Reintentar fallidas" para procesarla de nuevo. Cargala a mano solo si vuelve a fallar varias veces.';
++  motivo = 'Gemini no disponible' + (errorCrudo ? ' (' + errorCrudo + ')' : '') + ' | ' + accionManual;
++} else {
++  tipoError = 'gemini_sin_texto';
++  accionManual = 'Acción requerida: cargar manualmente en Holistor. El PDF no se agregó al PRN automático porque Gemini no devolvió texto válido.';
++  motivo = (errorCrudo || 'Gemini no devolvió texto válido') + ' | ' + accionManual;
++}
+ const entry = pdfNombreM + ' -- ' + motivo;
+ if (!p.fallidos.includes(entry)) p.fallidos.push(entry);
+ if (!p.cargar_manual) p.cargar_manual = [];
+-if (!p.cargar_manual.some(x => (x.pdf || x.pdf_nombre) === pdfNombreM)) p.cargar_manual.push({ pdf: pdfNombreM, motivo, tipo_error: 'gemini_sin_texto', accion: accionManual });
++if (!p.cargar_manual.some(x => (x.pdf || x.pdf_nombre) === pdfNombreM)) p.cargar_manual.push({ pdf: pdfNombreM, motivo, tipo_error: tipoError, accion: accionManual });
+ if (pdfNombreM) p.archivos_estado[pdfNombreM] = 'fallida';
+ if (_pk_me && sd.procesos) sd.procesos[_pk_me] = p;
+-return { json: { error: true, prn_content: '', encabezado: '', nombre_archivo: '', pdf_nombre: pdfNombreM, motivo, cargar_manual: true, tipo_error: 'gemini_sin_texto', accion_requerida: accionManual } };
++return { json: { error: true, prn_content: '', encabezado: '', nombre_archivo: '', pdf_nombre: pdfNombreM, motivo, cargar_manual: true, tipo_error: tipoError, accion_requerida: accionManual } };
+ 

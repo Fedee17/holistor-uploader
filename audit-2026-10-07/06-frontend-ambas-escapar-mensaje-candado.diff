@@ -1,0 +1,28 @@
+--- a/index.html
++++ b/index.html
+@@ -3038,7 +3038,10 @@
+     _ultimoRechazoProceso = null;
+ 
+     if (data.proceso_ya_activo === true) {
+-      showAlert(data.mensaje || 'Ya hay un proceso activo para este cliente y período.', 'warn');
++      // FIX 07/10/2026 (auditoría H-13): el mensaje viene del servidor -> escapar
++      // acá, en el punto de inyección (showAlert recibe HTML a propósito en otros
++      // llamados, así que no se escapa adentro de showAlert).
++      showAlert(escapeHtml(data.mensaje || 'Ya hay un proceso activo para este cliente y período.'), 'warn');
+     } else {
+       showAlert('Procesamiento iniciado en n8n.', 'success');
+       logProceso('n8n confirmó inicio de procesamiento.');
+--- a/index-test.html
++++ b/index-test.html
+@@ -3038,7 +3038,10 @@
+     _ultimoRechazoProceso = null;
+ 
+     if (data.proceso_ya_activo === true) {
+-      showAlert(data.mensaje || 'Ya hay un proceso activo para este cliente y período.', 'warn');
++      // FIX 07/10/2026 (auditoría H-13): el mensaje viene del servidor -> escapar
++      // acá, en el punto de inyección (showAlert recibe HTML a propósito en otros
++      // llamados, así que no se escapa adentro de showAlert).
++      showAlert(escapeHtml(data.mensaje || 'Ya hay un proceso activo para este cliente y período.'), 'warn');
+     } else {
+       showAlert('Procesamiento iniciado en n8n.', 'success');
+       logProceso('n8n confirmó inicio de procesamiento.');

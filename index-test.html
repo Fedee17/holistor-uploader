@@ -574,7 +574,7 @@ const statsCache = cacheElementos(['statCola', 'statSubidos', 'statErrores']);
 // ──────────────────────────────────────────────────────────────────────────────
 // ALERTS
 // ──────────────────────────────────────────────────────────────────────────────
-function showAlert(msg, type) {
+function showAlert(msg, type, sinPopup) {
   const el = document.getElementById('alert');
   const icons = { success:'circle-check', error:'alert-circle', info:'info-circle', warn:'alert-triangle' };
   el.className = 'alert a-' + type;
@@ -592,7 +592,10 @@ function showAlert(msg, type) {
   // parecía no hacer nada. El cartel de arriba queda como respaldo/historial, pero
   // un error ahora también se muestra como popup modal — imposible de pasar por
   // alto sin importar el scroll, igual que el popup de "¿Querés reprocesarlas?".
-  if (type === 'error') mostrarAlertaPopup(msg);
+  // FIX 07/10/2026: sinPopup=true lo usa quien va a mostrar en su lugar el popup
+  // de mostrarAlertaPopupMultiple() (lista de archivos con problema, uno por
+  // uno) -- evita que salgan los dos popups superpuestos.
+  if (type === 'error' && !sinPopup) mostrarAlertaPopup(msg);
 }
 
 function mostrarAlertaPopup(msg) {
@@ -620,6 +623,65 @@ function mostrarAlertaPopup(msg) {
 
   const cerrar = () => fondo.remove();
   document.getElementById('btnAlertaPopupCerrar').addEventListener('click', cerrar);
+  fondo.addEventListener('click', (e) => { if (e.target === fondo) cerrar(); });
+}
+
+// FIX 07/10/2026: popup tipo "carrusel" para cuando hay VARIOS archivos con
+// problema (ej. subida de PDFs). Antes se mandaban todos amontonados en un
+// solo cartel ("Entendido" cerraba los N de una sola vez, difícil de leer
+// con más de 2-3 archivos). Ahora se ve un archivo a la vez, con
+// Anterior/Siguiente y un contador ("2 de 3") -- igual de imposible de
+// pasar por alto, pero más fácil de leer uno por uno.
+function mostrarAlertaPopupMultiple(items) {
+  const existente = document.getElementById('alertaPopupFondo');
+  if (existente) existente.remove();
+  if (!Array.isArray(items) || !items.length) return;
+
+  let idx = 0;
+
+  const fondo = document.createElement('div');
+  fondo.id = 'alertaPopupFondo';
+  fondo.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,20,18,.5);display:flex;align-items:center;justify-content:center;z-index:10001;padding:1rem;';
+
+  const modal = document.createElement('div');
+  modal.className = 'card';
+  modal.style.cssText = 'max-width:420px;width:100%;padding:0;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.3);';
+  fondo.appendChild(modal);
+  document.body.appendChild(fondo);
+
+  const cerrar = () => fondo.remove();
+
+  function render() {
+    const it = items[idx] || {};
+    const contador = items.length > 1
+      ? `<div style="font-size:12px;color:#888;margin-bottom:4px;">${idx + 1} de ${items.length}</div>`
+      : '';
+    const esUltimo = idx === items.length - 1;
+    modal.innerHTML = `
+      <div style="padding:1.25rem 1.25rem .5rem;font-size:14px;line-height:1.5;display:flex;gap:10px;align-items:flex-start;">
+        <i class="ti ti-alert-circle" style="color:#c5221f;font-size:20px;flex-shrink:0;margin-top:1px;"></i>
+        <div style="min-width:0;">
+          ${contador}
+          <div style="font-weight:600;word-break:break-word;">${escapeHtml(it.nombre || '')}</div>
+          <div style="color:#555;margin-top:2px;">${escapeHtml(it.motivo || '')}</div>
+        </div>
+      </div>
+      <div style="padding:1rem 1.25rem;display:flex;gap:8px;justify-content:flex-end;">
+        ${items.length > 1 ? `<button id="btnAlertaPopupAnterior" class="btn-secondary" ${idx === 0 ? 'disabled' : ''}>Anterior</button>` : ''}
+        ${items.length > 1 && !esUltimo
+          ? `<button id="btnAlertaPopupSiguiente" class="btn-primary">Siguiente</button>`
+          : `<button id="btnAlertaPopupCerrar" class="btn-primary">Entendido</button>`}
+      </div>
+    `;
+    const btnAnt = document.getElementById('btnAlertaPopupAnterior');
+    if (btnAnt) btnAnt.addEventListener('click', () => { if (idx > 0) { idx--; render(); } });
+    const btnSig = document.getElementById('btnAlertaPopupSiguiente');
+    if (btnSig) btnSig.addEventListener('click', () => { idx++; render(); });
+    const btnCerrar = document.getElementById('btnAlertaPopupCerrar');
+    if (btnCerrar) btnCerrar.addEventListener('click', cerrar);
+  }
+  render();
+
   fondo.addEventListener('click', (e) => { if (e.target === fondo) cerrar(); });
 }
 
@@ -2676,8 +2738,12 @@ async function startUpload() {
 
     const fallidosNombres = pending.filter(f => f.status === 'error').map(f => f.name);
     if (fallidosNombres.length > 0) {
-      const detalleFallidos = pending.filter(f => f.status === 'error').map(f => `<b>${escapeHtml(f.name)}</b>${f.error ? ': ' + escapeHtml(f.error) : ''}`).join('<br>');
-      showAlert(`${pending.length - fallidosNombres.length}/${pending.length} PDFs subidos. No se subieron ${fallidosNombres.length}:<br>${detalleFallidos}`, 'error');
+      // FIX 07/10/2026: el resumen corto va en el cartel de arriba (la página
+      // ya muestra el detalle en la cola de archivos); el popup, en vez de
+      // amontonar todos los errores en un solo bloque de texto, los muestra
+      // de a uno con Anterior/Siguiente -- mostrarAlertaPopupMultiple().
+      showAlert(`${pending.length - fallidosNombres.length}/${pending.length} PDFs subidos. No se subieron ${fallidosNombres.length}.`, 'error', true);
+      mostrarAlertaPopupMultiple(pending.filter(f => f.status === 'error').map(f => ({ nombre: f.name, motivo: f.error || '' })));
       logProceso(`Subida parcial: fallaron ${fallidosNombres.length} de ${pending.length} — ${fallidosNombres.join(', ')}`);
     }
 

@@ -2939,22 +2939,14 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
 
   let mensaje, primario, secundario;
   if (nuevas === 0) {
-    // 07/10/2026: no hay nada nuevo que extraer, así que no tiene sentido
-    // preguntar -- pero igual hay que avisarle a n8n con una pasada real (sin
-    // Forzar): el servidor reconoce las repetidas por su huella (sin gastar
-    // Gemini) y recién ahí las saca de la carpeta Entrada (borra la copia o
-    // la mueve a Procesados). FIX: antes esto seguía de largo y armaba el
-    // cartel igual, con primario/secundario sin definir -- quedaba un cartel
-    // con botones rotos (id "undefined") que no hacían nada al tocarlos.
-    logProceso('Escaneo: todo repetido, se limpia la carpeta de entrada sin reprocesar.');
-    _procesoInicioTs = null;
-    _procesoTimeoutTotalMs = null;
-    sendFlush(false, false);
-    return;
+    mensaje = `De este lote: ${descripcion}. ¿Querés reprocesarlas de todos modos?`;
+    primario = { id: 'btnEscaneoNo', texto: 'No, dejar así' };
+    secundario = { id: 'btnEscaneoSi', texto: 'Sí, reprocesar' };
+  } else {
+    mensaje = `De este lote: ${descripcion}. ¿Querés reprocesarlas también, o solo las ${nuevas} nueva(s)?`;
+    primario = { id: 'btnEscaneoNo', texto: `Solo las nuevas (${nuevas})` };
+    secundario = { id: 'btnEscaneoSi', texto: `Reprocesar todas (${nuevas + repetidas})` };
   }
-  mensaje = `De este lote: ${descripcion}. ¿Querés reprocesarlas también, o solo las ${nuevas} nueva(s)?`;
-  primario = { id: 'btnEscaneoNo', texto: `Solo las nuevas (${nuevas})` };
-  secundario = { id: 'btnEscaneoSi', texto: `Reprocesar todas (${nuevas + repetidas})` };
 
   const fondo = document.createElement('div');
   fondo.id = 'modalEscaneoFondo';
@@ -2990,9 +2982,13 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
   });
    document.getElementById('btnEscaneoNo').addEventListener('click', () => {
     fondo.remove();
-    // nuevas === 0 ya no llega acá: mostrarCartelEscaneo corta antes de armar
-    // este cartel en ese caso (ver más arriba).
-    logProceso('Escaneo: usuario eligió procesar solo las nuevas.');
+    // Aunque elija no reprocesar, se avisa igual a n8n con una pasada real
+    // (forzar=false): el servidor reconoce las repetidas por su huella/clave
+    // (sin gastar Gemini) y recién ahí las saca de Entrada (borra la copia o
+    // la mueve a Procesados).
+    logProceso(nuevas === 0
+      ? 'Escaneo: usuario eligió no reprocesar nada (se limpia Entrada igual).'
+      : 'Escaneo: usuario eligió procesar solo las nuevas.');
     _procesoInicioTs = null;
     _procesoTimeoutTotalMs = null;
     sendFlush(false, false);

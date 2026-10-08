@@ -2717,6 +2717,7 @@ async function startUpload() {
         const detalle = err.name === 'AbortError' ? 'timeout' : err.message;
         console.error('Error subiendo PDF', item.name, err);
         item.error = detalle;
+        item.rechazado = (err && err.rechazado === true);
         if (!(err && err.rechazado === true)) showAlert(`Error subiendo ${escapeHtml(item.name)}: ${escapeHtml(detalle)}`, 'error');
         logProceso(`Error subiendo ${item.name}: ${detalle}`);
       }
@@ -2738,7 +2739,16 @@ async function startUpload() {
 
     const subidosOk = pending.some(f => f.status === 'done');
     if (!subidosOk) {
-      showAlert('No se pudo subir ningún PDF' + etiquetaTanda + '. Revisá conexión o n8n.', 'error');
+      // FIX 08/10/2026: si TODOS los archivos fueron rechazados por el servidor
+      // (vacíos / no son PDF), no culpar a la conexión: mostrar el motivo de cada uno.
+      const _todosRechazados = pending.length > 0 && pending.every(f => f.status === 'error' && f.rechazado === true);
+      if (_todosRechazados) {
+        showAlert(`Ningún archivo se subió${etiquetaTanda}: ${pending.length === 1 ? 'el archivo fue rechazado' : 'los ' + pending.length + ' archivos fueron rechazados'}. Mirá el detalle en el aviso.`, 'error', true);
+        mostrarAlertaPopupMultiple(pending.map(f => ({ nombre: f.name, motivo: f.error || '' })));
+        logProceso(`Subida rechazada${etiquetaTanda}: ${pending.map(f => f.name).join(', ')}`);
+      } else {
+        showAlert('No se pudo subir ningún PDF' + etiquetaTanda + '. Revisá conexión o n8n.', 'error');
+      }
       detenerCountdown();
       continue;
     }

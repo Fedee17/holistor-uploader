@@ -845,10 +845,16 @@ function toggleProvFaltantesLista() {
 // PROCESO Y RESET
 // ──────────────────────────────────────────────────────────────────────────────
 async function resetProceso() {
+  // (08/10/2026) Sin cliente y período elegidos no se manda nada: el servidor tampoco libera nada
+  // en ese caso (antes liberaba los procesos de TODOS los clientes).
+  const cuit = clienteSeleccionado?.cuit || '';
+  const per = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
+  if (!cuit || !per) {
+    showAlert('Para liberar un proceso primero elegí el cliente y el período.', 'error');
+    return;
+  }
   if (!confirm('¿Liberar el proceso bloqueado?')) return;
   try {
-    const cuit = clienteSeleccionado?.cuit || '';
-    const per = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
     const res = await fetchConTimeout(WEBHOOK.reset(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -859,6 +865,8 @@ async function resetProceso() {
       showAlert(`Proceso liberado. Ya podés procesar de nuevo.`, 'success');
       stopPolling();
       document.getElementById('estadoProceso').style.display = 'none';
+    } else {
+      showAlert(escapeHtml(data.mensaje || 'No se pudo liberar el proceso.'), 'error');
     }
   } catch(e) {
     showAlert('No se pudo conectar con n8n.', 'error');

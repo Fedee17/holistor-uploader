@@ -245,6 +245,7 @@
       <div id="loteResultado" style="display:none; font-size:13px; color:#188038; background:#e6f4ea; border-radius:8px; padding:8px 12px; margin-bottom:8px;">
         <i class="ti ti-circle-check" style="font-size:14px;"></i> <span id="loteResultadoText"></span>
       </div>
+      <div id="avisoSubida" role="alert" style="display:none; font-size:13px; line-height:1.5; color:#a50e0e; background:#fce8e6; border:0.5px solid #f4c7c3; border-radius:8px; padding:10px 12px; margin-bottom:8px;"></div>
       <div class="btn-row">
         <button class="btn-primary" id="btnSubir" onclick="handleSubir()"><i class="ti ti-upload"></i> Subir y procesar</button>
         <button class="btn-secondary" id="btnProcesar" onclick="procesarAhoraConEspera()" style="display:none;"><i class="ti ti-player-play"></i> Procesar ahora</button>        <button class="btn-secondary" onclick="clearPending()">Limpiar pendientes</button>
@@ -2375,11 +2376,24 @@ const ESTADO_LABELS = {
   duplicada:'duplicada', otro_cliente:'otro cliente', cargar_manual:'carga manual', gemini_json_invalido:'JSON inválido'
 };
 
+// FIX 08/10/2026: aviso fijo al lado de la lista de archivos y del botón "Subir y procesar"
+// (el cartel de arriba de todo quedaba fuera de la vista). Se borra al empezar otra subida.
+function mostrarAvisoSubida(texto) {
+  const el = document.getElementById('avisoSubida');
+  if (!el) return;
+  if (!texto) { el.style.display = 'none'; el.textContent = ''; return; }
+  el.textContent = texto;
+  el.style.display = 'block';
+  try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+}
+
 function buildFileListHTML() {
   return files.map((f,i) => `
     <div class="file-item">
       <i class="ti ti-file-type-pdf" style="font-size:16px;color:#c5221f;flex-shrink:0;"></i>
-      <span class="file-name">${escapeHtml(f.name)}</span>
+      ${(f.status === 'error' && f.error)
+        ? `<div style="flex:1;min-width:0;"><span class="file-name" style="display:block;">${escapeHtml(f.name)}</span><span style="display:block;font-size:12px;color:#a50e0e;line-height:1.4;">${escapeHtml(f.error)}</span></div>`
+        : `<span class="file-name">${escapeHtml(f.name)}</span>`}
       <span class="file-size">${(f.size/1024).toFixed(0)} KB</span>
       ${f._yaProcesadaAviso ? `<span class="badge b-ya_procesada" title="Ya parece estar procesada antes -- el sistema te va a preguntar al procesar">ya procesada</span>` : ''}
       <span class="badge b-${f.status}">${ESTADO_LABELS[f.status]||f.status}</span>
@@ -2720,6 +2734,7 @@ async function startUpload() {
     iniciarCountdown(_procesoTimeoutTotalMs);
 
     uploading = true;
+    mostrarAvisoSubida('');
     setUploadControlsDisabled(true);
     mostrarEstadoProceso('procesando');
     updateProcesoUX('validacion', 8, 'Validando' + etiquetaTanda, `Cliente: ${clienteSeleccionado.nombre || clienteSeleccionado.cuit} · Período ${periodoStr()}`, { progressText:'Validación inicial completa' });
@@ -2792,11 +2807,14 @@ async function startUpload() {
       renderQueue();
       renderHistory();
       if (_todosRechazados) {
-        showAlert(`Ningún archivo se subió${etiquetaTanda}: ${pending.length === 1 ? 'el archivo fue rechazado' : 'los ' + pending.length + ' archivos fueron rechazados'}. Mirá el detalle en el aviso.`, 'error', true);
+        const _txtRechazo = `Ningún archivo se subió${etiquetaTanda}: ${pending.length === 1 ? 'el archivo fue rechazado' : 'los ' + pending.length + ' archivos fueron rechazados'}. El motivo de cada uno está en la lista de archivos, debajo de su nombre.`;
+        showAlert(_txtRechazo, 'error', true);
+        mostrarAvisoSubida(_txtRechazo);
         mostrarAlertaPopupMultiple(pending.map(f => ({ nombre: f.name, motivo: f.error || '' })));
         logProceso(`Subida rechazada${etiquetaTanda}: ${pending.map(f => f.name).join(', ')}`);
       } else {
         showAlert('No se pudo subir ningún PDF' + etiquetaTanda + '. Revisá conexión o n8n.', 'error');
+        mostrarAvisoSubida('No se pudo subir ningún PDF' + etiquetaTanda + '. Revisá la conexión y volvé a intentar; si sigue pasando, avisá.');
       }
       detenerCountdown();
       continue;
@@ -2808,7 +2826,9 @@ async function startUpload() {
       // ya muestra el detalle en la cola de archivos); el popup, en vez de
       // amontonar todos los errores en un solo bloque de texto, los muestra
       // de a uno con Anterior/Siguiente -- mostrarAlertaPopupMultiple().
-      showAlert(`${pending.length - fallidosNombres.length}/${pending.length} PDFs subidos. No se subieron ${fallidosNombres.length}.`, 'error', true);
+      const _txtParcial = `${pending.length - fallidosNombres.length}/${pending.length} PDFs subidos. No se ${fallidosNombres.length === 1 ? 'subió 1 archivo' : 'subieron ' + fallidosNombres.length + ' archivos'}: el motivo está en la lista de archivos, debajo de su nombre.`;
+      showAlert(_txtParcial, 'error', true);
+      mostrarAvisoSubida(_txtParcial);
       mostrarAlertaPopupMultiple(pending.filter(f => f.status === 'error').map(f => ({ nombre: f.name, motivo: f.error || '' })));
       logProceso(`Subida parcial: fallaron ${fallidosNombres.length} de ${pending.length} — ${fallidosNombres.join(', ')}`);
     }

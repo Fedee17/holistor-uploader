@@ -446,6 +446,9 @@ let escaneoEnCurso = false;
 let _archivoExcelPendiente = null;
 let _ultimoExcelParseado = null;  // { zone, registros, receptorCuit, periodoPrincipal } del último Excel leído, para poder revalidar sin releer el archivo si el usuario cambia el período después
 let registroSubido = false;
+// FIX 08/10/2026: cuenta los pasos del Excel de ARCA que están en marcha (leerlo y guardarlo).
+// Mientras sea > 0, "Subir y procesar" espera en vez de avisar "Sin registro de comprobantes".
+let registroOcupado = 0;
 let archivosFallidos = [];
 let _reintentoCliente = null;
 let _reintentoPeriodo = null;
@@ -916,6 +919,12 @@ function mostrarCargando(zone, file) {
 }
 
 async function guardarRegistroEnN8n(zone, registros, receptorCuit) {
+  registroOcupado++;
+  try { return await _guardarRegistroEnN8n(zone, registros, receptorCuit); }
+  finally { registroOcupado--; }
+}
+
+async function _guardarRegistroEnN8n(zone, registros, receptorCuit) {
   registroSubido = false;  // v12: solo true cuando el guardado se CONFIRMA (evita estricto contra fila vieja en timeout/error)
   zone.classList.add('loaded');
   const existingBtn = zone.querySelector('.ez-remove');
@@ -963,6 +972,12 @@ async function guardarRegistroEnN8n(zone, registros, receptorCuit) {
 }
 
 async function handleExcelFile(file) {
+  registroOcupado++;
+  try { return await _handleExcelFile(file); }
+  finally { registroOcupado--; }
+}
+
+async function _handleExcelFile(file) {
   if (!validarArchivoExcel(file)) return;
 
   if (!clienteSeleccionado) {
@@ -1452,6 +1467,10 @@ function parsearRegistroARCA(file) {
 function handleSubir() {
   if (!clienteSeleccionado) {
     showAlert('Seleccioná cliente', 'warn');
+    return;
+  }
+  if (registroOcupado > 0) {
+    showAlert('El Excel de ARCA todavía se está cargando. Esperá a que diga "Registro guardado" y volvé a tocar "Subir y procesar".', 'warn');
     return;
   }
   const pending = files.filter(f => f.status === 'pending');
@@ -2714,6 +2733,7 @@ async function startUpload() {
         const detalle = err.name === 'AbortError' ? 'timeout' : err.message;
         console.error('Error subiendo PDF', item.name, err);
         item.error = detalle;
+        item.rechazado = (err && err.rechazado === true);
         // FIX 07/10/2026: si el backend rechazó el archivo (ver 'Validar Subida'
         // en n8n), no mostrar acá el cartel individual -- se muestra uno solo
         // al final de la tanda con el detalle de todos los rechazados (carrusel).
@@ -2738,7 +2758,16 @@ async function startUpload() {
 
     const subidosOk = pending.some(f => f.status === 'done');
     if (!subidosOk) {
-      showAlert('No se pudo subir ningún PDF' + etiquetaTanda + '. Revisá conexión o n8n.', 'error');
+      // FIX 08/10/2026: si TODOS los archivos fueron rechazados por el servidor
+      // (vacíos / no son PDF), no culpar a la conexión: mostrar el motivo de cada uno.
+      const _todosRechazados = pending.length > 0 && pending.every(f => f.status === 'error' && f.rechazado === true);
+      if (_todosRechazados) {
+        showAlert(`Ningún archivo se subió${etiquetaTanda}: ${pending.length === 1 ? 'el archivo fue rechazado' : 'los ' + pending.length + ' archivos fueron rechazados'}. Mirá el detalle en el aviso.`, 'error', true);
+        mostrarAlertaPopupMultiple(pending.map(f => ({ nombre: f.name, motivo: f.error || '' })));
+        logProceso(`Subida rechazada${etiquetaTanda}: ${pending.map(f => f.name).join(', ')}`);
+      } else {
+        showAlert('No se pudo subir ningún PDF' + etiquetaTanda + '. Revisá conexión o n8n.', 'error');
+      }
       detenerCountdown();
       continue;
     }
@@ -3134,7 +3163,7 @@ function initApp() {
   const excelInput = document.getElementById('excelInput');
 
   excelZone.addEventListener('click', () => {
-    if (!registroSubido) excelInput.click();
+    if (!registroSubido && registroOcupado === 0) excelInput.click();
   });
   excelInput.addEventListener('change', (e) => {
     if (e.target.files[0]) handleExcelFile(e.target.files[0]);

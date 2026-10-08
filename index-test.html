@@ -2807,7 +2807,7 @@ async function startUpload() {
       renderQueue();
       renderHistory();
       if (_todosRechazados) {
-        const _txtRechazo = `Ningún archivo se subió${etiquetaTanda}: ${pending.length === 1 ? 'el archivo fue rechazado' : 'los ' + pending.length + ' archivos fueron rechazados'}. El motivo de cada uno está en la lista de archivos, debajo de su nombre.`;
+        const _txtRechazo = `Ningún archivo se subió${etiquetaTanda}: ${pending.length === 1 ? 'el archivo fue rechazado' : 'los ' + pending.length + ' archivos fueron rechazados'}.`;
         showAlert(_txtRechazo, 'error', true);
         mostrarAvisoSubida(_txtRechazo);
         mostrarAlertaPopupMultiple(pending.map(f => ({ nombre: f.name, motivo: f.error || '' })));
@@ -2826,7 +2826,7 @@ async function startUpload() {
       // ya muestra el detalle en la cola de archivos); el popup, en vez de
       // amontonar todos los errores en un solo bloque de texto, los muestra
       // de a uno con Anterior/Siguiente -- mostrarAlertaPopupMultiple().
-      const _txtParcial = `${pending.length - fallidosNombres.length}/${pending.length} PDFs subidos. No se ${fallidosNombres.length === 1 ? 'subió 1 archivo' : 'subieron ' + fallidosNombres.length + ' archivos'}: el motivo está en la lista de archivos, debajo de su nombre.`;
+      const _txtParcial = `${pending.length - fallidosNombres.length}/${pending.length} PDFs subidos. No se ${fallidosNombres.length === 1 ? 'subió 1 archivo' : 'subieron ' + fallidosNombres.length + ' archivos'}.`;
       showAlert(_txtParcial, 'error', true);
       mostrarAvisoSubida(_txtParcial);
       mostrarAlertaPopupMultiple(pending.filter(f => f.status === 'error').map(f => ({ nombre: f.name, motivo: f.error || '' })));

@@ -2154,10 +2154,17 @@ async function reintentar() {
   showAlert('Reintentando fallidas… esperando indexación de Drive', 'info');
    try {
     const _cantidadReintentar = archivosFallidos.length;
+    // FIX 07/10/2026 (auditoría): capturar los nombres ANTES de vaciar archivosFallidos.
+    // Calculados después (como estaba), la lista llegaba siempre vacía a n8n y
+    // "Reintentar fallidas" nunca pedía reintentar PDFs puntuales. Misma corrección
+    // que ya tiene index.html (commit bcae97b).
+    const nombresReintentar = _cantidadReintentar
+      ? archivosFallidos.map(x => splitNombreMotivo(x).pdf_nombre).filter(Boolean)
+      : [];
     document.getElementById('cardFallidos').style.display = 'none';
     archivosFallidos = [];
     await sleep(calcularEsperaIndexacion(_cantidadReintentar));
-    await sendFlush(true, false, _cantidadReintentar ? archivosFallidos.map(x => splitNombreMotivo(x).pdf_nombre).filter(Boolean) : []);
+    await sendFlush(true, false, nombresReintentar);
   } catch(e) {
     showAlert('Error al reintentar.', 'error');
   } finally {
@@ -2943,9 +2950,14 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
 
   const LIMITE = 6;
   const todas = [...yaProcesadas.map(f => ({...f, tipo:'ya'})), ...duplicadasLote.map(f => ({...f, tipo:'dup'}))];
-  const repetidas = todas.length;
+  const totalFilas = todas.length;
+  // FIX 07/10/2026 (auditoría): solo las "ya procesadas" cuentan como reprocesables.
+  // Las copias repetidas dentro del lote el servidor las descarta siempre (también
+  // con forzar) y manejarResultadoEscaneo ya las avisó aparte: no deben inflar el
+  // número del botón "Reprocesar todas (N)". Se siguen listando como filas informativas.
+  const repetidas = yaProcesadas.length;
   const visibles = todas.slice(0, LIMITE);
-  const resto = repetidas - visibles.length;
+  const resto = totalFilas - visibles.length;
 
   function formatearFecha(iso) {
     if (!iso) return '';
@@ -3067,7 +3079,10 @@ async function sendFlush(forzar, soloEscanear, reintentarPdfs) {
     _ultimoRechazoProceso = null;
 
     if (data.proceso_ya_activo === true) {
-      showAlert(data.mensaje || 'Ya hay un proceso activo para este cliente y período.', 'warn');
+      // FIX 07/10/2026 (auditoría H-13): el mensaje viene del servidor -> escapar
+      // acá, en el punto de inyección (showAlert recibe HTML a propósito en otros
+      // llamados, así que no se escapa adentro de showAlert).
+      showAlert(escapeHtml(data.mensaje || 'Ya hay un proceso activo para este cliente y período.'), 'warn');
     } else {
       showAlert('Procesamiento iniciado en n8n.', 'success');
       logProceso('n8n confirmó inicio de procesamiento.');

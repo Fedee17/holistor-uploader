@@ -1848,7 +1848,9 @@ function iniciarPolling() {
         const prnReal = data.prn_guardado === true && (_lineas == null || Number(_lineas) > 0);
         const incidenciasTxt = [nf ? `${fallidosVisibles.length} error(es)` : '', manuales.length ? `${manuales.length} carga manual` : '', otrosCliente.length ? `${otrosCliente.length} omitida(s)` : ''].filter(Boolean).join(' · ');
         if (!prnReal) {
-          updateProcesoUX('final', 100, 'Sin PRN generado', naCount ? `${naCount} factura(s) no estan en el registro ARCA cargado.` : 'No se genero ninguna linea de PRN en esta corrida.', { error:true, progressText:'No se genero PRN.' });
+          const _soloYa = !naCount && !nf && !manuales.length && !otrosCliente.length && Array.isArray(data.ya_procesadas) && data.ya_procesadas.length > 0;
+          if (_soloYa) updateProcesoUX('final', 100, 'Sin cambios', 'Todas las facturas de este lote ya estaban procesadas: no hay nada nuevo.', { progressText:'Sin facturas nuevas.' });
+          else updateProcesoUX('final', 100, 'Sin PRN generado', naCount ? `${naCount} factura(s) no estan en el registro ARCA cargado.` : 'No se genero ninguna linea de PRN en esta corrida.', { error:true, progressText:'No se genero PRN.' });
         } else {
           updateProcesoUX('final', 100, incidenciasTxt ? 'PRN listo con avisos' : 'PRN listo', incidenciasTxt ? `PRN generado. Avisos: ${incidenciasTxt}.` : 'PRN generado correctamente.', { progressText: incidenciasTxt ? 'Revisar avisos.' : 'Proceso completo.' });
         }
@@ -1890,7 +1892,7 @@ function iniciarPolling() {
         // 'prnReal' del cartel final: null solo puede venir del caso "incierto" (timeout,
         // ver mostrarEstadoProceso más abajo) — acá siempre es true/false, así que una vez
         // acumulado alcanza con R.prnReal (true si CUALQUIER tanda generó PRN real).
-        mostrarEstadoProceso('listo', R.fallidos, R.prnReal, R.naCount, data.prn_file_id, data.prn_file_name, data.lineas_finales_generadas, R.manuales, R.otrosCliente, R.facturasCount);
+        mostrarEstadoProceso('listo', R.fallidos, R.prnReal, R.naCount, data.prn_file_id, data.prn_file_name, data.lineas_finales_generadas, R.manuales, R.otrosCliente, R.facturasCount, R.yaProcesadas.length, R.duplicadosEnLote.length);
         if (prnReal && data.prn_file_id) _prnDeTandas.push({ id: String(data.prn_file_id), name: String(data.prn_file_name || '') });
         mostrarDiagnostico(data);
         if (R.fallidos.length > 0) mostrarFallidos(R.fallidos);
@@ -2011,7 +2013,7 @@ function toggleAdvertenciasTecnicas() {
   if (chevron) chevron.className = abierta ? 'ti ti-chevron-down' : 'ti ti-chevron-up';
 }
 
-function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prnFileName, lineasCount, manuales, otrosCliente, facturasCount) {
+function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prnFileName, lineasCount, manuales, otrosCliente, facturasCount, yaProcesadasCount, duplicadasLoteCount) {
   const el = document.getElementById('estadoProceso');
   if (!el) return;
 
@@ -2046,6 +2048,20 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prn
       // No se generó PRN real (0 líneas / todas no_en_arca): NO decir "PRN listo".
       el.className = 'alert a-warn';
       el.innerHTML = '<i class="ti ti-alert-triangle" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
+      // FIX 08/10/2026: si lo único que había eran facturas YA procesadas antes (y no
+      // hubo errores, ni "no está en ARCA", ni cargas manuales), decir eso: el motivo
+      // real de que no haya PRN nuevo no es un problema, es que no había nada nuevo.
+      const _nYa = Number(yaProcesadasCount) || 0;
+      const _nDup = Number(duplicadasLoteCount) || 0;
+      const _soloRepetidas = _nYa > 0 && !(naCount > 0) && !nf && !(manuales && manuales.length) && !(otrosCliente && otrosCliente.length);
+      if (_soloRepetidas) {
+        el.className = 'alert a-info';
+        el.innerHTML = '<i class="ti ti-info-circle" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
+        document.getElementById('_epMsg').textContent =
+          `No había nada nuevo para procesar: ${_nYa === 1 ? 'la factura de este lote ya estaba procesada y se dejó como estaba' : `las ${_nYa} facturas de este lote ya estaban procesadas y se dejaron como estaban`}, por eso no se generó un PRN nuevo.` +
+          (_nDup > 0 ? ` ${_nDup === 1 ? 'Una copia repetida del mismo archivo se descartó' : `${_nDup} copias repetidas del mismo archivo se descartaron`}.` : '') +
+          ' Si querés rehacerlas, volvé a subirlas y elegí "Sí, reprocesar".';
+      } else
       document.getElementById('_epMsg').textContent = (naCount && naCount > 0)
         ? `No se generó PRN: ${naCount} factura(s) no están en el registro ARCA cargado. Cargá el Excel de ARCA y reprocesá.`
         : 'No se generó ningún PRN en esta corrida. Revisá el detalle o Drive.';
@@ -2768,6 +2784,13 @@ async function startUpload() {
       // FIX 08/10/2026: si TODOS los archivos fueron rechazados por el servidor
       // (vacíos / no son PDF), no culpar a la conexión: mostrar el motivo de cada uno.
       const _todosRechazados = pending.length > 0 && pending.every(f => f.status === 'error' && f.rechazado === true);
+      // FIX 08/10/2026: no se subió nada, así que no hay ningún proceso en marcha.
+      // Antes el panel quedaba en "Procesando… / Subiendo PDFs 15%" con el botón
+      // "Liberar proceso". Se limpia el panel (y se vuelve a mostrar la lista de
+      // archivos) ANTES de mostrar los avisos con el motivo.
+      resetProcesoUX();
+      renderQueue();
+      renderHistory();
       if (_todosRechazados) {
         showAlert(`Ningún archivo se subió${etiquetaTanda}: ${pending.length === 1 ? 'el archivo fue rechazado' : 'los ' + pending.length + ' archivos fueron rechazados'}. Mirá el detalle en el aviso.`, 'error', true);
         mostrarAlertaPopupMultiple(pending.map(f => ({ nombre: f.name, motivo: f.error || '' })));
@@ -2966,35 +2989,64 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
     } catch(e) { return iso; }
   }
 
-  const filas = visibles.map(f => `
-    <div class="concil-row">
-      <span class="concil-denom">${escapeHtml(f.emisor || f.pdf || '')}</span>
-      <span class="concil-total">${f.tipo === 'ya' ? escapeHtml(formatearFecha(f.procesada_en)) : 'mismo lote'}</span>
-    </div>`).join('');
-
-  const filaResto = resto > 0
-    ? `<div style="padding:8px 14px;font-size:12px;color:#888;">y ${resto} más — ver el detalle completo abajo</div>`
-    : '';
-
-    const nYa = yaProcesadas.length;
+  const nYa = yaProcesadas.length;
   const nDup = duplicadasLote.length;
-  function parteYa(n) { return `${n} ya procesada${n !== 1 ? 's' : ''} antes`; }
-  function parteDup(n) { return `${n} repetida${n !== 1 ? 's' : ''} dentro de este mismo lote`; }
-  let descripcion;
-  if (nYa > 0 && nDup > 0) descripcion = `${parteYa(nYa)} y ${parteDup(nDup)}`;
-  else if (nDup > 0) descripcion = parteDup(nDup);
-  else descripcion = parteYa(nYa);
+  const pl = (n, a, b) => (n === 1 ? a : b);
 
-  let mensaje, primario, secundario;
+  // Texto amigable: qué pasó, y qué hace cada botón.
+  let titulo, intro;
   if (nuevas === 0) {
-    mensaje = `De este lote: ${descripcion}. ¿Querés reprocesarlas de todos modos?`;
+    titulo = nYa > 0 ? 'Estas facturas ya estaban procesadas' : 'Archivos repetidos en este lote';
+    intro = nYa > 0
+      ? `No hay facturas nuevas en este lote. ${nYa === 1 ? 'La única factura válida ya se procesó' : `Las ${nYa} facturas válidas ya se procesaron`} antes.`
+      : 'No hay facturas nuevas en este lote.';
+  } else {
+    titulo = 'Hay facturas que ya estaban procesadas';
+    intro = `Este lote tiene ${nuevas} ${pl(nuevas, 'factura nueva', 'facturas nuevas')} y ${nYa} que ya ${pl(nYa, 'se procesó', 'se procesaron')} antes.`;
+  }
+
+  const queHace = [];
+  if (nuevas === 0) {
+    queHace.push(`<b>No, dejar así:</b> no se genera ningún PRN y ${pl(nYa, 'la factura ya procesada queda como estaba', 'las facturas ya procesadas quedan como estaban')}.`);
+    queHace.push(`<b>Sí, reprocesar:</b> ${pl(nYa, 'se vuelve a leer la factura', `se vuelven a leer las ${nYa} facturas`)} y se arma un PRN nuevo.`);
+  } else {
+    queHace.push(`<b>Solo las nuevas (${nuevas}):</b> se procesan únicamente las nuevas. ${pl(nYa, 'La ya procesada queda como estaba', 'Las ya procesadas quedan como estaban')}.`);
+    queHace.push(`<b>Reprocesar todas (${nuevas + nYa}):</b> se procesan las nuevas y ${pl(nYa, 'se vuelve a leer la ya procesada', `se vuelven a leer las ${nYa} ya procesadas`)}.`);
+  }
+
+  let primario, secundario;
+  if (nuevas === 0) {
     primario = { id: 'btnEscaneoNo', texto: 'No, dejar así' };
     secundario = { id: 'btnEscaneoSi', texto: 'Sí, reprocesar' };
   } else {
-    mensaje = `De este lote: ${descripcion}. ¿Querés reprocesarlas también, o solo las ${nuevas} nueva(s)?`;
     primario = { id: 'btnEscaneoNo', texto: `Solo las nuevas (${nuevas})` };
     secundario = { id: 'btnEscaneoSi', texto: `Reprocesar todas (${nuevas + repetidas})` };
   }
+
+  // Listas separadas: "ya procesadas" (se pueden reprocesar) y "repetidas en el lote" (se descartan solas).
+  const visYa = visibles.filter(f => f.tipo === 'ya');
+  const visDup = visibles.filter(f => f.tipo === 'dup');
+  const filasYa = visYa.map(f => `
+    <div class="concil-row">
+      <span class="concil-denom">${escapeHtml(f.emisor || f.pdf || '')}</span>
+      <span class="concil-total">${escapeHtml(formatearFecha(f.procesada_en))}</span>
+    </div>`).join('');
+  const filasDup = visDup.map(f => `
+    <div class="concil-row">
+      <span class="concil-denom">${escapeHtml(f.emisor || f.pdf || '')}</span>
+      <span class="concil-total">mismo archivo</span>
+    </div>`).join('');
+  const bloqueYa = nYa > 0 ? `
+      <div style="font-size:12px;font-weight:600;color:#333;margin:6px 0 2px;">Ya procesadas antes (${nYa})</div>
+      <div style="font-size:12px;color:#666;margin-bottom:4px;">Podés reprocesarlas si querés. A la derecha, la fecha en que se procesaron.</div>
+      ${filasYa}` : '';
+  const bloqueDup = nDup > 0 ? `
+      <div style="font-size:12px;font-weight:600;color:#333;margin:10px 0 2px;">Repetidas dentro de este lote (${nDup})</div>
+      <div style="font-size:12px;color:#666;margin-bottom:4px;">Es el mismo archivo subido más de una vez. Se descartan solas, elijas lo que elijas: no tenés que hacer nada.</div>
+      ${filasDup}` : '';
+  const filaResto = resto > 0
+    ? `<div style="padding:8px 0;font-size:12px;color:#888;">y ${resto} más — ver el detalle completo abajo</div>`
+    : '';
 
   const fondo = document.createElement('div');
   fondo.id = 'modalEscaneoFondo';
@@ -3002,15 +3054,18 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
 
   const modal = document.createElement('div');
   modal.className = 'card';
-  modal.style.cssText = 'max-width:440px;width:100%;max-height:80vh;display:flex;flex-direction:column;padding:0;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.3);';
+  modal.style.cssText = 'max-width:460px;width:100%;max-height:85vh;display:flex;flex-direction:column;padding:0;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.3);';
 
   modal.innerHTML = `
     <div style="padding:1.25rem 1.25rem .5rem;font-size:14px;line-height:1.5;">
-      <div style="font-weight:600;margin-bottom:2px;">¿Querés reprocesarlas?</div>
-      <div style="color:#555;">${escapeHtml(mensaje)}</div>
+      <div style="font-weight:600;margin-bottom:2px;">${escapeHtml(titulo)}</div>
+      <div style="color:#555;">${escapeHtml(intro)}</div>
     </div>
     <div style="padding:.5rem 1.25rem;overflow-y:auto;flex:1;border-top:0.5px solid #f0f0ea;border-bottom:0.5px solid #f0f0ea;">
-      ${filas}${filaResto}
+      ${bloqueYa}${bloqueDup}${filaResto}
+    </div>
+    <div style="padding:.75rem 1.25rem 0;font-size:12px;line-height:1.5;color:#555;">
+      ${queHace.map(t => `<div style="margin-bottom:4px;">${t}</div>`).join('')}
     </div>
     <div style="padding:1rem 1.25rem;display:flex;gap:8px;">
       <button id="${secundario.id}" class="btn-secondary" style="flex:1;">${secundario.texto}</button>

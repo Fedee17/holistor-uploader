@@ -447,6 +447,7 @@ let escaneoEnCurso = false;
 let _archivoExcelPendiente = null;
 let _ultimoExcelParseado = null;  // { zone, registros, receptorCuit, periodoPrincipal } del último Excel leído, para poder revalidar sin releer el archivo si el usuario cambia el período después
 let registroSubido = false;
+let _registroEnviadoUltimo = null;  // valor de tiene_registro que se MANDÓ en el último pedido de procesar (la conciliación se decide con este, no con el estado de la página al mostrarla)
 // FIX 08/10/2026: cuenta los pasos del Excel de ARCA que están en marcha (leerlo y guardarlo).
 // Mientras sea > 0, "Subir y procesar" espera en vez de avisar "Sin registro de comprobantes".
 let registroOcupado = 0;
@@ -488,7 +489,7 @@ function crearResumenTandasVacio() {
     yaProcesadas: [],
     duplicadosEnLote: [],
     // Conciliación (verificacion.resumen + sus listas) — se suman/concatenan tanda a tanda.
-    verifResumen: { conciliadas:0, total_a_revisar:0, falta_procesar:0, fuera_de_arca:0 },
+    verifResumen: { conciliadas:0, total_a_revisar:0, falta_procesar:0, fuera_de_arca:0, en_registro:null },
     verifConciliadas: [],
     verifTotalARevisar: [],
     verifFaltaProcesar: [],
@@ -1814,6 +1815,9 @@ function iniciarPolling() {
           || (Array.isArray(data.no_en_arca)   && data.no_en_arca.length   > 0)
           || (Array.isArray(data.ya_procesadas)&& data.ya_procesadas.length> 0)
           || (Array.isArray(data.cargar_manual)&& data.cargar_manual.length> 0)
+          // FIX 09/10/2026: un lote donde todas las facturas son de otro cliente no genera PRN ni
+          // fallidas; sin esta línea la página nunca daba el proceso por terminado y quedaba en "Procesando…".
+          || (Array.isArray(data.otro_cliente) && data.otro_cliente.length > 0)
           || (data.conciliacion && Array.isArray(data.conciliacion.procesadas_registradas)
               && data.conciliacion.procesadas_registradas.length > 0);
         if (!_tieneContenido) {
@@ -1886,6 +1890,12 @@ function iniciarPolling() {
           R.verifResumen.total_a_revisar += Number(vr.total_a_revisar) || 0;
           R.verifResumen.falta_procesar += Number(vr.falta_procesar) || 0;
           R.verifResumen.fuera_de_arca += Number(vr.fuera_de_arca) || 0;
+          // Filas del registro ARCA que vio el servidor: se guarda el MENOR valor de las tandas,
+          // así una sola tanda que no vio el registro alcanza para avisar.
+          if (vr.en_registro !== undefined && vr.en_registro !== null && Number.isFinite(Number(vr.en_registro))) {
+            const _er = Number(vr.en_registro);
+            R.verifResumen.en_registro = (R.verifResumen.en_registro === null) ? _er : Math.min(R.verifResumen.en_registro, _er);
+          }
           R.verifConciliadas = R.verifConciliadas.concat(data.verificacion.conciliadas || []);
           R.verifTotalARevisar = R.verifTotalARevisar.concat(data.verificacion.total_a_revisar || []);
           R.verifFaltaProcesar = R.verifFaltaProcesar.concat(data.verificacion.falta_procesar || []);
@@ -2104,20 +2114,38 @@ function mostrarConciliacion(verif, concil, noEnArca, yaProcesadas, duplicadosEn
   card.scrollIntoView({ behavior:'smooth', block:'nearest' });
 
   let html = '';
+  // Regla (acordada con el estudio, 09/10): con el Excel de ARCA cargado, una factura que no está en
+  // ARCA NO entra al PRN, así que "En el PRN, pero no figuran en ARCA" tiene que estar vacío y no se
+  // muestra. Si trae algo con el Excel cargado es un error del sistema y se muestra con aviso.
+  // Sin el Excel cargado en esta sesión también se muestra si trae facturas, aclarando contra qué se comparó.
+  const _fueraLista = (hayVerif && Array.isArray(verif.fuera_de_arca)) ? verif.fuera_de_arca : [];
+  const _conExcel = (typeof _registroEnviadoUltimo !== 'undefined' && _registroEnviadoUltimo !== null) ? _registroEnviadoUltimo : ((typeof registroSubido !== 'undefined') && registroSubido === true);
+  const _enRegSrv = (hayVerif && verif.resumen && verif.resumen.en_registro !== undefined && verif.resumen.en_registro !== null) ? Number(verif.resumen.en_registro) : NaN;
+  // Solo se muestra si trae facturas: "sin Excel en esta sesión" no significa "sin registro" (el servidor compara contra lo guardado de cargas anteriores).
+  const _mostrarFuera = _fueraLista.length > 0 || (Number(hayVerif && verif.resumen ? verif.resumen.fuera_de_arca : 0) > 0);
   if (hayVerif) {
     const r = verif.resumen || {};
     html += `<div class="concil-summary">`
       + `<span class="concil-badge cb-ok">✓ ${r.conciliadas||0} conciliadas</span>`
       + `<span class="concil-badge cb-warn">⚠ ${r.total_a_revisar||0} total a revisar</span>`
       + `<span class="concil-badge cb-err">✗ ${r.falta_procesar||0} falta procesar</span>`
-      + `<span class="concil-badge cb-warn">↗ ${r.fuera_de_arca||0} fuera de ARCA</span>`
+      + (_mostrarFuera ? `<span class="concil-badge cb-warn">↗ ${r.fuera_de_arca||0} en el PRN sin figurar en ARCA</span>` : '')
       + `</div>`;
     html += buildConcilSection('circle-check', 'Conciliadas — clave y total OK', (verif.conciliadas || []).map(x => ({ clave:x.clave, total:x.total })), 'ok');
     html += buildRevisarSection(verif.total_a_revisar || []);
     const _faltaCount = (verif.falta_procesar || []).length;
     const _faltaLabel = 'Falta procesar — en ARCA, no en el PRN' + (_faltaCount > 0 ? ' <span style="font-size:11px;font-weight:400;color:#666;">(PDFs no subidos en esta corrida o con error)</span>' : '');
     html += buildConcilSection('circle-x', _faltaLabel, (verif.falta_procesar || []).map(x => ({ clave:x.clave, denominacion:x.denominacion, total:x.total_registro })), 'err');
-    html += buildConcilSection('arrow-up-right', 'Fuera de ARCA / carga manual — en el PRN, no en ARCA', (verif.fuera_de_arca || []).map(x => ({ clave:x.clave, denominacion:x.denominacion, total:x.total_extraido })), 'warn');
+    if (_mostrarFuera) {
+      if (_conExcel) {
+        const _srvVacio = Number.isFinite(_enRegSrv) && _enRegSrv === 0;
+        const _txtAviso = _srvVacio
+          ? 'El servidor no encontró el registro de ARCA de este cliente y período, así que este PRN salió <b>sin validarse contra ARCA</b>. Volvé a cargar el Excel y procesá de nuevo antes de importar.'
+          : 'Con el Excel de ARCA cargado esto no debería pasar: estas facturas entraron al PRN sin figurar en el registro. Revisalas antes de importar el PRN.';
+        html += `<div class="concil-aviso" style="margin:8px 0;padding:10px 12px;border:1px solid #f0b4ae;background:#fdecea;color:#8a1c14;border-radius:8px;font-size:13px;">⚠ ${_txtAviso}</div>`;
+      }
+      html += buildConcilSection('arrow-up-right', 'En el PRN, pero no figuran en ARCA' + (_conExcel ? '' : ' <span style="font-size:11px;font-weight:400;color:#666;">(' + ((Number.isFinite(_enRegSrv) && _enRegSrv === 0) ? 'no hay registro de ARCA para este cliente y período: no se pudo validar' : 'no se cargó el Excel en esta sesión: se comparó contra el registro guardado antes') + ')</span>'), _fueraLista.map(x => ({ clave:x.clave, denominacion:x.denominacion, total:x.total_extraido })), 'warn');
+    }
   } else if (concil) {
     html += buildConcilSection('circle-check', 'Procesadas y en registro', concil.procesadas_registradas || [], 'ok');
     html += buildConcilSection('alert-triangle', 'Procesadas pero NO en registro', concil.procesadas_no_registro || [], 'warn');
@@ -2148,8 +2176,9 @@ function buildRevisarSection(items) {
 }
 
 function buildNaSection(noEnArca) {
+  if (!Array.isArray(noEnArca) || noEnArca.length === 0) return '';
   const rows = noEnArca.slice(0,150).map(it => `<div class="concil-row"><span class="concil-key">${escapeHtml(it.pdf||'')}</span><span class="concil-denom">${escapeHtml(it.emisor||'')}</span><span class="concil-total">${escapeHtml(it.total||'')}</span></div>`).join('');
-  return `<div class="concil-section"><div class="concil-head"><i class="ti ti-clock-pause concil-icon ci-warn"></i><span class="concil-title">No procesadas — no están en ARCA</span><span class="concil-badge cb-warn">${noEnArca.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${noEnArca.length ? rows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
+  return `<div class="concil-section"><div class="concil-head"><i class="ti ti-clock-pause concil-icon ci-warn"></i><span class="concil-title">Omitidas del PRN — no figuran en ARCA. Cargar a mano en Holistor</span><span class="concil-badge cb-warn">${noEnArca.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${noEnArca.length ? rows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
 }
 
 function buildYpSection(yaProcesadas) {
@@ -3135,6 +3164,7 @@ async function sendFlush(forzar, soloEscanear, reintentarPdfs) {
   try {
     updateProcesoUX('ia', 62, 'Iniciando n8n', 'Se envió la orden de procesamiento al workflow.', { progressText:'Disparando holistor-procesar…' });
     logProceso('Enviando orden a n8n: holistor-procesar.');
+    _registroEnviadoUltimo = (registroSubido === true);
     const res = await fetchConTimeout(WEBHOOK.procesar(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

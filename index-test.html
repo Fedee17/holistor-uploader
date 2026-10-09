@@ -2179,6 +2179,7 @@ function buildRevisarSection(items) {
 }
 
 function buildNaSection(noEnArca) {
+  if (!Array.isArray(noEnArca) || noEnArca.length === 0) return '';
   const rows = noEnArca.slice(0,150).map(it => `<div class="concil-row"><span class="concil-key">${escapeHtml(it.pdf||'')}</span><span class="concil-denom">${escapeHtml(it.emisor||'')}</span><span class="concil-total">${escapeHtml(it.total||'')}</span></div>`).join('');
   return `<div class="concil-section"><div class="concil-head"><i class="ti ti-clock-pause concil-icon ci-warn"></i><span class="concil-title">Omitidas del PRN — no figuran en ARCA. Cargar a mano en Holistor</span><span class="concil-badge cb-warn">${noEnArca.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${noEnArca.length ? rows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
 }

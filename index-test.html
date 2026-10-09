@@ -1821,6 +1821,9 @@ function iniciarPolling() {
           || (Array.isArray(data.no_en_arca)   && data.no_en_arca.length   > 0)
           || (Array.isArray(data.ya_procesadas)&& data.ya_procesadas.length> 0)
           || (Array.isArray(data.cargar_manual)&& data.cargar_manual.length> 0)
+          // FIX 09/10/2026: un lote donde todas las facturas son de otro cliente no genera PRN ni
+          // fallidas; sin esta línea la página nunca daba el proceso por terminado y quedaba en "Procesando…".
+          || (Array.isArray(data.otro_cliente) && data.otro_cliente.length > 0)
           || (data.conciliacion && Array.isArray(data.conciliacion.procesadas_registradas)
               && data.conciliacion.procesadas_registradas.length > 0);
         if (!_tieneContenido) {

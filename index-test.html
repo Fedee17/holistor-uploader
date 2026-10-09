@@ -2120,11 +2120,12 @@ function mostrarConciliacion(verif, concil, noEnArca, yaProcesadas, duplicadosEn
   // Regla (acordada con el estudio, 09/10): con el Excel de ARCA cargado, una factura que no está en
   // ARCA NO entra al PRN, así que "En el PRN, pero no figuran en ARCA" tiene que estar vacío y no se
   // muestra. Si trae algo con el Excel cargado es un error del sistema y se muestra con aviso.
-  // Sin el Excel cargado no hay con qué validar: se muestra siempre.
+  // Sin el Excel cargado en esta sesión también se muestra si trae facturas, aclarando contra qué se comparó.
   const _fueraLista = (hayVerif && Array.isArray(verif.fuera_de_arca)) ? verif.fuera_de_arca : [];
   const _conExcel = (typeof _registroEnviadoUltimo !== 'undefined' && _registroEnviadoUltimo !== null) ? _registroEnviadoUltimo : ((typeof registroSubido !== 'undefined') && registroSubido === true);
   const _enRegSrv = (hayVerif && verif.resumen && verif.resumen.en_registro !== undefined && verif.resumen.en_registro !== null) ? Number(verif.resumen.en_registro) : NaN;
-  const _mostrarFuera = !_conExcel || _fueraLista.length > 0 || (Number(hayVerif && verif.resumen ? verif.resumen.fuera_de_arca : 0) > 0);
+  // Solo se muestra si trae facturas: "sin Excel en esta sesión" no significa "sin registro" (el servidor compara contra lo guardado de cargas anteriores).
+  const _mostrarFuera = _fueraLista.length > 0 || (Number(hayVerif && verif.resumen ? verif.resumen.fuera_de_arca : 0) > 0);
   if (hayVerif) {
     const r = verif.resumen || {};
     html += `<div class="concil-summary">`
@@ -2146,7 +2147,7 @@ function mostrarConciliacion(verif, concil, noEnArca, yaProcesadas, duplicadosEn
           : 'Con el Excel de ARCA cargado esto no debería pasar: estas facturas entraron al PRN sin figurar en el registro. Revisalas antes de importar el PRN.';
         html += `<div class="concil-aviso" style="margin:8px 0;padding:10px 12px;border:1px solid #f0b4ae;background:#fdecea;color:#8a1c14;border-radius:8px;font-size:13px;">⚠ ${_txtAviso}</div>`;
       }
-      html += buildConcilSection('arrow-up-right', 'En el PRN, pero no figuran en ARCA' + (_conExcel ? '' : ' <span style="font-size:11px;font-weight:400;color:#666;">(no se cargó el Excel de ARCA: no se pudo validar)</span>'), _fueraLista.map(x => ({ clave:x.clave, denominacion:x.denominacion, total:x.total_extraido })), 'warn');
+      html += buildConcilSection('arrow-up-right', 'En el PRN, pero no figuran en ARCA' + (_conExcel ? '' : ' <span style="font-size:11px;font-weight:400;color:#666;">(' + ((Number.isFinite(_enRegSrv) && _enRegSrv === 0) ? 'no hay registro de ARCA para este cliente y período: no se pudo validar' : 'no se cargó el Excel en esta sesión: se comparó contra el registro guardado antes') + ')</span>'), _fueraLista.map(x => ({ clave:x.clave, denominacion:x.denominacion, total:x.total_extraido })), 'warn');
     }
   } else if (concil) {
     html += buildConcilSection('circle-check', 'Procesadas y en registro', concil.procesadas_registradas || [], 'ok');

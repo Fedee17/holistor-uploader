@@ -3014,6 +3014,8 @@ function manejarResultadoEscaneo(data) {
   if (nuevas === 0 && repetidas === 0) {
     logProceso('Escaneo: no hay facturas de este cliente/período en la carpeta de entrada.');
     showAlert('No hay facturas para procesar: la carpeta de entrada no tiene PDFs de este cliente y período.', 'warn');
+    // FIX 09/10/2026: el panel de progreso quedaba en "Escaneando… 65 %" aunque ya no había nada para hacer.
+    updateProcesoUX('final', 100, 'Sin facturas', 'La carpeta de entrada no tiene PDFs de este cliente y período.', { progressText:'Sin facturas para procesar.' });
     _corridaTerminada(false);
     return;
   }

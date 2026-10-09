@@ -43,7 +43,7 @@ La credencial vieja `Header Auth account` (`x-goog-api-key`, Google) NO se tocó
 
 ## Decisiones tomadas (17/09)
 - Recargar el Excel de un período ya cargado **inserta filas nuevas** (REGISTRO_ESPERADO es solo-agregar; el sistema une los duplicados por clave al leer). Aceptado por el estudio; la alternativa de actualizar las filas existentes en lugar de agregar ("opción 3") queda **para más adelante**.
-- Facturas "sin ARCA": hoy solo se rechazan estrictamente cuando el Excel se cargó en esa misma corrida (`tiene_registro`). Ofrecido y sin decidir: aplicar el modo estricto siempre que la hoja ya tenga registro para ese cliente/período.
+- Facturas "sin ARCA": hoy solo se rechazan estrictamente cuando el Excel se cargó en esa misma corrida (`tiene_registro`). Ofrecido y sin decidir: aplicar el modo estricto siempre que la hoja ya tenga registro para ese cliente/período. **[Superado el 09/10/2026: `Indexar Registro` (producción `0872aba4`, TEST `5debc5f6`) pone `tiene_registro = true` cuando el registro guardado tiene filas; ver `9_cambios_2026-10-09_modo_estricto.md`.]**
 
 ## Otros pendientes
 - **17/09**: todos los pendientes de abajo y los de la sección anterior están cargados en ClickUp (lista "Desarrollo y Automatización", 24 tareas: 7 completadas + 17 pendientes). Los cuatro archivos de conocimiento del Proyecto y el informe de auditoría quedaron actualizados el mismo día.

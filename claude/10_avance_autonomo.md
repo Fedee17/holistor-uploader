@@ -19,7 +19,7 @@ Frase exacta: "Retomá el trabajo autónomo de Holistor: leé claude/10_avance_a
 
 | # | Tarea | Estado | Último paso | Siguiente paso | Evidencia |
 |---|---|---|---|---|---|
-| 1 | Documentos del Proyecto al día (09/10) | en curso | Verificado por grep que 9_/9b_ ya dicen INP y citan b5653ee; 2_/3_/7_ ya describen Indexar Registro 0872aba4 | Revisar línea por línea lo que quede viejo y corregirlo (pendiente-publicar… l.46) | — |
+| 1 | Documentos del Proyecto al día (09/10) | hecha | Verificado por grep y contra el workflow bajado: los seis docs ya tenían INP, b5653ee e Indexar Registro 0872aba4 | — | Commit de este paso; `Indexar Registro` l.105-111 idéntico PROD/TEST; nota en 2_ y 7_; `pendiente-publicar…` l.46 marcada como superada |
 | 2 | Hallazgos 2 y 3 del 24/09 (ClickUp 86e3myeyw) | pendiente | ClickUp confirmado: coincide con el informe | Diseño comparado (3 opciones) → TEST → prueba con 2 clientes y sondeo | — |
 | 3 | "cliente ?" en Generar PRN | pendiente | Origen localizado: `_cuitRefGuard` cae en '?' sin cuitClienteRef/cuitClienteArchivo | Cambio mínimo en TEST + corrida real | — |
 | 4 | Carrera del candado (H-04) | pendiente | — | Tarea ClickUp + alternativa liviana | — |

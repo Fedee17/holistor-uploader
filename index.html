@@ -1857,7 +1857,7 @@ function iniciarPolling() {
         if (!prnReal) {
           const _soloYa = !naCount && !nf && !manuales.length && !otrosCliente.length && Array.isArray(data.ya_procesadas) && data.ya_procesadas.length > 0;
           if (_soloYa) updateProcesoUX('final', 100, 'Sin cambios', 'Todas las facturas de este lote ya estaban procesadas: no hay nada nuevo.', { progressText:'Sin facturas nuevas.' });
-          else updateProcesoUX('final', 100, 'Sin PRN generado', naCount ? `${naCount} factura(s) no estan en el registro ARCA cargado.` : 'No se genero ninguna linea de PRN en esta corrida.', { error:true, progressText:'No se genero PRN.' });
+          else updateProcesoUX('final', 100, 'Sin PRN generado', naCount ? `${naCount} factura(s) no figuran en ARCA (no entran al PRN).` : 'No se genero ninguna linea de PRN en esta corrida.', { error:true, progressText:'No se genero PRN.' });
         } else {
           updateProcesoUX('final', 100, incidenciasTxt ? 'PRN listo con avisos' : 'PRN listo', incidenciasTxt ? `PRN generado. Avisos: ${incidenciasTxt}.` : 'PRN generado correctamente.', { progressText: incidenciasTxt ? 'Revisar avisos.' : 'Proceso completo.' });
         }
@@ -2076,7 +2076,7 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prn
           ' Si querés rehacerlas, volvé a subirlas y elegí "Sí, reprocesar".';
       } else
       document.getElementById('_epMsg').textContent = (naCount && naCount > 0)
-        ? `No se generó PRN: ${naCount} factura(s) no están en el registro ARCA cargado. Cargá el Excel de ARCA y reprocesá.`
+        ? `No se generó PRN: ${naCount} factura(s) no figuran en ARCA. Cargalas a mano en Holistor, o si ya figuran en ARCA, subí de nuevo el Excel actualizado y reprocesá.`
         : 'No se generó ningún PRN en esta corrida. Revisá el detalle o Drive.';
     } else {
       const btnAud = document.getElementById('btnAuditoria');
@@ -2306,6 +2306,10 @@ function mostrarOtroCliente(items) {
   if (!card) return;
   if (!items || !items.length) { card.style.display = 'none'; return; }
   card.style.display = 'block';
+  // FIX 09/10/2026: el servidor a veces manda "cliente ?" en el motivo; se completa con el CUIT elegido.
+  const _selC = document.getElementById('selCliente');
+  const _cuitSel = _selC && _selC.value ? String(_selC.value) : '';
+  if (_cuitSel) items = items.map(it => (it && typeof it.motivo === 'string' && it.motivo.indexOf('cliente ?') >= 0) ? Object.assign({}, it, { motivo: it.motivo.replace('cliente ?', 'cliente ' + _cuitSel) }) : it);
   renderListaDetalle('listOtroCliente', items, 'b-otro_cliente', 'omitida', 'other-note', 'No entra al PRN de este cliente.');
 }
 

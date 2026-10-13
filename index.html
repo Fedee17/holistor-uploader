@@ -2494,6 +2494,14 @@ async function addFilesInner(newFiles) {
   const pdfs = Array.from(newFiles).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
   if (!pdfs.length) { showAlert('Solo PDFs', 'error'); return; }
 
+  // FIX 13/10/2026: después de una corrida terminada, el botón "Ver detalle de las facturas" queda
+  // visible y renderQueue() lo toma como "hay un proceso en marcha": oculta la zona donde está
+  // "Subir y procesar", y al arrastrar facturas nuevas parecía que no pasaba nada (solo se
+  // arreglaba recargando o cambiando de cliente). Si la corrida anterior ya terminó (resultado
+  // mostrado y sin consultas de estado activas), se hace la misma limpieza que al cambiar de
+  // cliente, para que los botones vuelvan a verse. Si hay un proceso en marcha no se toca nada.
+  if (_resultadoYaMostrado === true && !pollingInterval) resetProcesoUX();
+
   const nuevosItems = pdfs.map(f => ({ name: f.name, size: f.size, file: f, status: 'uploading' }));
   nuevosItems.forEach(it => files.push(it));
   renderQueue();
@@ -3405,6 +3413,8 @@ console.log('Holistor uploader inline JS cargado OK');
           || (Array.isArray(data?.no_en_arca)    && data.no_en_arca.length    > 0)
           || (Array.isArray(data?.ya_procesadas) && data.ya_procesadas.length > 0)
           || (Array.isArray(data?.cargar_manual) && data.cargar_manual.length > 0)
+          // FIX 13/10/2026: lote con solo facturas de otro cliente (mismo criterio que _tieneContenido de iniciarPolling).
+          || (Array.isArray(data?.otro_cliente) && data.otro_cliente.length > 0)
           || (Array.isArray(data?.duplicados_en_lote) && data.duplicados_en_lote.length > 0)
           || (Array.isArray(data?.nuevas_en_escaneo)  && data.nuevas_en_escaneo.length  > 0)
           || (data?.conciliacion && Array.isArray(data.conciliacion.procesadas_registradas)

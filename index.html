@@ -53,7 +53,6 @@
   .registry-warn-head { display: flex; align-items: center; gap: 6px; font-weight: 500; margin-bottom: 6px; }
   .registry-warn-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .rw-btn-a { background: #1a1a1a; color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; cursor: pointer; }
-  .rw-btn-b { background: none; border: 0.5px solid #92400e; border-radius: 6px; padding: 6px 14px; font-size: 12px; cursor: pointer; color: #92400e; }
   .queue { margin-top: 1rem; display: none; }
   .queue-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; margin-bottom: 8px; }
   .file-list { max-height: 260px; overflow-y: auto; }
@@ -218,17 +217,16 @@
         <i class="ti ti-file-spreadsheet ez-icon"></i>
         <div class="ez-text">
           <div class="ez-title" id="ezTitle">Arrastrá el Excel de ARCA o hacé clic</div>
-          <div class="ez-sub" id="ezSub">Necesario para la conciliación de comprobantes</div>
+          <div class="ez-sub" id="ezSub">Obligatorio para procesar: se pide en cada sesión</div>
         </div>
         <span class="ez-action" id="ezAction">Seleccionar</span>
       </div>
       <input type="file" id="excelInput" accept=".xlsx,.xls,.csv" />
       <div class="registry-warn" id="registryWarn">
-        <div class="registry-warn-head"><i class="ti ti-alert-triangle" style="font-size:14px;"></i> Sin registro de comprobantes</div>
-        Podés procesar igual, pero no se realizará conciliación.
+        <div class="registry-warn-head"><i class="ti ti-alert-triangle" style="font-size:14px;"></i> Falta el Excel de ARCA</div>
+        Para procesar facturas tenés que subir, en esta sesión, el Excel (o CSV) de "Mis Comprobantes Recibidos" de este cliente y período.
         <div class="registry-warn-btns">
-          <button class="rw-btn-a" onclick="focusExcelZone()"><i class="ti ti-table" style="font-size:11px;"></i> Subir registro primero</button>
-          <button class="rw-btn-b" onclick="procesarSinRegistro()">Procesar sin registro</button>
+          <button class="rw-btn-a" onclick="focusExcelZone()"><i class="ti ti-table" style="font-size:11px;"></i> Subir el Excel de ARCA</button>
         </div>
       </div>
       <div class="registry-warn" id="provFaltantes" style="display:none;"></div>
@@ -447,6 +445,7 @@ let escaneoEnCurso = false;
 let _archivoExcelPendiente = null;
 let _ultimoExcelParseado = null;  // { zone, registros, receptorCuit, periodoPrincipal } del último Excel leído, para poder revalidar sin releer el archivo si el usuario cambia el período después
 let registroSubido = false;
+let _registroPeriodoGuardado = '';  // período (AAAA-MM) del Excel de ARCA que se guardó en esta sesión; vacío si no hay
 let _registroEnviadoUltimo = null;  // valor de tiene_registro que se MANDÓ en el último pedido de procesar (la conciliación se decide con este, no con el estado de la página al mostrarla)
 // FIX 08/10/2026: cuenta los pasos del Excel de ARCA que están en marcha (leerlo y guardarlo).
 // Mientras sea > 0, "Subir y procesar" espera en vez de avisar "Sin registro de comprobantes".
@@ -873,17 +872,38 @@ async function resetProceso() {
 // ──────────────────────────────────────────────────────────────────────────────
 function resetRegistro() {
   registroSubido = false;
+  _registroPeriodoGuardado = '';
   const zone = document.getElementById('excelZone');
   zone.classList.remove('loaded','highlight');
   const xBtn = zone.querySelector('.ez-remove');
   if (xBtn) xBtn.remove();
   ezCache.ezTitle.textContent = 'Arrastrá el Excel de ARCA o hacé clic';
-  ezCache.ezSub.textContent = 'Necesario para la conciliación de comprobantes';
+  ezCache.ezSub.textContent = 'Obligatorio para procesar: se pide en cada sesión';
   ezCache.ezAction.textContent = 'Seleccionar';
   document.getElementById('excelInput').value = '';
   document.getElementById('registryWarn').style.display = 'none';
   const pf = document.getElementById('provFaltantes');
   if (pf) { pf.style.display = 'none'; pf.innerHTML = ''; }
+}
+
+// REGLA DEL ESTUDIO (13/10/2026): no se procesa ninguna factura sin el Excel (o CSV) de ARCA subido en ESTA
+// sesión, para ESTE cliente y ESTE período (se pide de nuevo aunque ya esté guardado en la hoja). Reemplaza
+// al botón "Procesar sin registro". Sin Excel el sistema no puede decir si una factura es del cliente.
+function registroVigente() {
+  return registroSubido === true && registroOcupado === 0 && _registroPeriodoGuardado !== '' && _registroPeriodoGuardado === periodoStr();
+}
+function exigirRegistro() {
+  if (registroVigente()) return true;
+  const w = document.getElementById('registryWarn');
+  if (w) w.style.display = 'block';
+  if (registroOcupado > 0) {
+    showAlert('El Excel de ARCA todavía se está cargando. Esperá a que diga "Registro guardado" y volvé a intentar.', 'warn');
+  } else if (registroSubido === true && _registroPeriodoGuardado !== periodoStr()) {
+    showAlert(`El Excel de ARCA que subiste es del período ${_registroPeriodoGuardado} y el elegido es ${periodoStr()}. Tocá la X del Excel y subí el de este período.`, 'warn');
+  } else {
+    showAlert('Falta el Excel de ARCA: subilo antes de procesar (se pide en cada sesión).', 'warn');
+  }
+  return false;
 }
 
 function focusExcelZone() {
@@ -893,11 +913,6 @@ function focusExcelZone() {
   zone.scrollIntoView({ behavior:'smooth', block:'center' });
   setTimeout(() => zone.classList.remove('highlight'), 3000);
   document.getElementById('excelInput').click();
-}
-
-function procesarSinRegistro() {
-  document.getElementById('registryWarn').style.display = 'none';
-  startUpload();
 }
 
 function validarArchivoExcel(file) {
@@ -936,6 +951,7 @@ async function guardarRegistroEnN8n(zone, registros, receptorCuit) {
 
 async function _guardarRegistroEnN8n(zone, registros, receptorCuit) {
   registroSubido = false;  // v12: solo true cuando el guardado se CONFIRMA (evita estricto contra fila vieja en timeout/error)
+  _registroPeriodoGuardado = '';
   zone.classList.add('loaded');
   const existingBtn = zone.querySelector('.ez-remove');
   if (!existingBtn) {
@@ -959,6 +975,7 @@ async function _guardarRegistroEnN8n(zone, registros, receptorCuit) {
     const dataReg = await jsonSeguro(resReg);
     if (resReg.ok && dataReg.ok !== false) {
       registroSubido = true;  // v12: guardado confirmado
+      _registroPeriodoGuardado = periodoStr;  // (acá periodoStr es el texto AAAA-MM calculado arriba, no la función)
       const estadoTexto = 'Registro guardado ✓';
       ezCache.ezSub.textContent = `${registros.length} comprobantes · ${estadoTexto}`;
       showAlert(`${registros.length} ${pluralizar(registros.length, 'comprobante', 'comprobantes')} guardados.`, 'success');
@@ -1496,10 +1513,7 @@ function handleSubir() {
     renderQueue();
   }
 
-  if (!registroSubido) {
-    document.getElementById('registryWarn').style.display = 'block';
-    return;
-  }
+  if (!exigirRegistro()) return;
 
   startUpload();
 }
@@ -2196,6 +2210,7 @@ function buildDupSection(duplicadosEnLote) {
 // ──────────────────────────────────────────────────────────────────────────────
 async function reintentar() {
   if (!archivosFallidos.length) return;
+  if (!exigirRegistro()) return;
   if (_reintentoCliente) clienteSeleccionado = _reintentoCliente;
   if (_reintentoPeriodo) periodo = _reintentoPeriodo;
   document.querySelectorAll('#cardFallidos button').forEach(b => b.disabled = true);
@@ -2882,9 +2897,9 @@ async function startUpload() {
       logProceso(`Subida parcial: fallaron ${fallidosNombres.length} de ${pending.length} — ${fallidosNombres.join(', ')}`);
     }
 
-    updateProcesoUX('registro', 50, registroSubido ? 'Registro ARCA cargado' : 'Sin registro ARCA', registroSubido ? 'El registro ARCA quedó disponible para conciliación.' : 'Se procesará sin conciliación completa.', { progressText: registroSubido ? 'Registro listo' : 'Sin registro' });
-    setStepDetail('registro', registroSubido ? 'Cargado' : 'Omitido');
-    logProceso(registroSubido ? 'Registro ARCA disponible para conciliación.' : 'Procesamiento sin registro ARCA.');
+    updateProcesoUX('registro', 50, 'Registro ARCA cargado', 'El registro ARCA quedó disponible para conciliación.', { progressText: 'Registro listo' });
+    setStepDetail('registro', 'Cargado');
+    logProceso('Registro ARCA disponible para conciliación.');
     updateProcesoUX('ia', 58, 'Esperando Drive', 'PDFs subidos. Esperando indexación de Google Drive antes de revisar qué ya está hecho.', { progressText:'Indexando archivos…' });
     setStepDetail('ia', 'Revisando qué ya está hecho');
     if (!fallidosNombres.length) showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
@@ -3234,6 +3249,7 @@ async function sendFlush(forzar, soloEscanear, reintentarPdfs) {
 }
 
 async function procesarAhoraConEspera() {
+  if (!exigirRegistro()) return;
   showAlert('Esperando indexación de Drive…', 'info');
   await sleep(DRIVE_INDEX_DELAY_MS);
   await escanearYProcesar();
@@ -3337,7 +3353,6 @@ Object.assign(window, {
   onClienteChange,
   actualizarPeriodo,
   focusExcelZone,
-  procesarSinRegistro,
   handleSubir,
   sendFlush,
   clearPending,

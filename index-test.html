@@ -331,6 +331,9 @@
 // (carpeta "TEST — Holistor"), separadas por completo de las de producción.
 // ──────────────────────────────────────────────────────────────────────────────
 const BASE_WEBHOOK = 'https://fede123.app.n8n.cloud/webhook';
+// (16/10/2026) Carpeta de Drive donde el servidor deja los PDF que no figuran en ARCA
+// (ambiente TEST: dentro de "TEST — Holistor"). Solo se usa para el enlace "Abrir carpeta".
+const CARPETA_NO_EN_ARCA_URL = 'https://drive.google.com/drive/folders/1AY_D9ewIumZgIS_08Zj9ENdy8Pam1Zzp';
 const WEBHOOK = {
   upload:    () => BASE_WEBHOOK + '/holistor-upload-test',
   auditoria: () => BASE_WEBHOOK + '/holistor-auditoria-test',
@@ -502,6 +505,15 @@ function crearResumenTandasVacio() {
   };
 }
 let _resumenTandas = crearResumenTandasVacio();
+// (16/10/2026) Enlaces de Drive por nombre de PDF, sumados tanda a tanda. _ultimoEstado
+// solo guarda el último sondeo (o sea, la última tanda), así que con varias tandas los
+// PDF de las primeras se quedaban sin enlace "Ver PDF".
+let _mapaDriveAcum = {};
+function _drivePorNombre(nombre) {
+  const n = String(nombre || '');
+  const sinCuit = n.replace(/^\d{11}__/, '');
+  return _mapaDriveAcum[n] || _mapaDriveAcum[sinCuit] || '';
+}
 let _resultadoYaMostrado = false;
 // Tamaño de tanda (auditoría 16/09/2026, H-06): n8n Cloud corta cada ejecución a
 // los 40 minutos y una factura nueva tarda ~28 s → ~80 facturas por corrida
@@ -1797,6 +1809,7 @@ function iniciarPolling() {
       // backend, pero nada lo guardaba en ningún lado -- el link nunca se
       // activaba. Guardar acá la respuesta completa del último sondeo.
       window._ultimoEstado = data;
+      (Array.isArray(data.pdfs_drive) ? data.pdfs_drive : []).forEach(d => { if (d && d.pdf && d.drive_url) _mapaDriveAcum[d.pdf] = d.drive_url; });
 
       // Si el total real que devuelve el servidor es mayor al que se usó para
       // calcular el tiempo de espera (por ejemplo, había archivos de una sesión
@@ -2197,8 +2210,16 @@ function buildRevisarSection(items) {
 
 function buildNaSection(noEnArca) {
   if (!Array.isArray(noEnArca) || noEnArca.length === 0) return '';
-  const rows = noEnArca.slice(0,150).map(it => `<div class="concil-row"><span class="concil-key">${escapeHtml(it.pdf||'')}</span><span class="concil-denom">${escapeHtml(it.emisor||'')}</span><span class="concil-total">${escapeHtml(it.total||'')}</span></div>`).join('');
-  return `<div class="concil-section"><div class="concil-head"><i class="ti ti-clock-pause concil-icon ci-warn"></i><span class="concil-title">Omitidas del PRN — no figuran en ARCA. Cargar a mano en Holistor</span><span class="concil-badge cb-warn">${noEnArca.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${noEnArca.length ? rows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
+  // (16/10/2026) Cada fila lleva un enlace "Ver PDF" (el servidor manda el enlace de Drive en
+  // pdfs_drive; el identificador del archivo no cambia aunque se mueva de carpeta) y el título
+  // lleva "Abrir carpeta", porque esos PDF ahora van a la carpeta "No figura en ARCA" de Drive.
+  const rows = noEnArca.slice(0,150).map(it => {
+    const _url = _drivePorNombre(it.pdf || '');
+    const _link = _url ? ` <a href="${escapeHtml(_url)}" target="_blank" rel="noopener" style="font-size:12px;white-space:nowrap;">Ver PDF</a>` : '';
+    return `<div class="concil-row"><span class="concil-key">${escapeHtml(it.pdf||'')}${_link}</span><span class="concil-denom">${escapeHtml(it.emisor||'')}</span><span class="concil-total">${escapeHtml(it.total||'')}</span></div>`;
+  }).join('');
+  const _carpeta = (typeof CARPETA_NO_EN_ARCA_URL === 'string' && CARPETA_NO_EN_ARCA_URL) ? ` <a href="${escapeHtml(CARPETA_NO_EN_ARCA_URL)}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="font-size:12px;font-weight:normal;white-space:nowrap;">Abrir carpeta en Drive</a>` : '';
+  return `<div class="concil-section"><div class="concil-head"><i class="ti ti-clock-pause concil-icon ci-warn"></i><span class="concil-title">Omitidas del PRN — no figuran en ARCA. Cargar a mano en Holistor${_carpeta}</span><span class="concil-badge cb-warn">${noEnArca.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${noEnArca.length ? rows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
 }
 
 function buildYpSection(yaProcesadas) {
@@ -2299,17 +2320,16 @@ function normalizarListaResultado(data, claves) {
 function renderListaDetalle(containerId, items, badgeClass, badgeText, noteClass, defaultNote) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  const mapaDrive = {};
-  ((window._ultimoEstado && window._ultimoEstado.pdfs_drive) || []).forEach(d => { if (d && d.pdf) mapaDrive[d.pdf] = d.drive_url; });
   el.innerHTML = (items || []).map(it => {
     const nom = it.pdf_nombre || it.pdf || it.nombre || String(it || '');
+    const _urlDrive = _drivePorNombre(nom);
     const mot = it.motivo || '';
     const acc = it.accion_requerida || '';
     const nota = acc || mot || defaultNote || '';
     return `<div class="history-item" style="align-items:flex-start;">
       <i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;margin-top:2px;"></i>
       <span class="history-name" style="white-space:normal;line-height:1.35;">${escapeHtml(nom)}${nota ? `<div class="${noteClass}">${escapeHtml(nota)}</div>` : ''}</span>
-      ${mapaDrive[nom] ? ` <a href="${escapeHtml(mapaDrive[nom])}" target="_blank" rel="noopener" style="font-size:12px;">Ver en Drive</a>` : ''}
+      ${_urlDrive ? ` <a href="${escapeHtml(_urlDrive)}" target="_blank" rel="noopener" style="font-size:12px;">Ver en Drive</a>` : ''}
       <span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span>
     </div>`;
   }).join('');
@@ -2785,6 +2805,7 @@ async function startUpload() {
 
   _prnDeTandas = [];
   _resumenTandas = crearResumenTandasVacio();
+  _mapaDriveAcum = {};
   for (let t = 0; t < tandas.length; t++) {
     const pending = tandas[t];
     const etiquetaTanda = tandas.length > 1 ? ` (tanda ${t + 1} de ${tandas.length})` : '';

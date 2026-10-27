@@ -381,7 +381,7 @@ function balancesMostrarError(err) {
   `;
   el.resultadoAvisos.innerHTML = '';
   el.resultadoFallos.innerHTML = '';
-  el.btnReconsultar.hidden = !err.esTimeout; // solo se ofrece volver a consultar si se agotó el tiempo
+  el.btnReconsultar.hidden = !err.puedeReconsultar; // se ofrece volver a consultar si falló el seguimiento (tiempo agotado o conexión perdida)
   console.error('Error procesando:', err);
 }
 
@@ -422,14 +422,16 @@ function balancesEsperarResultado(cliente, totalPdfsSubidos) {
         fallosSeguidos++;
         console.error(`Falló la consulta de estado (${fallosSeguidos} seguidas):`, err);
         if (fallosSeguidos >= BALANCES_ESTADO_FALLOS_MAXIMOS) {
-          reject(new Error('Se perdió la conexión mientras se consultaba el estado.'));
+          const errConexion = new Error('Se perdió la conexión mientras se consultaba el estado.');
+          errConexion.puedeReconsultar = true;
+          reject(errConexion);
           return;
         }
       }
 
       if (Date.now() - inicio > timeoutMs) {
         const errTimeout = new Error('El proceso está tardando demasiado. Probá consultar el estado más tarde.');
-        errTimeout.esTimeout = true;
+        errTimeout.puedeReconsultar = true;
         reject(errTimeout);
         return;
       }
@@ -484,7 +486,7 @@ function balancesMostrarResultado(data) {
 }
 
 // ------------------------------------------------------------
-// Volver a consultar el estado después de que se agotó el tiempo
+// Volver a consultar el estado después de que se agotó el tiempo o se perdió la conexión
 // (no sube ni procesa nada: solo retoma balances-estado)
 // ------------------------------------------------------------
 

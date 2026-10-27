@@ -1,0 +1,21 @@
+--- a/index-test.html	2026-10-07 16:10:17.416012961 +0000
++++ b/index-test.html	2026-10-07 16:10:17.416389278 +0000
+@@ -2135,10 +2135,17 @@
+   showAlert('Reintentando fallidas… esperando indexación de Drive', 'info');
+    try {
+     const _cantidadReintentar = archivosFallidos.length;
++    // FIX 07/10/2026 (auditoría): capturar los nombres ANTES de vaciar archivosFallidos.
++    // Calculados después (como estaba), la lista llegaba siempre vacía a n8n y
++    // "Reintentar fallidas" nunca pedía reintentar PDFs puntuales. Misma corrección
++    // que ya tiene index.html (commit bcae97b).
++    const nombresReintentar = _cantidadReintentar
++      ? archivosFallidos.map(x => splitNombreMotivo(x).pdf_nombre).filter(Boolean)
++      : [];
+     document.getElementById('cardFallidos').style.display = 'none';
+     archivosFallidos = [];
+     await sleep(calcularEsperaIndexacion(_cantidadReintentar));
+-    await sendFlush(true, false, _cantidadReintentar ? archivosFallidos.map(x => splitNombreMotivo(x).pdf_nombre).filter(Boolean) : []);
++    await sendFlush(true, false, nombresReintentar);
+   } catch(e) {
+     showAlert('Error al reintentar.', 'error');
+   } finally {

@@ -1,0 +1,11 @@
+--- a/index.html	2026-10-07 16:10:17.432356144 +0000
++++ b/index.html	2026-10-07 16:10:17.432973465 +0000
+@@ -213,7 +213,7 @@
+       <input type="file" id="fileInput" accept=".pdf" multiple />
+     </div>
+     <div>
+-      <label class="field-label"><i class="ti ti-table" style="color:#188038;font-size:14px;"></i> Registro ARCA — Mis Comprobantes Recibidos (.xlsx)</label>
++      <label class="field-label"><i class="ti ti-table" style="color:#188038;font-size:14px;"></i> Registro ARCA — Mis Comprobantes Recibidos (.xlsx o .csv)</label>
+       <div class="excel-zone" id="excelZone">
+         <i class="ti ti-file-spreadsheet ez-icon"></i>
+         <div class="ez-text">

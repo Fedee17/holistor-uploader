@@ -7,9 +7,15 @@
 const BALANCES_URL_BASE = 'https://fede123.app.n8n.cloud/webhook';
 
 // Tiempos del seguimiento y de los pedidos (fáciles de cambiar acá)
-const BALANCES_ESTADO_INTERVALO_MS = 3000;            // espera entre una consulta de estado y la siguiente
+// Cada consulta de balances-estado cuenta como una ejecución de n8n: se consulta rápido al
+// principio y después más espaciado.
+const BALANCES_POLLING_RAPIDO_MS = 3000;              // espera entre consultas durante los primeros instantes
+const BALANCES_POLLING_RAPIDO_DURANTE_MS = 30 * 1000; // cuánto dura ese ritmo rápido, desde que arranca el seguimiento
+const BALANCES_POLLING_LENTO_MS = 10 * 1000;          // espera entre consultas pasado ese tiempo
 const BALANCES_ESTADO_LIMITE_PEDIDO_MS = 30 * 1000;   // límite de cada consulta de estado
-const BALANCES_ESTADO_FALLOS_MAXIMOS = 3;             // fallos seguidos que se toleran antes de cortar
+// Espera después de cada fallo seguido, antes de reintentar. Al fallo número (largo + 1) se rinde.
+const BALANCES_REINTENTOS_ESPERA_MS = [5 * 1000, 15 * 1000, 40 * 1000];
+const BALANCES_RETRY_AFTER_MAXIMO_MS = 60 * 1000;     // tope de la espera pedida por el servidor (429/503 con Retry-After)
 const BALANCES_TIMEOUT_MINIMO_MS = 5 * 60 * 1000;     // tiempo máximo de seguimiento, como mínimo
 const BALANCES_TIMEOUT_POR_PDF_MS = 60 * 1000;        // minutos extra de seguimiento por cada PDF subido
 const BALANCES_LIMITE_RESET_MS = 60 * 1000;
@@ -385,11 +391,27 @@ function balancesMostrarError(err) {
   console.error('Error procesando:', err);
 }
 
+// Segundos pedidos por el servidor en el encabezado Retry-After, en milisegundos (con tope).
+// Solo vale para 429 y 503. Devuelve null si no hay encabezado o no se entiende.
+// (Desde otro dominio el navegador solo deja leer este encabezado si el servidor lo expone con Access-Control-Expose-Headers.)
+function balancesEsperaRetryAfter(resp) {
+  if (resp.status !== 429 && resp.status !== 503) return null;
+  const valor = resp.headers.get('Retry-After');
+  if (!valor) return null;
+  const segundos = Number(valor);
+  const ms = Number.isFinite(segundos) ? segundos * 1000 : Date.parse(valor) - Date.now();
+  if (!Number.isFinite(ms)) return null;
+  return Math.min(Math.max(ms, 0), BALANCES_RETRY_AFTER_MAXIMO_MS);
+}
+
 // Consulta balances-estado hasta que el proceso termine. La siguiente consulta
 // se programa recién cuando termina la anterior (así nunca se superponen).
-// Tolera hasta BALANCES_ESTADO_FALLOS_MAXIMOS fallos seguidos (red, límite de
-// tiempo, error HTTP o respuesta que no es JSON). Corta si pasa el tiempo máximo,
-// que es el mayor entre el mínimo y un tiempo por cada PDF subido.
+// Ritmo normal: cada BALANCES_POLLING_RAPIDO_MS durante BALANCES_POLLING_RAPIDO_DURANTE_MS desde que
+// arranca el seguimiento y después cada BALANCES_POLLING_LENTO_MS. Tras un fallo (red, límite de
+// tiempo, error HTTP o respuesta que no es JSON) reintenta esperando lo que dice
+// BALANCES_REINTENTOS_ESPERA_MS (o el Retry-After del servidor) y se rinde al fallo seguido
+// número (largo de esa lista + 1). Una consulta buena vuelve al ritmo normal. Corta si pasa el
+// tiempo máximo (esperas incluidas), que es el mayor entre el mínimo y un tiempo por cada PDF subido.
 function balancesEsperarResultado(cliente, totalPdfsSubidos) {
   const timeoutMs = Math.max(BALANCES_TIMEOUT_MINIMO_MS, totalPdfsSubidos * BALANCES_TIMEOUT_POR_PDF_MS);
   const inicio = Date.now();
@@ -397,6 +419,7 @@ function balancesEsperarResultado(cliente, totalPdfsSubidos) {
 
   return new Promise((resolve, reject) => {
     const consultar = async () => {
+      let esperaPedidaMs = null; // espera pedida por el servidor (Retry-After) tras un fallo
       try {
         const { resp, data } = await balancesFetchConLimite(
           `${BALANCES_URL_BASE}/balances-estado?cliente=${encodeURIComponent(cliente)}`,
@@ -404,7 +427,11 @@ function balancesEsperarResultado(cliente, totalPdfsSubidos) {
           BALANCES_ESTADO_LIMITE_PEDIDO_MS,
           true
         );
-        if (!resp.ok) throw new Error(`El servidor respondió con un error (código ${resp.status}).`);
+        if (!resp.ok) {
+          const errHttp = new Error(`El servidor respondió con un error (código ${resp.status}).`);
+          errHttp.esperaMs = balancesEsperaRetryAfter(resp);
+          throw errHttp;
+        }
         if (data === null) throw new Error('La respuesta del servidor no es válida.');
 
         fallosSeguidos = 0;
@@ -420,8 +447,9 @@ function balancesEsperarResultado(cliente, totalPdfsSubidos) {
         }
       } catch (err) {
         fallosSeguidos++;
+        esperaPedidaMs = (err.esperaMs ?? null);
         console.error(`Falló la consulta de estado (${fallosSeguidos} seguidas):`, err);
-        if (fallosSeguidos >= BALANCES_ESTADO_FALLOS_MAXIMOS) {
+        if (fallosSeguidos > BALANCES_REINTENTOS_ESPERA_MS.length) {
           const errConexion = new Error('Se perdió la conexión mientras se consultaba el estado.');
           errConexion.puedeReconsultar = true;
           reject(errConexion);
@@ -436,10 +464,16 @@ function balancesEsperarResultado(cliente, totalPdfsSubidos) {
         return;
       }
 
-      setTimeout(consultar, BALANCES_ESTADO_INTERVALO_MS);
+      let esperaMs;
+      if (fallosSeguidos > 0) {
+        esperaMs = esperaPedidaMs ?? BALANCES_REINTENTOS_ESPERA_MS[fallosSeguidos - 1];
+      } else {
+        esperaMs = (Date.now() - inicio < BALANCES_POLLING_RAPIDO_DURANTE_MS) ? BALANCES_POLLING_RAPIDO_MS : BALANCES_POLLING_LENTO_MS;
+      }
+      setTimeout(consultar, esperaMs);
     };
 
-    setTimeout(consultar, BALANCES_ESTADO_INTERVALO_MS);
+    setTimeout(consultar, BALANCES_POLLING_RAPIDO_MS);
   });
 }
 

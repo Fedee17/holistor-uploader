@@ -6,10 +6,21 @@
 
 const BALANCES_URL_BASE = 'https://fede123.app.n8n.cloud/webhook';
 
+// Tiempos del seguimiento y de los pedidos (fáciles de cambiar acá)
+const BALANCES_ESTADO_INTERVALO_MS = 3000;            // espera entre una consulta de estado y la siguiente
+const BALANCES_ESTADO_LIMITE_PEDIDO_MS = 30 * 1000;   // límite de cada consulta de estado
+const BALANCES_ESTADO_FALLOS_MAXIMOS = 3;             // fallos seguidos que se toleran antes de cortar
+const BALANCES_TIMEOUT_MINIMO_MS = 5 * 60 * 1000;     // tiempo máximo de seguimiento, como mínimo
+const BALANCES_TIMEOUT_POR_PDF_MS = 60 * 1000;        // minutos extra de seguimiento por cada PDF subido
+const BALANCES_LIMITE_RESET_MS = 60 * 1000;
+const BALANCES_LIMITE_UPLOAD_MS = 180 * 1000;
+const BALANCES_LIMITE_PROCESAR_MS = 60 * 1000;
+
 // Estado en memoria de esta pestaña (se pierde al recargar, es normal)
 const balancesEstado = {
   clientes: [],           // [{cliente, bancos: [...]}, ...]
   archivos: [],           // File[] elegidos por el usuario, pendientes de procesar
+  ultimoProceso: null,    // {cliente, totalPdfs} del último proceso iniciado, para poder volver a consultar su estado
 };
 
 // ------------------------------------------------------------
@@ -41,6 +52,7 @@ const el = {
   resultadoResumen: document.getElementById('balances-resultado-resumen'),
   resultadoAvisos: document.getElementById('balances-resultado-avisos'),
   resultadoFallos: document.getElementById('balances-resultado-fallos'),
+  btnReconsultar: document.getElementById('balances-btn-reconsultar'),
   btnNuevaCarga: document.getElementById('balances-btn-nueva-carga'),
 };
 
@@ -75,11 +87,11 @@ async function balancesCargarClientes() {
 }
 
 // Escapa texto para que no rompa el HTML si un nombre de cliente
-// tuviera caracteres especiales (< > & etc.)
+// tuviera caracteres especiales (< > & " ' etc.), también dentro de atributos
 function balancesEscapar(texto) {
   const d = document.createElement('div');
   d.textContent = texto;
-  return d.innerHTML;
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // Cuando cambia el cliente elegido, mostramos qué bancos tiene habilitados
@@ -253,6 +265,35 @@ function balancesArchivoABase64(archivo) {
 }
 
 // ------------------------------------------------------------
+// Pedido con límite de tiempo. Si leerJson es true, la lectura del cuerpo
+// también cuenta dentro del límite. Devuelve { resp, data }: data es null
+// si la respuesta no era JSON válido (o si no se pidió leerlo).
+// ------------------------------------------------------------
+
+async function balancesFetchConLimite(url, opciones, limiteMs, leerJson = false) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), limiteMs);
+  try {
+    const resp = await fetch(url, { ...opciones, signal: ctrl.signal });
+    let data = null;
+    if (leerJson) {
+      try {
+        data = await resp.json();
+      } catch (errJson) {
+        if (errJson.name === 'AbortError') throw errJson;
+        data = null;
+      }
+    }
+    return { resp, data };
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('Se agotó el tiempo de espera del servidor.');
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ------------------------------------------------------------
 // Procesar: reset → upload → procesar (async) → polling de estado
 // ------------------------------------------------------------
 
@@ -265,13 +306,18 @@ async function balancesProcesarTodo() {
   balancesMostrarSeccionEstado(true);
   balancesActualizarProgreso(10, 'Preparando…');
 
+  let siguiendoEstado = false; // true cuando ya pasaron reset/upload/procesar y solo queda consultar el estado
+
   try {
     // 1. Reset del proceso de este cliente
-    await fetch(`${BALANCES_URL_BASE}/balances-reset`, {
+    const { resp: respReset } = await balancesFetchConLimite(`${BALANCES_URL_BASE}/balances-reset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cliente }),
-    });
+    }, BALANCES_LIMITE_RESET_MS);
+    if (!respReset.ok) {
+      throw new Error(`No se pudo preparar el proceso: el servidor respondió con un error (código ${respReset.status}).`);
+    }
 
     // 2. Convertir todos los PDFs a base64
     balancesActualizarProgreso(20, 'Leyendo los archivos…');
@@ -283,57 +329,85 @@ async function balancesProcesarTodo() {
 
     // 3. Subir los PDFs
     balancesActualizarProgreso(35, 'Subiendo los resúmenes…');
-    const respUpload = await fetch(`${BALANCES_URL_BASE}/balances-upload`, {
+    const { resp: respUpload, data: dataUpload } = await balancesFetchConLimite(`${BALANCES_URL_BASE}/balances-upload`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cliente, archivos: archivosBase64 }),
-    });
-    const dataUpload = await respUpload.json();
-    if (!dataUpload.ok) {
-      throw new Error(dataUpload.error || 'No se pudieron subir los archivos.');
+    }, BALANCES_LIMITE_UPLOAD_MS, true);
+    if (!respUpload.ok || !dataUpload || !dataUpload.ok) {
+      throw new Error((dataUpload && dataUpload.error) || 'No se pudieron subir los archivos.');
     }
 
     // 4. Disparar el procesamiento — responde al toque, sigue en segundo plano
-    await fetch(`${BALANCES_URL_BASE}/balances-procesar`, {
+    const { resp: respProcesar } = await balancesFetchConLimite(`${BALANCES_URL_BASE}/balances-procesar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cliente }),
-    });
+    }, BALANCES_LIMITE_PROCESAR_MS);
+    if (!respProcesar.ok) {
+      throw new Error(`No se pudo iniciar el procesamiento: el servidor respondió con un error (código ${respProcesar.status}).`);
+    }
 
     // 5. Polling contra balances-estado hasta que termine
+    siguiendoEstado = true;
+    balancesEstado.ultimoProceso = { cliente, totalPdfs: archivosBase64.length };
     balancesActualizarProgreso(40, 'Leyendo los resúmenes con IA…');
-    const resultadoFinal = await balancesEsperarResultado(cliente);
-    balancesActualizarProgreso(100, 'Listo.');
-    balancesMostrarResultado(resultadoFinal);
+    await balancesSeguirProceso(cliente, archivosBase64.length);
 
   } catch (err) {
-    balancesActualizarProgreso(100, '');
-    balancesMostrarSeccionEstado(false);
-    balancesMostrarSeccionResultados(true);
-    el.resultadoResumen.innerHTML = `
-      <div class="balances-mensaje balances-mensaje-error">
-        No se pudo completar el proceso: ${balancesEscapar(err.message)}
-      </div>
-    `;
-    el.resultadoAvisos.innerHTML = '';
-    el.resultadoFallos.innerHTML = '';
-    console.error('Error procesando:', err);
+    balancesMostrarError(err);
+    if (!siguiendoEstado) {
+      // Falló antes de que el proceso arrancara: se puede volver a intentar
+      el.btnProcesar.disabled = balancesEstado.archivos.length === 0 || !el.selectCliente.value;
+    }
   }
 }
 
-// Consulta balances-estado cada 3 segundos hasta que el proceso termine.
-// Corta también si pasan más de 5 minutos, para no quedar consultando para siempre
-// si algo se cuelga del lado de n8n.
-function balancesEsperarResultado(cliente) {
-  const INTERVALO_MS = 3000;
-  const TIMEOUT_MS = 5 * 60 * 1000;
+// Espera el resultado y lo muestra. Si falla, el error lo maneja quien llama.
+async function balancesSeguirProceso(cliente, totalPdfs) {
+  const resultadoFinal = await balancesEsperarResultado(cliente, totalPdfs);
+  balancesActualizarProgreso(100, 'Listo.');
+  balancesMostrarResultado(resultadoFinal);
+}
+
+function balancesMostrarError(err) {
+  balancesActualizarProgreso(100, '');
+  balancesMostrarSeccionEstado(false);
+  balancesMostrarSeccionResultados(true);
+  el.resultadoResumen.innerHTML = `
+    <div class="balances-mensaje balances-mensaje-error">
+      No se pudo completar el proceso: ${balancesEscapar(err.message)}
+    </div>
+  `;
+  el.resultadoAvisos.innerHTML = '';
+  el.resultadoFallos.innerHTML = '';
+  el.btnReconsultar.hidden = !err.esTimeout; // solo se ofrece volver a consultar si se agotó el tiempo
+  console.error('Error procesando:', err);
+}
+
+// Consulta balances-estado hasta que el proceso termine. La siguiente consulta
+// se programa recién cuando termina la anterior (así nunca se superponen).
+// Tolera hasta BALANCES_ESTADO_FALLOS_MAXIMOS fallos seguidos (red, límite de
+// tiempo, error HTTP o respuesta que no es JSON). Corta si pasa el tiempo máximo,
+// que es el mayor entre el mínimo y un tiempo por cada PDF subido.
+function balancesEsperarResultado(cliente, totalPdfsSubidos) {
+  const timeoutMs = Math.max(BALANCES_TIMEOUT_MINIMO_MS, totalPdfsSubidos * BALANCES_TIMEOUT_POR_PDF_MS);
   const inicio = Date.now();
+  let fallosSeguidos = 0;
 
   return new Promise((resolve, reject) => {
-    const intervalo = setInterval(async () => {
+    const consultar = async () => {
       try {
-        const resp = await fetch(`${BALANCES_URL_BASE}/balances-estado?cliente=${encodeURIComponent(cliente)}`);
-        const data = await resp.json();
+        const { resp, data } = await balancesFetchConLimite(
+          `${BALANCES_URL_BASE}/balances-estado?cliente=${encodeURIComponent(cliente)}`,
+          {},
+          BALANCES_ESTADO_LIMITE_PEDIDO_MS,
+          true
+        );
+        if (!resp.ok) throw new Error(`El servidor respondió con un error (código ${resp.status}).`);
+        if (data === null) throw new Error('La respuesta del servidor no es válida.');
+
+        fallosSeguidos = 0;
 
         if (data.total_pdfs > 0) {
           const porcentaje = 40 + Math.round((data.pdfs_procesados / data.total_pdfs) * 55);
@@ -341,24 +415,34 @@ function balancesEsperarResultado(cliente) {
         }
 
         if (data.listo) {
-          clearInterval(intervalo);
           resolve(data);
           return;
         }
-
-        if (Date.now() - inicio > TIMEOUT_MS) {
-          clearInterval(intervalo);
-          reject(new Error('El proceso está tardando demasiado. Probá consultar el estado más tarde.'));
-        }
       } catch (err) {
-        clearInterval(intervalo);
-        reject(new Error('Se perdió la conexión mientras se consultaba el estado.'));
+        fallosSeguidos++;
+        console.error(`Falló la consulta de estado (${fallosSeguidos} seguidas):`, err);
+        if (fallosSeguidos >= BALANCES_ESTADO_FALLOS_MAXIMOS) {
+          reject(new Error('Se perdió la conexión mientras se consultaba el estado.'));
+          return;
+        }
       }
-    }, INTERVALO_MS);
+
+      if (Date.now() - inicio > timeoutMs) {
+        const errTimeout = new Error('El proceso está tardando demasiado. Probá consultar el estado más tarde.');
+        errTimeout.esTimeout = true;
+        reject(errTimeout);
+        return;
+      }
+
+      setTimeout(consultar, BALANCES_ESTADO_INTERVALO_MS);
+    };
+
+    setTimeout(consultar, BALANCES_ESTADO_INTERVALO_MS);
   });
 }
 
 function balancesMostrarSeccionEstado(mostrar) {
+  el.btnReconsultar.hidden = true;
   el.seccionEstado.hidden = !mostrar;
   el.seccionResultados.hidden = true;
   el.btnProcesar.disabled = true;
@@ -398,6 +482,25 @@ function balancesMostrarResultado(data) {
     </div>
   `).join('');
 }
+
+// ------------------------------------------------------------
+// Volver a consultar el estado después de que se agotó el tiempo
+// (no sube ni procesa nada: solo retoma balances-estado)
+// ------------------------------------------------------------
+
+el.btnReconsultar.addEventListener('click', async () => {
+  const proceso = balancesEstado.ultimoProceso;
+  if (!proceso) return;
+
+  balancesMostrarSeccionEstado(true);
+  balancesActualizarProgreso(40, 'Consultando el estado…');
+
+  try {
+    await balancesSeguirProceso(proceso.cliente, proceso.totalPdfs);
+  } catch (err) {
+    balancesMostrarError(err);
+  }
+});
 
 // ------------------------------------------------------------
 // Volver a cargar más resúmenes sin recargar la página

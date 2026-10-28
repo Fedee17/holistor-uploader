@@ -500,9 +500,26 @@ function balancesMostrarResultado(data) {
   const huboFallos = (data.fallos || []).length > 0;
   const claseResumen = huboFallos ? 'balances-mensaje-alerta' : 'balances-mensaje-exito';
 
+  // "Con problemas" = archivos distintos en la lista de fallos (no la cantidad de renglones)
+  const totalPdfs = data.total_pdfs || 0;
+  // "Hoja RESULTADOS" no es un PDF: no cuenta acá, pero su fallo se sigue mostrando en el desplegable
+  const conProblemas = new Set(
+    (data.fallos || []).map(fallo => String(fallo.archivo || '').trim()).filter(archivo => archivo !== 'Hoja RESULTADOS')
+  ).size;
+  const guardados = Math.max(totalPdfs - conProblemas, 0);
+  let textoResumen;
+  if (!huboFallos) {
+    textoResumen = `Se procesaron ${data.pdfs_procesados || 0} de ${totalPdfs} resúmenes.`;
+  } else if (conProblemas === 0) {
+    const guardadosTexto = totalPdfs === 1 ? 'Se guardó 1 resumen' : `Se guardaron ${totalPdfs} resúmenes`;
+    textoResumen = `${guardadosTexto}, pero hubo un problema al actualizar la hoja. Revisá el detalle.`;
+  } else {
+    textoResumen = `Se revisaron ${totalPdfs} resúmenes: ${guardados} ${guardados === 1 ? 'guardado' : 'guardados'}, ${conProblemas} ${conProblemas === 1 ? 'con problema' : 'con problemas'}.`;
+  }
+
   el.resultadoResumen.innerHTML = `
     <div class="balances-mensaje ${claseResumen}">
-      Se procesaron ${data.pdfs_procesados || 0} de ${data.total_pdfs || 0} resúmenes.
+      ${textoResumen}
     </div>
   `;
 

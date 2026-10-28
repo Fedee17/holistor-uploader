@@ -506,17 +506,55 @@ function balancesMostrarResultado(data) {
     </div>
   `;
 
-  el.resultadoAvisos.innerHTML = (data.avisos || []).map(aviso => `
-    <div class="balances-mensaje balances-mensaje-alerta">
+  // Tipos de aviso según el comienzo del mensaje; los no reconocidos van a "otros" (nunca se descartan)
+  const gruposAvisos = {
+    totales: [],
+    sinMovimientos: [],
+    otros: [],
+    reemplazados: []
+  };
+  (data.avisos || []).forEach(aviso => {
+    const mensaje = String(aviso.mensaje || '').trim();
+    let tipo = 'otros';
+    if (mensaje.startsWith('Ya había un resumen cargado')) tipo = 'reemplazados';
+    else if (mensaje.startsWith('Sin movimientos')) tipo = 'sinMovimientos';
+    else if (mensaje.startsWith('Los totales impresos por el banco no coinciden')) tipo = 'totales';
+    // Solo "totales que no coinciden" es de advertencia; el resto es informativo (fondo neutro, sin CSS nuevo)
+    const atributosRenglon = tipo === 'totales'
+      ? 'class="balances-mensaje balances-mensaje-alerta"'
+      : 'class="balances-mensaje" style="background:var(--balances-color-fondo);color:var(--balances-color-texto);"';
+    gruposAvisos[tipo].push(`
+    <div ${atributosRenglon}>
       <strong>${balancesEscapar(aviso.archivo)}</strong> — ${balancesEscapar(aviso.banco)}, cuenta ${balancesEscapar(aviso.cuenta)} (${balancesEscapar(aviso.moneda)}): ${balancesEscapar(aviso.mensaje)}
     </div>
-  `).join('');
+  `);
+  });
 
-  el.resultadoFallos.innerHTML = (data.fallos || []).map(fallo => `
+  const renglonesFallos = (data.fallos || []).map(fallo => `
     <div class="balances-mensaje balances-mensaje-error">
       <strong>${balancesEscapar(fallo.archivo)}</strong>: ${balancesEscapar(fallo.motivo)}
     </div>
-  `).join('');
+  `);
+
+  el.resultadoFallos.innerHTML = balancesArmarDesplegable('⚠️ Problemas a revisar', renglonesFallos, 'balances-mensaje-error');
+  el.resultadoAvisos.innerHTML =
+    balancesArmarDesplegable('⚠️ Totales que no coinciden', gruposAvisos.totales, 'balances-mensaje-alerta') +
+    balancesArmarDesplegable('Sin movimientos', gruposAvisos.sinMovimientos, '') +
+    balancesArmarDesplegable('Otros avisos', gruposAvisos.otros, '') +
+    balancesArmarDesplegable('Resúmenes reemplazados', gruposAvisos.reemplazados, '');
+}
+
+// Desplegable cerrado por defecto con el título y la cantidad. Sin renglones no se muestra nada.
+function balancesArmarDesplegable(titulo, renglones, claseColor) {
+  if (renglones.length === 0) return '';
+  return `
+    <details class="balances-desplegable">
+      <summary class="balances-mensaje ${claseColor}" style="cursor:pointer;font-weight:600;">
+        ${titulo} (${renglones.length})
+      </summary>
+      ${renglones.join('')}
+    </details>
+  `;
 }
 
 // ------------------------------------------------------------

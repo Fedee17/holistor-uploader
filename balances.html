@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Estudio Riorda — Balances Bancarios</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="estilos-base.css">
   <link rel="stylesheet" href="balances.css">
 </head>
 <body>
@@ -11,7 +13,7 @@
   <header class="balances-header">
     <h1>Extracción de Balances Bancarios</h1>
     <nav class="balances-nav">
-      <a href="index.html">Facturas (Holistor)</a>
+      <a href="index.html">Facturas</a>
       <div class="balances-nav-item">
         <a href="balances.html" aria-current="page">Balances Bancarios ▾</a>
         <div class="balances-nav-dropdown">
@@ -28,7 +30,7 @@
 
     <!-- Paso 1: elegir cliente -->
     <section id="balances-seccion-cliente" class="balances-card">
-      <h2>1. Elegí el cliente</h2>
+      <h2>Paso 1 <b>Elegí el cliente</b></h2>
 
       <div class="balances-campo">
         <label for="balances-select-cliente">Cliente</label>
@@ -37,83 +39,143 @@
         </select>
       </div>
 
-      <p id="balances-bancos-habilitados" class="balances-nota"></p>
+      <!-- "Bancos habilitados" + un chip por banco (lo arma balances.js) -->
+      <div id="balances-bancos-habilitados" class="balances-chips-linea"></div>
 
-      <button id="balances-btn-mostrar-alta" type="button" class="balances-link-boton">
-        + Agregar cliente o banco nuevo
-      </button>
-    </section>
-
-    <!-- Formulario de alta de cliente/banco (oculto por defecto, JS lo muestra) -->
-    <section id="balances-seccion-alta" class="balances-card" hidden>
-      <h2>Agregar cliente o banco</h2>
-
-      <div class="balances-campo">
-        <label for="balances-alta-cliente">Nombre del cliente</label>
-        <input type="text" id="balances-alta-cliente" placeholder="Ej: nombre del cliente">
+      <div class="balances-alta-enlaces">
+        <button id="balances-btn-alta-cliente" type="button" class="balances-link-boton" aria-expanded="false" aria-controls="balances-alta-cliente">+ Agregar cliente</button>
+        <button id="balances-btn-alta-banco" type="button" class="balances-link-boton" aria-expanded="false" aria-controls="balances-alta-banco">+ Agregar banco a un cliente</button>
       </div>
 
-      <div class="balances-campo">
-        <label for="balances-alta-banco">Banco</label>
-        <select id="balances-alta-banco">
-          <option value="">Elegí un banco</option>
-          <option value="Galicia">Galicia</option>
-          <option value="Nación">Nación</option>
-          <option value="Santander">Santander</option>
-          <option value="Macro">Macro</option>
-        </select>
-      </div>
+      <!-- Alta de cliente / de banco: se ve un formulario por vez (JS los abre y cierra) -->
+      <div id="balances-seccion-alta">
 
-      <div class="balances-acciones">
-        <button id="balances-btn-confirmar-alta" type="button">Agregar</button>
-        <button id="balances-btn-cancelar-alta" type="button" class="balances-boton-secundario">Cancelar</button>
-      </div>
+        <div id="balances-alta-cliente" class="balances-alta" hidden>
+          <h3>Agregar cliente</h3>
+          <p class="balances-nota">Nombre tal como va a figurar en la lista, y los bancos con los que opera. Podés tildar más de uno. Solo aparecen los bancos que el sistema sabe leer.</p>
 
-      <p id="balances-alta-mensaje" class="balances-nota" role="status" aria-live="polite"></p>
+          <div class="balances-campo">
+            <label for="balances-alta-nombre">Nombre del cliente</label>
+            <input type="text" id="balances-alta-nombre" placeholder="Ej.: Abast. El Cimarrón" autocomplete="off">
+          </div>
+
+          <div class="balances-campo" role="group" aria-labelledby="balances-alta-cliente-bancos-titulo">
+            <span id="balances-alta-cliente-bancos-titulo" class="balances-campo-titulo">Bancos</span>
+            <div id="balances-alta-cliente-bancos" class="balances-bancos"></div>
+          </div>
+
+          <div class="balances-acciones">
+            <button id="balances-btn-confirmar-cliente" type="button" class="balances-boton-primario">Agregar cliente</button>
+            <button id="balances-btn-cancelar-cliente" type="button">Cancelar</button>
+          </div>
+        </div>
+
+        <div id="balances-alta-banco" class="balances-alta" hidden>
+          <h3>Agregar banco a un cliente</h3>
+          <p class="balances-nota">Se muestran los bancos que ya tiene el cliente elegido arriba; tildá los que faltan.</p>
+
+          <div class="balances-campo">
+            <span class="balances-campo-titulo">Cliente</span>
+            <strong id="balances-alta-banco-cliente"></strong>
+          </div>
+
+          <div class="balances-campo">
+            <span class="balances-campo-titulo">Bancos habilitados</span>
+            <div id="balances-alta-banco-chips" class="balances-chips"></div>
+          </div>
+
+          <div class="balances-campo" role="group" aria-labelledby="balances-alta-banco-bancos-titulo">
+            <span id="balances-alta-banco-bancos-titulo" class="balances-campo-titulo">Agregar</span>
+            <div id="balances-alta-banco-bancos" class="balances-bancos"></div>
+          </div>
+
+          <div class="balances-acciones">
+            <button id="balances-btn-confirmar-banco" type="button" class="balances-boton-primario">Agregar bancos</button>
+            <button id="balances-btn-cancelar-banco" type="button">Cancelar</button>
+          </div>
+        </div>
+
+        <p id="balances-alta-mensaje" class="balances-nota" role="status" aria-live="polite"></p>
+      </div>
     </section>
 
     <!-- Paso 2: subir PDFs -->
     <section id="balances-seccion-upload" class="balances-card">
-      <h2>2. Subí los resúmenes bancarios</h2>
-      <p class="balances-nota">Podés subir todos los PDFs juntos, de cualquier banco — el sistema detecta a cuál corresponde cada uno.</p>
+      <h2>Paso 2 <b>Subí los resúmenes bancarios</b></h2>
+      <p class="balances-nota">Podés subir todos los PDFs juntos, de cualquier banco. El sistema detecta a cuál corresponde cada uno.</p>
 
       <div id="balances-zona-drop" class="balances-dropzone">
-        <p>Arrastrá los PDFs acá, o hacé click para elegirlos</p>
+        <p>Arrastrá los PDFs acá, o hacé clic para elegirlos</p>
         <input type="file" id="balances-input-archivos" accept="application/pdf" multiple hidden>
+      </div>
+
+      <div id="balances-lista-cabecera" class="balances-lista-cabecera" hidden>
+        <span id="balances-contador-archivos" aria-live="polite"></span>
+        <button id="balances-btn-quitar-todos" type="button" class="balances-boton-chico">Quitar todos</button>
       </div>
 
       <ul id="balances-lista-archivos" class="balances-lista-archivos"></ul>
 
       <div class="balances-acciones">
-        <button id="balances-btn-procesar" type="button" disabled>Procesar resúmenes</button>
+        <button id="balances-btn-procesar" type="button" class="balances-boton-primario" disabled>Procesar resúmenes</button>
       </div>
     </section>
 
     <!-- Estado / progreso -->
     <section id="balances-seccion-estado" class="balances-card" hidden>
-      <h2>Procesando…</h2>
+      <h2>Procesando <b id="balances-estado-subtitulo"></b></h2>
       <div id="balances-barra-progreso" class="balances-barra-progreso">
         <div id="balances-barra-progreso-relleno" class="balances-barra-progreso-relleno"></div>
       </div>
-      <p id="balances-estado-texto" class="balances-nota" role="status" aria-live="polite"></p>
+      <p id="balances-estado-texto" class="balances-estado-tag" role="status" aria-live="polite"></p>
     </section>
 
     <!-- Resultados -->
     <section id="balances-seccion-resultados" class="balances-card" hidden>
-      <h2>Resultado</h2>
+      <h2>Resultado <b id="balances-resultado-subtitulo"></b></h2>
 
       <div id="balances-resultado-resumen"></div>
 
-      <div id="balances-resultado-avisos"></div>
-
       <div id="balances-resultado-fallos"></div>
 
-      <button id="balances-btn-nueva-carga" type="button" class="balances-boton-secundario">
-        Cargar más resúmenes
-      </button>
+      <div id="balances-resultado-avisos"></div>
+
+      <div class="balances-acciones">
+        <button id="balances-btn-reconsultar" type="button" hidden>
+          Volver a consultar el estado
+        </button>
+
+        <button id="balances-btn-nueva-carga" type="button" class="balances-boton-primario">
+          Cargar más resúmenes
+        </button>
+      </div>
     </section>
 
   </main>
+
+  <!-- Ventana para pedir la contraseña de un PDF protegido (la abre balances.js) -->
+  <dialog id="balances-dialogo-clave" class="balances-dialogo" aria-labelledby="balances-dialogo-titulo">
+    <form id="balances-dialogo-form" method="dialog" autocomplete="off">
+      <h2 id="balances-dialogo-titulo">PDF protegido con contraseña <strong id="balances-dialogo-archivo"></strong></h2>
+      <p class="balances-dialogo-texto balances-nota">Este resumen está protegido. Escribí la contraseña para desbloquearlo. No se guarda.</p>
+
+      <div class="balances-campo">
+        <label for="balances-dialogo-clave-input">Contraseña</label>
+        <input type="password" id="balances-dialogo-clave-input" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </div>
+
+      <label class="balances-dialogo-mostrar">
+        <input type="checkbox" id="balances-dialogo-mostrar"> Mostrar contraseña
+      </label>
+
+      <div id="balances-dialogo-mensaje" role="alert" aria-live="polite"></div>
+
+      <div class="balances-acciones">
+        <button id="balances-dialogo-desbloquear" type="submit" class="balances-boton-primario">Desbloquear</button>
+        <button id="balances-dialogo-omitir" type="button">Omitir</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="balances.js"></script>
 </body>

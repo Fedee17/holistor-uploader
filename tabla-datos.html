@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Estudio Riorda — Tabla de Datos</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="estilos-base.css">
   <link rel="stylesheet" href="tabla-datos.css">
 </head>
 <body>
@@ -26,28 +28,23 @@
 
   <main class="tabla-main">
 
-    <section class="balances-card">
-      <h2>Elegí el cliente</h2>
-      <div class="balances-campo">
-        <label for="tabla-select-cliente">Cliente</label>
-        <select id="tabla-select-cliente">
-          <option value="" disabled selected hidden>Cargando clientes…</option>
-        </select>
-      </div>
+    <section class="tabla-barra">
+      <label for="tabla-select-cliente">Cliente</label>
+      <select id="tabla-select-cliente" class="tabla-select">
+        <option value="" disabled selected hidden>Cargando clientes…</option>
+      </select>
+      <span class="tabla-espacio"></span>
+      <span id="tabla-leyenda" class="tabla-ayuda"></span>
     </section>
 
-    <section id="tabla-seccion-estado" class="balances-card">
+    <section id="tabla-seccion-estado" class="tabla-estado">
       <p id="tabla-estado-texto" class="balances-nota">Elegí un cliente para ver sus datos.</p>
     </section>
 
-    <section id="tabla-seccion-tabla" class="balances-card tabla-card-ancha" hidden>
+    <section id="tabla-seccion-tabla" class="tabla-seccion" hidden>
       <h2 id="tabla-titulo-cliente"></h2>
-      <div class="tabla-scroll">
-        <table id="tabla-datos-tabla">
-          <thead id="tabla-datos-thead"></thead>
-          <tbody id="tabla-datos-tbody"></tbody>
-        </table>
-      </div>
+      <div id="tabla-tarjetas" class="tabla-tarjetas"></div>
+      <div id="tabla-detalle"></div>
     </section>
 
   </main>

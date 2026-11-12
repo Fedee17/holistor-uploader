@@ -511,13 +511,41 @@ function agregarBotonDescargaPrnFinal() {
   b.type = 'button'; b.className = 'btn-p'; b.id = '_epDescargarPrn';
   b.style.marginLeft = '8px';
   b.innerHTML = '<i class="ti ti-download"></i> Descargar PRN';
-  b.addEventListener('click', () => descargarPrn(R.lineasPrn, R.prnNombre));
+  // 12/11/2026 (A-6): el archivo sale del PRN pendiente que guarda la hoja (el mismo del cartel
+  // "Tenés un PRN listo"), no de lo que juntó la página: así un reintento no mezcla líneas.
+  b.addEventListener('click', () => descargarPrnPendiente(R.prnNombre));
   el.appendChild(b);
   if (R.prnDriveFallo) {
     const n = document.createElement('span');
     n.style.cssText = 'margin-left:8px;font-size:12px;';
     n.textContent = 'Drive no respondió; el archivo se arma acá';
     el.appendChild(n);
+  }
+}
+
+// 12/11/2026 (A-6): pide al servidor el PRN pendiente de este cliente/período y lo descarga.
+// Si no se puede traer, avisa y no arma ningún archivo (nunca un PRN parcial).
+async function descargarPrnPendiente(nombreRespaldo) {
+  const cuit = (clienteSeleccionado && clienteSeleccionado.cuit) || '';
+  const per = periodoStr();
+  if (!cuit || !per) { showAlert('Elegí cliente y período para descargar el PRN.', 'warn'); return; }
+  try {
+    const res = await fetchConTimeout(`${WEBHOOK.ultimoPrn()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`, {}, 20000);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await jsonSeguro(res);
+    if (!data || data.ok === false) throw new Error((data && data.mensaje) || 'respuesta con error');
+    if (data.lineas_recortadas === true) {
+      showAlert('No se puede descargar desde acá: el PRN tiene demasiadas facturas o no se pudo leer. Buscá el PRN consolidado en la carpeta PRN de Drive.', 'warn');
+      return;
+    }
+    if (!Array.isArray(data.lineas) || !data.lineas.length) {
+      showAlert('No hay un PRN guardado para este cliente y período.', 'warn');
+      return;
+    }
+    descargarPrn(data.lineas, data.prn_file_name || nombreRespaldo);
+  } catch (err) {
+    logProceso(`No se pudo traer el PRN para descargar (${err.message}).`);
+    showAlert(`No se pudo traer el PRN (${escapeHtml(err.message)}). Probá de nuevo en unos segundos.`, 'error');
   }
 }
 
@@ -2417,6 +2445,9 @@ async function reintentar() {
       : [];
     document.getElementById('cardFallidos').style.display = 'none';
     archivosFallidos = [];
+    // 12/11/2026 (A-6): el reintento arranca con el resumen de la página vacío; el PRN completo
+    // lo sigue guardando el servidor (y es lo que baja "Descargar PRN").
+    _resumenTandas = crearResumenTandasVacio();
     await sleep(calcularEsperaIndexacion(_cantidadReintentar));
     await sendFlush(true, false, nombresReintentar);
   } catch(e) {

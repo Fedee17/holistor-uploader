@@ -728,6 +728,9 @@ let _ultimoRechazoProceso = null; // {yaActivo:true, mensaje} si el servidor rec
 // mientras dura el mismo problema. Se vuelve a false cuando se guarda una
 // clave nueva (ver guardarToken()).
 let _claveRechazada = false;
+// 13/11/2026 (A-5): true cuando la tanda terminó porque la página se cansó de esperar (no porque
+// n8n avisara que terminó). En ese caso no se sube la tanda siguiente.
+let _corridaVencida = false;
 function _corridaTerminada(ok) {
   if (typeof _resolverCorridaActual === 'function') { const r = _resolverCorridaActual; _resolverCorridaActual = null; r(ok !== false); }
 }
@@ -1635,7 +1638,9 @@ function parsearRegistroARCA(file) {
             tipo_cod: tipoCod,
             pto_vta: ptoVta,
             numero_hasta: numHasta,
-            total: String(r[29]||''),
+            // 13/11/2026 (M-6): el total sale del valor crudo de la celda (rowsRaw), como tipo_cambio:
+            // el formato de visualización de Excel puede esconder decimales. Si no es número, el de siempre.
+            total: (rowsRaw[i] && typeof rowsRaw[i][29] === 'number' && isFinite(rowsRaw[i][29])) ? String(rowsRaw[i][29]) : String(r[29]||''),
             denominacion_emisor: String(r[8]||''),
             fecha: String(r[0]||''),
             estado: 'pendiente',
@@ -1955,7 +1960,10 @@ function iniciarPolling() {
       // resultado confirmado, cuando en realidad el proceso puede seguir
       // trabajando tranquilamente en n8n. Se usa null para el caso "incierto".
       mostrarEstadoProceso('listo', [], null);
-      _corridaTerminada();
+      // 13/11/2026 (A-5): la tanda NO se da por terminada bien: n8n puede seguir trabajando y
+      // subir la siguiente la haría rechazar (sus PDF quedarían sin procesar en Drive).
+      _corridaVencida = true;
+      _corridaTerminada(false);
       // Liberar el candado local anti-doble-PRN (bloque v19 al final del archivo).
       // Sin esto, el botón "Subir y procesar" queda trabado indefinidamente
       // para este cliente/período después de un timeout del navegador, aunque
@@ -3137,6 +3145,7 @@ async function startUpload() {
     setStepDetail('ia', 'Revisando qué ya está hecho');
     if (!fallidosNombres.length) showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
     await sleep(calcularEsperaIndexacion(pending.length));
+    _corridaVencida = false;
     const finDeCorrida = esperarFinDeCorrida();
     await escanearYProcesar();
     const corridaOk = await finDeCorrida;
@@ -3155,6 +3164,15 @@ async function startUpload() {
         _ultimoRechazoProceso = null;
         logProceso(`Tanda ${t + 1}: el servidor rechazó la orden porque este cliente/período ya lo está procesando otra persona.`);
         showAlert(`${escapeHtml(msjServidor)}<br><br>Los PDF que subiste quedaron en Drive: <b>no los vuelvas a subir</b> y <b>no uses "Liberar proceso"</b> (cortaría la corrida de la otra persona). Cuando esa corrida termine, volvé a tocar Procesar: lo que ya esté hecho se reconoce como repetido y lo nuevo se procesa.`, 'error');
+        return;
+      }
+      // 13/11/2026 (A-5): la página dejó de esperar esta tanda por tiempo. No es que la orden no
+      // salió: n8n puede seguir procesándola. Se corta sin subir más y sin sugerir "Liberar proceso".
+      if (_corridaVencida) {
+        _corridaVencida = false;
+        const restantesV = tandas.length - (t + 1);
+        logProceso(`Tanda ${t + 1} de ${tandas.length}: se dejó de esperar por tiempo. Se corta acá${restantesV > 0 ? ` (quedan ${restantesV} ${pluralizar(restantesV, 'tanda', 'tandas')} sin subir)` : ''}.`);
+        if (restantesV > 0) showAlert(`La tanda ${t + 1} tardó más de lo esperado y la página dejó de esperarla; n8n puede seguir procesándola. Por eso no se subieron las ${restantesV} ${pluralizar(restantesV, 'tanda', 'tandas')} siguientes. Los PDF ya subidos quedaron en Drive: <b>no los vuelvas a subir</b>. Esperá unos minutos y volvé a tocar Procesar: lo que ya esté hecho se reconoce como repetido y lo nuevo se procesa.`, 'warn');
         return;
       }
       // FIX 18/09/2026: la orden de procesar no salió. Los PDF de esta tanda ya

@@ -495,7 +495,7 @@ function descargarPrn(lineas, nombreArchivo) {
   marcarPrnDescargado();
 }
 
-// Botón "Descargar PRN" del cartel final de la corrida, al lado de "Ver en Drive". Usa las líneas
+// Botón "Descargar PRN" del cartel final de la corrida (única forma de bajar el PRN). Usa las líneas
 // acumuladas de todas las tandas (_resumenTandas.lineasPrn). Si Drive no guardó el archivo, igual aparece.
 function agregarBotonDescargaPrnFinal() {
   const R = _resumenTandas;
@@ -505,13 +505,41 @@ function agregarBotonDescargaPrnFinal() {
   b.type = 'button'; b.className = 'btn-p'; b.id = '_epDescargarPrn';
   b.style.marginLeft = '8px';
   b.innerHTML = '<i class="ti ti-download"></i> Descargar PRN';
-  b.addEventListener('click', () => descargarPrn(R.lineasPrn, R.prnNombre));
+  // 12/11/2026 (A-6): el archivo sale del PRN pendiente que guarda la hoja (el mismo del cartel
+  // "Tenés un PRN listo"), no de lo que juntó la página: así un reintento no mezcla líneas.
+  b.addEventListener('click', () => descargarPrnPendiente(R.prnNombre));
   el.appendChild(b);
   if (R.prnDriveFallo) {
     const n = document.createElement('span');
     n.style.cssText = 'margin-left:8px;font-size:12px;';
     n.textContent = 'Drive no respondió; el archivo se arma acá';
     el.appendChild(n);
+  }
+}
+
+// 12/11/2026 (A-6): pide al servidor el PRN pendiente de este cliente/período y lo descarga.
+// Si no se puede traer, avisa y no arma ningún archivo (nunca un PRN parcial).
+async function descargarPrnPendiente(nombreRespaldo) {
+  const cuit = (clienteSeleccionado && clienteSeleccionado.cuit) || '';
+  const per = periodoStr();
+  if (!cuit || !per) { showAlert('Elegí cliente y período para descargar el PRN.', 'warn'); return; }
+  try {
+    const res = await fetchConTimeout(`${WEBHOOK.ultimoPrn()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`, {}, 20000);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await jsonSeguro(res);
+    if (!data || data.ok === false) throw new Error((data && data.mensaje) || 'respuesta con error');
+    if (data.lineas_recortadas === true) {
+      showAlert('No se puede descargar desde acá: el PRN tiene demasiadas facturas o no se pudo leer. Buscá el PRN consolidado en la carpeta PRN de Drive.', 'warn');
+      return;
+    }
+    if (!Array.isArray(data.lineas) || !data.lineas.length) {
+      showAlert('No hay un PRN guardado para este cliente y período.', 'warn');
+      return;
+    }
+    descargarPrn(data.lineas, data.prn_file_name || nombreRespaldo);
+  } catch (err) {
+    logProceso(`No se pudo traer el PRN para descargar (${err.message}).`);
+    showAlert(`No se pudo traer el PRN (${escapeHtml(err.message)}). Probá de nuevo en unos segundos.`, 'error');
   }
 }
 
@@ -555,7 +583,7 @@ function mostrarCartelPrn(data) {
   box.innerHTML = '<i class="ti ti-file-check"></i><div class="prn-listo-body">'
     + '<div class="prn-listo-title">Tenés un PRN listo que todavía no descargaste</div>'
     + `<div class="prn-listo-line">${escapeHtml(linea)}</div>`
-    + (recortado ? '<div class="prn-listo-nota">El archivo es muy grande para descargarlo desde acá: usá Ver en Drive</div>' : '')
+    + (recortado ? '<div class="prn-listo-nota">No se puede descargar desde acá: el PRN tiene demasiadas facturas o no se pudo leer. Buscá el PRN consolidado en la carpeta PRN de Drive, importalo y apretá «Ya lo tengo».</div>' : '')
     + '<div class="prn-listo-btns"></div></div>';
   const btns = box.querySelector('.prn-listo-btns');
   if (!recortado) {
@@ -564,13 +592,6 @@ function mostrarCartelPrn(data) {
     b.innerHTML = '<i class="ti ti-download"></i> Descargar PRN';
     b.addEventListener('click', () => descargarPrn(data.lineas || [], data.prn_file_name));
     btns.appendChild(b);
-  }
-  if (data.prn_drive_url) {
-    const a = document.createElement('a');
-    a.className = 'btn-s'; a.target = '_blank'; a.rel = 'noopener';
-    a.href = data.prn_drive_url;
-    a.innerHTML = '<i class="ti ti-brand-google-drive"></i> Ver en Drive';
-    btns.appendChild(a);
   }
   const ya = document.createElement('button');
   ya.type = 'button'; ya.className = 'btn-l';
@@ -2284,13 +2305,9 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prn
       if (btnAud) btnAud.style.display = 'inline-flex';
       el.className = 'alert a-success';
      const _facturasTxt = (facturasCount && Number(facturasCount) > 0) ? ` · ${facturasCount} ${pluralizar(Number(facturasCount),'factura','facturas')}` : '';
-      // id="_epDriveLink": cuando la corrida se parte en tandas, consolidarPrnTandas()
-      // pisa este link para que apunte al PRN CONSOLIDADO (todas las líneas), no al
-      // de la última tanda (parcial) -- ver comentario ahí.
-      const _driveLinkHtml = prnFileId
-        ? ` <a id="_epDriveLink" href="https://drive.google.com/file/d/${escapeHtml(prnFileId)}/view" target="_blank" rel="noopener" style="color:#1a6e38;font-weight:600;margin-left:6px;text-decoration:underline;"><i class="ti ti-download" style="font-size:13px;"></i> Ver en Drive</a>`
-        : '';
-      el.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>' + _driveLinkHtml;
+      // 12/11/2026: sin enlace "Ver en Drive". El PRN se descarga solo con "Descargar PRN"
+      // (agregarBotonDescargaPrnFinal), así queda marcado como descargado.
+      el.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
       const nm_ep = manuales && manuales.length > 0;
       const no_ep = otrosCliente && otrosCliente.length > 0;
       const avisos_ep = [nf ? `${fallidos.length} ${pluralizar(fallidos.length, 'error', 'errores')}` : '', nm_ep ? `${manuales.length} carga manual` : '', no_ep ? `${otrosCliente.length} otro cliente` : ''].filter(Boolean).join(' · ');
@@ -2420,6 +2437,9 @@ async function reintentar() {
       : [];
     document.getElementById('cardFallidos').style.display = 'none';
     archivosFallidos = [];
+    // 12/11/2026 (A-6): el reintento arranca con el resumen de la página vacío; el PRN completo
+    // lo sigue guardando el servidor (y es lo que baja "Descargar PRN").
+    _resumenTandas = crearResumenTandasVacio();
     await sleep(calcularEsperaIndexacion(_cantidadReintentar));
     await sendFlush(true, false, nombresReintentar);
   } catch(e) {
@@ -3145,9 +3165,12 @@ async function startUpload() {
     if (tandas.length > 1) logProceso(`Tanda ${t + 1} de ${tandas.length} terminada.`);
   }
   if (tandas.length > 1) {
-    showAlert(`Listo: se procesaron ${tandas.length} tandas. Hay un archivo PRN por tanda en Drive.`, 'success');
+    showAlert(`Listo: se procesaron ${tandas.length} tandas.`, 'success');
     await consolidarPrnTandas(tandas.length);
   }
+  // 12/11/2026: si hubo PRN pero la página no recibió sus líneas (resultado recortado), no hay botón
+  // "Descargar PRN": se muestra el cartel "Tenés un PRN listo", que las lee de la hoja.
+  if (_resumenTandas.prnReal && !_resumenTandas.lineasPrn.length) consultarUltimoPrn();
 }
 
 // 21/09/2026: cuando la corrida se partió en tandas, cada tanda dejó su propio PRN
@@ -3178,25 +3201,8 @@ async function consolidarPrnTandas(cantTandas) {
     const avisos = Array.isArray(data.avisos) ? data.avisos : [];
     logProceso(`Consolidado listo: ${data.prn_file_name} (${data.lineas} líneas de ${data.archivos_unidos} archivos).` + (avisos.length ? ' Avisos: ' + avisos.join(' | ') : ''));
     showAlert(`✓ PRN consolidado listo: ${data.lineas} líneas de ${data.archivos_unidos} tandas.` + (avisos.length ? ' Revisá los avisos en el detalle.' : ''), avisos.length ? 'warn' : 'success');
-    // FIX 21/09/2026: antes esto AGREGABA un segundo link al lado del "Ver en
-    // Drive" que ya había dejado la última tanda (que apunta al PRN parcial de
-    // esa tanda sola) -- quedaban los dos juntos y no quedaba claro cuál abrir.
-    // Ahora se REEMPLAZA ese link para que "Ver en Drive" apunte siempre al PRN
-    // consolidado (el que tiene TODAS las líneas de todas las tandas), no al
-    // parcial. Si por algún motivo el link no existe en el cartel, se agrega.
-    const _consolidadoHref = `https://drive.google.com/file/d/${escapeHtml(data.prn_file_id)}/view`;
-    const _consolidadoLabel = `<i class="ti ti-files" style="font-size:13px;"></i> Ver PRN consolidado en Drive (${escapeHtml(String(data.lineas))} líneas)`;
+    // 12/11/2026: el consolidado queda en Drive como copia; la página no ofrece enlace.
     if (data.prn_file_name) _resumenTandas.prnNombre = String(data.prn_file_name); // el botón Descargar PRN usa el nombre del consolidado
-    const linkExistente = document.getElementById('_epDriveLink');
-    if (linkExistente) {
-      linkExistente.href = _consolidadoHref;
-      linkExistente.innerHTML = _consolidadoLabel;
-    } else {
-      const el = document.getElementById('estadoProceso');
-      if (el) {
-        el.insertAdjacentHTML('beforeend', ` <a id="_epDriveLink" href="${_consolidadoHref}" target="_blank" rel="noopener" style="color:#1a6e38;font-weight:700;margin-left:6px;text-decoration:underline;">${_consolidadoLabel}</a>`);
-      }
-    }
   } catch (err) {
     const detalle = err.name === 'AbortError' ? 'tiempo de espera agotado' : err.message;
     logProceso(`Consolidado: no se pudo armar el archivo único (${detalle}). Los PRN por tanda siguen en Drive: ${prns.map(p => p.name || p.id).join(', ')}.`);

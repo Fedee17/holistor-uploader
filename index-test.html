@@ -500,8 +500,9 @@ function descargarPrn(lineas, nombreArchivo) {
   marcarPrnDescargado();
 }
 
-// Botón "Descargar PRN" del cartel final de la corrida (única forma de bajar el PRN). Usa las líneas
-// acumuladas de todas las tandas (_resumenTandas.lineasPrn). Si Drive no guardó el archivo, igual aparece.
+// Botón "Descargar PRN" del cartel final de la corrida (única forma de bajar el PRN). Aparece solo si la
+// página recibió líneas del PRN (_resumenTandas.lineasPrn), pero el archivo lo baja del servidor con
+// descargarPrnPendiente(), no de esas líneas. Si Drive no guardó el archivo, igual aparece.
 // Si la página no recibió las líneas, al terminar la corrida se muestra el cartel "Tenés un PRN listo".
 function agregarBotonDescargaPrnFinal() {
   const R = _resumenTandas;

@@ -1106,11 +1106,11 @@ function exigirRegistro() {
   const w = document.getElementById('registryWarn');
   if (w) w.style.display = 'block';
   if (registroOcupado > 0) {
-    showAlert('El Excel de ARCA todavía se está cargando. Esperá a que diga "Registro guardado" y volvé a intentar.', 'warn');
+    avisoBloqueo('El Excel de ARCA todavía se está cargando. Esperá a que diga "Registro guardado" y volvé a intentar.');
   } else if (registroSubido === true && _registroPeriodoGuardado !== periodoStr()) {
-    showAlert(`El Excel de ARCA que subiste es del período ${_registroPeriodoGuardado} y el elegido es ${periodoStr()}. Tocá la X del Excel y subí el de este período.`, 'warn');
+    avisoBloqueo(`El Excel de ARCA que subiste es del período ${_registroPeriodoGuardado} y el elegido es ${periodoStr()}. Tocá la X del Excel y subí el de este período.`);
   } else {
-    showAlert('Falta el Excel de ARCA: subilo antes de procesar (se pide en cada sesión).', 'warn');
+    avisoBloqueo('Falta el Excel de ARCA: subilo antes de procesar (se pide en cada sesión).');
   }
   return false;
 }
@@ -1153,9 +1153,9 @@ function mostrarCargando(zone, file) {
 }
 
 async function guardarRegistroEnN8n(zone, registros, receptorCuit) {
-  registroOcupado++;
+  registroOcupado++; actualizarBotonSubir();
   try { return await _guardarRegistroEnN8n(zone, registros, receptorCuit); }
-  finally { registroOcupado--; }
+  finally { registroOcupado--; actualizarBotonSubir(); }
 }
 
 async function _guardarRegistroEnN8n(zone, registros, receptorCuit) {
@@ -1208,9 +1208,31 @@ async function _guardarRegistroEnN8n(zone, registros, receptorCuit) {
 }
 
 async function handleExcelFile(file) {
-  registroOcupado++;
+  registroOcupado++; actualizarBotonSubir();
   try { return await _handleExcelFile(file); }
-  finally { registroOcupado--; }
+  finally { registroOcupado--; actualizarBotonSubir(); }
+}
+
+// 13/11/2026: mientras se carga el Excel de ARCA, el botón lo dice ("Cargando Excel…"). Antes el
+// clic se frenaba con un cartel arriba de la página que no se veía y parecía que no pasaba nada.
+// Solo cambia el texto: no toca disabled (eso lo maneja el bloqueo de doble proceso, más abajo).
+function actualizarBotonSubir() {
+  const b = document.getElementById('btnSubir');
+  if (!b) return;
+  if (registroOcupado > 0) {
+    if (!b.dataset.textoOriginal) b.dataset.textoOriginal = b.innerHTML;
+    b.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> Cargando Excel…';
+  } else if (b.dataset.textoOriginal) {
+    b.innerHTML = b.dataset.textoOriginal;
+    delete b.dataset.textoOriginal;
+  }
+}
+
+// 13/11/2026: cuando algo frena el botón, el aviso sale también en una ventana en el centro de la
+// pantalla (la persona suele estar abajo, junto al botón, y no ve el cartel de arriba).
+function avisoBloqueo(msg) {
+  showAlert(msg, 'warn');
+  mostrarAlertaPopup(msg);
 }
 
 async function _handleExcelFile(file) {
@@ -1704,18 +1726,18 @@ function parsearRegistroARCA(file) {
 // ──────────────────────────────────────────────────────────────────────────────
 function handleSubir() {
   if (!clienteSeleccionado) {
-    showAlert('Seleccioná cliente', 'warn');
+    avisoBloqueo('Seleccioná cliente');
     return;
   }
   if (registroOcupado > 0) {
-    showAlert('El Excel de ARCA todavía se está cargando. Esperá a que diga "Registro guardado" y volvé a tocar "Subir y procesar".', 'warn');
+    avisoBloqueo('El Excel de ARCA todavía se está cargando. Esperá a que diga "Registro guardado" y volvé a tocar "Subir y procesar".');
     return;
   }
   const pending = files.filter(f => f.status === 'pending');
   const duplicates = files.filter(f => f.status === 'duplicate');
 
   if (!pending.length && !duplicates.length) {
-    showAlert('No hay archivos', 'warn');
+    avisoBloqueo('No hay archivos para subir: agregá los PDF de las facturas.');
     return;
   }
 

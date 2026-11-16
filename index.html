@@ -728,6 +728,9 @@ let _ultimoRechazoProceso = null; // {yaActivo:true, mensaje} si el servidor rec
 // mientras dura el mismo problema. Se vuelve a false cuando se guarda una
 // clave nueva (ver guardarToken()).
 let _claveRechazada = false;
+// 13/11/2026 (A-5): true cuando la tanda terminó porque la página se cansó de esperar (no porque
+// n8n avisara que terminó). En ese caso no se sube la tanda siguiente.
+let _corridaVencida = false;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -1096,11 +1099,11 @@ function exigirRegistro() {
   const w = document.getElementById('registryWarn');
   if (w) w.style.display = 'block';
   if (registroOcupado > 0) {
-    showAlert('El Excel de ARCA todavía se está cargando. Esperá a que diga "Registro guardado" y volvé a intentar.', 'warn');
+    avisoBloqueo('El Excel de ARCA todavía se está cargando. Esperá a que diga "Registro guardado" y volvé a intentar.');
   } else if (registroSubido === true && _registroPeriodoGuardado !== periodoStr()) {
-    showAlert(`El Excel de ARCA que subiste es del período ${_registroPeriodoGuardado} y el elegido es ${periodoStr()}. Tocá la X del Excel y subí el de este período.`, 'warn');
+    avisoBloqueo(`El Excel de ARCA que subiste es del período ${_registroPeriodoGuardado} y el elegido es ${periodoStr()}. Tocá la X del Excel y subí el de este período.`);
   } else {
-    showAlert('Falta el Excel de ARCA: subilo antes de procesar (se pide en cada sesión).', 'warn');
+    avisoBloqueo('Falta el Excel de ARCA: subilo antes de procesar (se pide en cada sesión).');
   }
   return false;
 }
@@ -1143,9 +1146,9 @@ function mostrarCargando(zone, file) {
 }
 
 async function guardarRegistroEnN8n(zone, registros, receptorCuit) {
-  registroOcupado++;
+  registroOcupado++; actualizarBotonSubir();
   try { return await _guardarRegistroEnN8n(zone, registros, receptorCuit); }
-  finally { registroOcupado--; }
+  finally { registroOcupado--; actualizarBotonSubir(); }
 }
 
 async function _guardarRegistroEnN8n(zone, registros, receptorCuit) {
@@ -1198,9 +1201,31 @@ async function _guardarRegistroEnN8n(zone, registros, receptorCuit) {
 }
 
 async function handleExcelFile(file) {
-  registroOcupado++;
+  registroOcupado++; actualizarBotonSubir();
   try { return await _handleExcelFile(file); }
-  finally { registroOcupado--; }
+  finally { registroOcupado--; actualizarBotonSubir(); }
+}
+
+// 13/11/2026: mientras se carga el Excel de ARCA, el botón lo dice ("Cargando Excel…"). Antes el
+// clic se frenaba con un cartel arriba de la página que no se veía y parecía que no pasaba nada.
+// Solo cambia el texto: no toca disabled (eso lo maneja el bloqueo de doble proceso, más abajo).
+function actualizarBotonSubir() {
+  const b = document.getElementById('btnSubir');
+  if (!b) return;
+  if (registroOcupado > 0) {
+    if (!b.dataset.textoOriginal) b.dataset.textoOriginal = b.innerHTML;
+    b.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> Cargando Excel…';
+  } else if (b.dataset.textoOriginal) {
+    b.innerHTML = b.dataset.textoOriginal;
+    delete b.dataset.textoOriginal;
+  }
+}
+
+// 13/11/2026: cuando algo frena el botón, el aviso sale también en una ventana en el centro de la
+// pantalla (la persona suele estar abajo, junto al botón, y no ve el cartel de arriba).
+function avisoBloqueo(msg) {
+  showAlert(msg, 'warn');
+  mostrarAlertaPopup(msg);
 }
 
 async function _handleExcelFile(file) {
@@ -1628,7 +1653,9 @@ function parsearRegistroARCA(file) {
             tipo_cod: tipoCod,
             pto_vta: ptoVta,
             numero_hasta: numHasta,
-            total: String(r[29]||''),
+            // 13/11/2026 (M-6): el total sale del valor crudo de la celda (rowsRaw), como tipo_cambio:
+            // el formato de visualización de Excel puede esconder decimales. Si no es número, el de siempre.
+            total: (rowsRaw[i] && typeof rowsRaw[i][29] === 'number' && isFinite(rowsRaw[i][29])) ? String(rowsRaw[i][29]) : String(r[29]||''),
             denominacion_emisor: String(r[8]||''),
             fecha: String(r[0]||''),
             estado: 'pendiente',
@@ -1692,18 +1719,18 @@ function parsearRegistroARCA(file) {
 // ──────────────────────────────────────────────────────────────────────────────
 function handleSubir() {
   if (!clienteSeleccionado) {
-    showAlert('Seleccioná cliente', 'warn');
+    avisoBloqueo('Seleccioná cliente');
     return;
   }
   if (registroOcupado > 0) {
-    showAlert('El Excel de ARCA todavía se está cargando. Esperá a que diga "Registro guardado" y volvé a tocar "Subir y procesar".', 'warn');
+    avisoBloqueo('El Excel de ARCA todavía se está cargando. Esperá a que diga "Registro guardado" y volvé a tocar "Subir y procesar".');
     return;
   }
   const pending = files.filter(f => f.status === 'pending');
   const duplicates = files.filter(f => f.status === 'duplicate');
 
   if (!pending.length && !duplicates.length) {
-    showAlert('No hay archivos', 'warn');
+    avisoBloqueo('No hay archivos para subir: agregá los PDF de las facturas.');
     return;
   }
 
@@ -1948,7 +1975,10 @@ function iniciarPolling() {
       // resultado confirmado, cuando en realidad el proceso puede seguir
       // trabajando tranquilamente en n8n. Se usa null para el caso "incierto".
       mostrarEstadoProceso('listo', [], null);
-      _corridaTerminada();
+      // 13/11/2026 (A-5): la tanda NO se da por terminada bien: n8n puede seguir trabajando y
+      // subir la siguiente la haría rechazar (sus PDF quedarían sin procesar en Drive).
+      _corridaVencida = true;
+      _corridaTerminada(false);
       // Liberar el candado local anti-doble-PRN (bloque v19 al final del archivo).
       // Sin esto, el botón "Subir y procesar" queda trabado indefinidamente
       // para este cliente/período después de un timeout del navegador, aunque
@@ -3136,6 +3166,7 @@ async function startUpload() {
     setStepDetail('ia', 'Revisando qué ya está hecho');
     if (!fallidosNombres.length) showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
     await sleep(calcularEsperaIndexacion(pending.length));
+    _corridaVencida = false;
     const finDeCorrida = esperarFinDeCorrida();
     await escanearYProcesar();
     const corridaOk = await finDeCorrida;
@@ -3154,6 +3185,15 @@ async function startUpload() {
         _ultimoRechazoProceso = null;
         logProceso(`Tanda ${t + 1}: el servidor rechazó la orden porque este cliente/período ya lo está procesando otra persona.`);
         showAlert(`${escapeHtml(msjServidor)}<br><br>Los PDF que subiste quedaron en Drive: <b>no los vuelvas a subir</b> y <b>no uses "Liberar proceso"</b> (cortaría la corrida de la otra persona). Cuando esa corrida termine, volvé a tocar Procesar: lo que ya esté hecho se reconoce como repetido y lo nuevo se procesa.`, 'error');
+        return;
+      }
+      // 13/11/2026 (A-5): la página dejó de esperar esta tanda por tiempo. No es que la orden no
+      // salió: n8n puede seguir procesándola. Se corta sin subir más y sin sugerir "Liberar proceso".
+      if (_corridaVencida) {
+        _corridaVencida = false;
+        const restantesV = tandas.length - (t + 1);
+        logProceso(`Tanda ${t + 1} de ${tandas.length}: se dejó de esperar por tiempo. Se corta acá${restantesV > 0 ? ` (quedan ${restantesV} ${pluralizar(restantesV, 'tanda', 'tandas')} sin subir)` : ''}.`);
+        if (restantesV > 0) showAlert(`La tanda ${t + 1} tardó más de lo esperado y la página dejó de esperarla; n8n puede seguir procesándola. Por eso no se subieron las ${restantesV} ${pluralizar(restantesV, 'tanda', 'tandas')} siguientes. Los PDF ya subidos quedaron en Drive: <b>no los vuelvas a subir</b>. Esperá unos minutos y volvé a tocar Procesar: lo que ya esté hecho se reconoce como repetido y lo nuevo se procesa.`, 'warn');
         return;
       }
       // FIX 18/09/2026: la orden de procesar no salió. Los PDF de esta tanda ya
@@ -3276,7 +3316,7 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
   const existente = document.getElementById('modalEscaneoFondo');
   if (existente) existente.remove();
 
-  const LIMITE = 6;
+  const LIMITE = 3;   // 16/11/2026: se muestran 3; el resto queda en "y N más"
   const todas = [...yaProcesadas.map(f => ({...f, tipo:'ya'})), ...duplicadasLote.map(f => ({...f, tipo:'dup'}))];
   const totalFilas = todas.length;
   // FIX 07/10/2026 (auditoría): solo las "ya procesadas" cuentan como reprocesables.
@@ -3298,31 +3338,20 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
   const nDup = duplicadasLote.length;
   const pl = (n, a, b) => (n === 1 ? a : b);
 
-  // Texto amigable: qué pasó, y qué hace cada botón.
+  // 16/11/2026: texto más corto. Título = qué pasó; una sola pregunta; los botones dicen qué hace cada uno.
   let titulo, intro;
   if (nuevas === 0) {
-    titulo = nYa > 0 ? 'Estas facturas ya estaban procesadas' : 'Archivos repetidos en este lote';
-    intro = nYa > 0
-      ? `No hay facturas nuevas en este lote. ${nYa === 1 ? 'La única factura válida ya se procesó' : `Las ${nYa} facturas válidas ya se procesaron`} antes.`
-      : 'No hay facturas nuevas en este lote.';
+    titulo = nYa > 0 ? pl(nYa, 'Esta factura ya se procesó', `Estas ${nYa} facturas ya se procesaron`) : 'Archivos repetidos en este lote';
+    intro = nYa > 0 ? pl(nYa, '¿La volvés a procesar?', '¿Las volvés a procesar?') : '';
   } else {
-    titulo = 'Hay facturas que ya estaban procesadas';
-    intro = `Este lote tiene ${nuevas} ${pl(nuevas, 'factura nueva', 'facturas nuevas')} y ${nYa} que ya ${pl(nYa, 'se procesó', 'se procesaron')} antes.`;
-  }
-
-  const queHace = [];
-  if (nuevas === 0) {
-    queHace.push(`<b>No, dejar así:</b> no se genera ningún PRN y ${pl(nYa, 'la factura ya procesada queda como estaba', 'las facturas ya procesadas quedan como estaban')}.`);
-    queHace.push(`<b>Sí, reprocesar:</b> ${pl(nYa, 'se vuelve a leer la factura', `se vuelven a leer las ${nYa} facturas`)} y se arma un PRN nuevo.`);
-  } else {
-    queHace.push(`<b>Solo las nuevas (${nuevas}):</b> se procesan únicamente las nuevas. ${pl(nYa, 'La ya procesada queda como estaba', 'Las ya procesadas quedan como estaban')}.`);
-    queHace.push(`<b>Reprocesar todas (${nuevas + nYa}):</b> se procesan las nuevas y ${pl(nYa, 'se vuelve a leer la ya procesada', `se vuelven a leer las ${nYa} ya procesadas`)}.`);
+    titulo = `${nuevas} ${pl(nuevas, 'nueva', 'nuevas')} y ${nYa} ya ${pl(nYa, 'procesada', 'procesadas')}`;
+    intro = '¿Procesás solo las nuevas o todas?';
   }
 
   let primario, secundario;
   if (nuevas === 0) {
-    primario = { id: 'btnEscaneoNo', texto: 'No, dejar así' };
-    secundario = { id: 'btnEscaneoSi', texto: 'Sí, reprocesar' };
+    primario = { id: 'btnEscaneoNo', texto: 'No reprocesar' };
+    secundario = { id: 'btnEscaneoSi', texto: `Sí, reprocesar (${repetidas})` };
   } else {
     primario = { id: 'btnEscaneoNo', texto: `Solo las nuevas (${nuevas})` };
     secundario = { id: 'btnEscaneoSi', texto: `Reprocesar todas (${nuevas + repetidas})` };
@@ -3342,15 +3371,13 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
       <span class="concil-total">mismo archivo</span>
     </div>`).join('');
   const bloqueYa = nYa > 0 ? `
-      <div style="font-size:12px;font-weight:600;color:#333;margin:6px 0 2px;">Ya procesadas antes (${nYa})</div>
-      <div style="font-size:12px;color:#666;margin-bottom:4px;">Podés reprocesarlas si querés. A la derecha, la fecha en que se procesaron.</div>
+      <div style="font-size:12px;font-weight:600;color:#333;margin:6px 0 2px;display:flex;justify-content:space-between;padding:0 14px;"><span>Ya procesadas (${nYa})</span><span>Fecha</span></div>
       ${filasYa}` : '';
   const bloqueDup = nDup > 0 ? `
-      <div style="font-size:12px;font-weight:600;color:#333;margin:10px 0 2px;">Repetidas dentro de este lote (${nDup})</div>
-      <div style="font-size:12px;color:#666;margin-bottom:4px;">Es el mismo archivo subido más de una vez. Se descartan solas, elijas lo que elijas: no tenés que hacer nada.</div>
+      <div style="font-size:12px;font-weight:600;color:#333;margin:10px 0 2px;">Subidas dos veces (${nDup}) · se descartan solas</div>
       ${filasDup}` : '';
   const filaResto = resto > 0
-    ? `<div style="padding:8px 0;font-size:12px;color:#888;">y ${resto} más — ver el detalle completo abajo</div>`
+    ? `<div style="padding:8px 14px;font-size:12px;color:#888;">y ${resto} más</div>`
     : '';
 
   const fondo = document.createElement('div');
@@ -3364,13 +3391,10 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
   modal.innerHTML = `
     <div style="padding:1.25rem 1.25rem .5rem;font-size:14px;line-height:1.5;">
       <div style="font-weight:600;margin-bottom:2px;">${escapeHtml(titulo)}</div>
-      <div style="color:#555;">${escapeHtml(intro)}</div>
+      ${intro ? `<div style="color:#555;">${escapeHtml(intro)}</div>` : ''}
     </div>
     <div style="padding:.5rem 1.25rem;overflow-y:auto;flex:1;border-top:0.5px solid #f0f0ea;border-bottom:0.5px solid #f0f0ea;">
       ${bloqueYa}${bloqueDup}${filaResto}
-    </div>
-    <div style="padding:.75rem 1.25rem 0;font-size:12px;line-height:1.5;color:#555;">
-      ${queHace.map(t => `<div style="margin-bottom:4px;">${t}</div>`).join('')}
     </div>
     <div style="padding:1rem 1.25rem;display:flex;gap:8px;">
       <button id="${secundario.id}" class="btn-secondary" style="flex:1;">${secundario.texto}</button>

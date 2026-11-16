@@ -3317,7 +3317,7 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
   const existente = document.getElementById('modalEscaneoFondo');
   if (existente) existente.remove();
 
-  const LIMITE = 6;
+  const LIMITE = 3;   // 16/11/2026: se muestran 3; el resto queda en "y N más"
   const todas = [...yaProcesadas.map(f => ({...f, tipo:'ya'})), ...duplicadasLote.map(f => ({...f, tipo:'dup'}))];
   const totalFilas = todas.length;
   // FIX 07/10/2026 (auditoría): solo las "ya procesadas" cuentan como reprocesables.
@@ -3339,31 +3339,20 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
   const nDup = duplicadasLote.length;
   const pl = (n, a, b) => (n === 1 ? a : b);
 
-  // Texto amigable: qué pasó, y qué hace cada botón.
+  // 16/11/2026: texto más corto. Título = qué pasó; una sola pregunta; los botones dicen qué hace cada uno.
   let titulo, intro;
   if (nuevas === 0) {
-    titulo = nYa > 0 ? 'Estas facturas ya estaban procesadas' : 'Archivos repetidos en este lote';
-    intro = nYa > 0
-      ? `No hay facturas nuevas en este lote. ${nYa === 1 ? 'La única factura válida ya se procesó' : `Las ${nYa} facturas válidas ya se procesaron`} antes.`
-      : 'No hay facturas nuevas en este lote.';
+    titulo = nYa > 0 ? pl(nYa, 'Esta factura ya se procesó', `Estas ${nYa} facturas ya se procesaron`) : 'Archivos repetidos en este lote';
+    intro = nYa > 0 ? pl(nYa, '¿La volvés a procesar?', '¿Las volvés a procesar?') : '';
   } else {
-    titulo = 'Hay facturas que ya estaban procesadas';
-    intro = `Este lote tiene ${nuevas} ${pl(nuevas, 'factura nueva', 'facturas nuevas')} y ${nYa} que ya ${pl(nYa, 'se procesó', 'se procesaron')} antes.`;
-  }
-
-  const queHace = [];
-  if (nuevas === 0) {
-    queHace.push(`<b>No, dejar así:</b> no se genera ningún PRN y ${pl(nYa, 'la factura ya procesada queda como estaba', 'las facturas ya procesadas quedan como estaban')}.`);
-    queHace.push(`<b>Sí, reprocesar:</b> ${pl(nYa, 'se vuelve a leer la factura', `se vuelven a leer las ${nYa} facturas`)} y se arma un PRN nuevo.`);
-  } else {
-    queHace.push(`<b>Solo las nuevas (${nuevas}):</b> se procesan únicamente las nuevas. ${pl(nYa, 'La ya procesada queda como estaba', 'Las ya procesadas quedan como estaban')}.`);
-    queHace.push(`<b>Reprocesar todas (${nuevas + nYa}):</b> se procesan las nuevas y ${pl(nYa, 'se vuelve a leer la ya procesada', `se vuelven a leer las ${nYa} ya procesadas`)}.`);
+    titulo = `${nuevas} ${pl(nuevas, 'nueva', 'nuevas')} y ${nYa} ya ${pl(nYa, 'procesada', 'procesadas')}`;
+    intro = '¿Procesás solo las nuevas o todas?';
   }
 
   let primario, secundario;
   if (nuevas === 0) {
-    primario = { id: 'btnEscaneoNo', texto: 'No, dejar así' };
-    secundario = { id: 'btnEscaneoSi', texto: 'Sí, reprocesar' };
+    primario = { id: 'btnEscaneoNo', texto: 'No reprocesar' };
+    secundario = { id: 'btnEscaneoSi', texto: `Sí, reprocesar (${repetidas})` };
   } else {
     primario = { id: 'btnEscaneoNo', texto: `Solo las nuevas (${nuevas})` };
     secundario = { id: 'btnEscaneoSi', texto: `Reprocesar todas (${nuevas + repetidas})` };
@@ -3383,15 +3372,13 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
       <span class="concil-total">mismo archivo</span>
     </div>`).join('');
   const bloqueYa = nYa > 0 ? `
-      <div style="font-size:12px;font-weight:600;color:#333;margin:6px 0 2px;">Ya procesadas antes (${nYa})</div>
-      <div style="font-size:12px;color:#666;margin-bottom:4px;">Podés reprocesarlas si querés. A la derecha, la fecha en que se procesaron.</div>
+      <div style="font-size:12px;font-weight:600;color:#333;margin:6px 0 2px;display:flex;justify-content:space-between;padding:0 14px;"><span>Ya procesadas (${nYa})</span><span>Fecha</span></div>
       ${filasYa}` : '';
   const bloqueDup = nDup > 0 ? `
-      <div style="font-size:12px;font-weight:600;color:#333;margin:10px 0 2px;">Repetidas dentro de este lote (${nDup})</div>
-      <div style="font-size:12px;color:#666;margin-bottom:4px;">Es el mismo archivo subido más de una vez. Se descartan solas, elijas lo que elijas: no tenés que hacer nada.</div>
+      <div style="font-size:12px;font-weight:600;color:#333;margin:10px 0 2px;">Subidas dos veces (${nDup}) · se descartan solas</div>
       ${filasDup}` : '';
   const filaResto = resto > 0
-    ? `<div style="padding:8px 0;font-size:12px;color:#888;">y ${resto} más — ver el detalle completo abajo</div>`
+    ? `<div style="padding:8px 14px;font-size:12px;color:#888;">y ${resto} más</div>`
     : '';
 
   const fondo = document.createElement('div');
@@ -3405,13 +3392,10 @@ function mostrarCartelEscaneo(nuevas, yaProcesadas, duplicadasLote) {
   modal.innerHTML = `
     <div style="padding:1.25rem 1.25rem .5rem;font-size:14px;line-height:1.5;">
       <div style="font-weight:600;margin-bottom:2px;">${escapeHtml(titulo)}</div>
-      <div style="color:#555;">${escapeHtml(intro)}</div>
+      ${intro ? `<div style="color:#555;">${escapeHtml(intro)}</div>` : ''}
     </div>
     <div style="padding:.5rem 1.25rem;overflow-y:auto;flex:1;border-top:0.5px solid #f0f0ea;border-bottom:0.5px solid #f0f0ea;">
       ${bloqueYa}${bloqueDup}${filaResto}
-    </div>
-    <div style="padding:.75rem 1.25rem 0;font-size:12px;line-height:1.5;color:#555;">
-      ${queHace.map(t => `<div style="margin-bottom:4px;">${t}</div>`).join('')}
     </div>
     <div style="padding:1rem 1.25rem;display:flex;gap:8px;">
       <button id="${secundario.id}" class="btn-secondary" style="flex:1;">${secundario.texto}</button>

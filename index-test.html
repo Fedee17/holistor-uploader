@@ -363,6 +363,7 @@ const WEBHOOK = {
   candado:   () => BASE_WEBHOOK + '/holistor-candado-test',
   // Último PRN guardado en el servidor para un cliente/período, y marca de "ya lo descargué".
   ultimoPrn:      () => BASE_WEBHOOK + '/holistor-ultimo-prn-test',
+  asignarRubro:   () => BASE_WEBHOOK + '/holistor-asignar-rubro-test',
   prnDescargado:  () => BASE_WEBHOOK + '/holistor-prn-descargado-test'
 };
 
@@ -524,12 +525,150 @@ function agregarBotonDescargaPrnFinal() {
   }
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// 17/11/2026: FACTURAS SIN RUBRO
+// Cuando Gemini no encuentra rubro y PROVEEDORES no lo tiene, el servidor arma igual la línea del PRN
+// (con el rubro en blanco) y la deja APARTE. Acá se muestra enseguida un recuadro con un desplegable por
+// factura; lo elegido se manda al servidor (holistor-asignar-rubro) recién cuando no hay una tanda
+// procesándose (si no, la tanda al cerrar pisaría el cambio). El servidor escribe el rubro y suma la
+// línea al PRN pendiente: no se vuelve a leer el PDF.
+// ──────────────────────────────────────────────────────────────────────────────
+const RUBROS_OPCIONES = [
+  ['CMG','Compras gravadas (reventa, materia prima, papelería, mesadas)'], ['INS','Insumos agropecuarios y granos'],
+  ['REP','Repuestos (uso propio)'], ['SER','Servicios y reparaciones'], ['ENG','Energía eléctrica'], ['AGU','Agua'],
+  ['COM','Combustible'], ['FLT','Fletes y transporte'], ['SEG','Seguros'], ['ALQ','Alquileres'], ['HON','Honorarios'],
+  ['GB','Gastos bancarios'], ['GF','Gastos financieros'], ['CBU','Bienes de uso'], ['CGG','Gastos gravados (publicidad, dif. de cambio)']
+];
+let _pendRubro = new Map();      // clave de la factura -> datos que manda el servidor
+let _rubroElegido = new Map();   // clave de la factura -> rubro elegido y todavía no aplicado
+let _pendRubroDe = '';           // cliente|período al que pertenecen las dos listas
+let _aplicandoRubros = null;     // promesa del envío en curso (nunca dos envíos a la vez)
+let _reintentosAplicar = 0;
+
+function _clavePendRubro() {
+  return ((clienteSeleccionado && clienteSeleccionado.cuit) || '') + '|' + periodoStr();
+}
+function mostrarPendientesRubro(lista) {
+  const clave = _clavePendRubro();
+  if (_pendRubroDe !== clave) { _pendRubro = new Map(); _rubroElegido = new Map(); _pendRubroDe = clave; }
+  // El servidor es la fuente: lo que ya no está pendiente allá, se saca de acá.
+  _pendRubro = new Map((Array.isArray(lista) ? lista : []).filter(x => x && x.k).map(x => [String(x.k), x]));
+  for (const k of [..._rubroElegido.keys()]) if (!_pendRubro.has(k)) _rubroElegido.delete(k);
+  renderPanelRubros();
+}
+function renderPanelRubros() {
+  let panel = document.getElementById('panelSinRubro');
+  if (_pendRubroDe !== _clavePendRubro() || !_pendRubro.size) { if (panel) panel.remove(); return; }
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'panelSinRubro';
+    panel.className = 'card';
+    panel.style.cssText = 'position:fixed;right:16px;bottom:16px;width:min(460px,calc(100vw - 32px));max-height:70vh;overflow:auto;z-index:9000;padding:0;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.25);';
+    document.body.appendChild(panel);
+  }
+  const enCurso = !!pollingInterval;
+  const opciones = RUBROS_OPCIONES.map(([c, t]) => `<option value="${c}">${c} — ${escapeHtml(t)}</option>`).join('');
+  const filas = [..._pendRubro.values()].map(x => {
+    const k = String(x.k);
+    const elegido = _rubroElegido.get(k) || '';
+    return `<div style="padding:.6rem 1rem;border-top:1px solid #e5e5e0;font-size:13px;line-height:1.4;">
+      <div><b>${escapeHtml(x.proveedor || '')}</b> · ${escapeHtml(x.comprobante || '')} · $ ${escapeHtml(x.total || '')}</div>
+      <div style="color:#5f5e5a;margin:2px 0 6px;">${x.descripcion ? escapeHtml(x.descripcion) : '<i>(sin descripción)</i>'}</div>
+      <select data-k="${escapeHtml(k)}" class="selRubroPend" style="width:100%;">
+        <option value="">— Elegir rubro —</option>${opciones}
+      </select>
+      ${elegido ? `<div style="font-size:12px;color:#3b6d11;margin-top:4px;">Elegido: ${escapeHtml(elegido)}${enCurso ? ' — se aplica cuando termine la tanda' : ''}</div>` : ''}
+    </div>`;
+  }).join('');
+  panel.innerHTML = `<div style="padding:.8rem 1rem;display:flex;gap:8px;align-items:center;">
+      <i class="ti ti-alert-triangle" style="color:#b36b00;font-size:18px;"></i>
+      <b style="font-size:14px;flex:1;">Facturas sin rubro (${_pendRubro.size})</b>
+    </div>
+    <div style="padding:0 1rem .6rem;font-size:12px;color:#5f5e5a;">No van al PRN hasta que les elijas el rubro.${enCurso ? ' La corrida sigue mientras tanto.' : ''}</div>
+    ${filas}`;
+  panel.querySelectorAll('select.selRubroPend').forEach(s => {
+    const k = s.getAttribute('data-k');
+    s.value = _rubroElegido.get(k) || '';
+    s.addEventListener('change', () => {
+      if (s.value) _rubroElegido.set(k, s.value); else _rubroElegido.delete(k);
+      renderPanelRubros();
+      if (!pollingInterval) aplicarRubrosElegidos();
+    });
+  });
+}
+// Manda al servidor los rubros elegidos. Nunca hay dos envíos a la vez. Si hay una tanda
+// procesándose, el servidor no toca nada y se vuelve a intentar en unos segundos.
+async function aplicarRubrosElegidos() {
+  if (_aplicandoRubros) { await _aplicandoRubros; return; }
+  if (_pendRubroDe !== _clavePendRubro()) return;
+  const asignaciones = [..._rubroElegido].filter(([k]) => _pendRubro.has(k)).map(([k, rubro]) => ({ k, rubro }));
+  if (!asignaciones.length) return;
+  const [cuit, per] = _pendRubroDe.split('|');
+  _aplicandoRubros = (async () => {
+    try {
+      const res = await fetchConTimeout(WEBHOOK.asignarRubro(), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cliente_cuit: cuit, periodo: per, asignaciones })
+      }, 30000);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await jsonSeguro(res);
+      if (data && data.ok === true) {
+        _reintentosAplicar = 0;
+        for (const a of (data.aplicadas || [])) { _pendRubro.delete(String(a.k)); _rubroElegido.delete(String(a.k)); }
+        const n = (data.aplicadas || []).length;
+        logProceso(`Rubro aplicado a ${n} factura(s): ya están en el PRN pendiente de descarga.`);
+        showAlert(`Rubro aplicado a ${n} ${pluralizar(n, 'factura')}: ya ${n === 1 ? 'está' : 'están'} en el PRN.`, 'success', true);
+      } else if (data && data.codigo === 'en_curso') {
+        logProceso('Rubros elegidos: hay una tanda procesándose, se aplican cuando termine.');
+        if (_reintentosAplicar < 6 && !pollingInterval) { _reintentosAplicar++; setTimeout(aplicarRubrosElegidos, 10000); }
+      } else if (data && data.codigo === 'nada_aplicado') {
+        for (const a of asignaciones) { _pendRubro.delete(a.k); _rubroElegido.delete(a.k); }
+      } else {
+        showAlert(escapeHtml((data && data.mensaje) || 'No se pudo aplicar el rubro.'), 'warn');
+      }
+    } catch (e) {
+      logProceso(`No se pudo aplicar el rubro (${e.message}); queda elegido para el próximo intento.`);
+    } finally {
+      renderPanelRubros();
+    }
+  })();
+  try { await _aplicandoRubros; } finally { _aplicandoRubros = null; }
+}
+// Lista actual del servidor (después de cada corrida y al cambiar de cliente/período).
+async function refrescarPendientesRubro() {
+  const cuit = (clienteSeleccionado && clienteSeleccionado.cuit) || '';
+  const per = periodoStr();
+  if (!cuit || !per) return;
+  try {
+    const res = await fetchConTimeout(`${WEBHOOK.ultimoPrn()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`, {}, 20000);
+    if (!res.ok) return;
+    const data = await jsonSeguro(res);
+    if (data && Array.isArray(data.pendientes_rubro)) mostrarPendientesRubro(data.pendientes_rubro);
+  } catch (e) {}
+}
+// Antes de descargar: si quedan facturas sin rubro, se avisa (no van en este PRN).
+function confirmarDescargaConPendientes(n) {
+  return new Promise(resolve => {
+    const fondo = document.createElement('div');
+    fondo.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,20,18,.5);display:flex;align-items:center;justify-content:center;z-index:10001;padding:1rem;';
+    fondo.innerHTML = `<div class="card" style="max-width:420px;width:100%;padding:0;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.3);">
+      <div style="padding:1.25rem 1.25rem .5rem;font-size:14px;line-height:1.5;">Hay <b>${n} ${pluralizar(n, 'factura')} sin rubro</b> que no ${n === 1 ? 'va' : 'van'} en este PRN. Elegile el rubro en el recuadro "Facturas sin rubro", o descargá igual y cargala${n === 1 ? '' : 's'} a mano en Holistor.</div>
+      <div style="padding:1rem 1.25rem;display:flex;gap:8px;">
+        <button class="btn-secondary" style="flex:1;" data-r="0">Volver</button>
+        <button class="btn-primary" style="flex:1;" data-r="1">Descargar igual</button>
+      </div></div>`;
+    fondo.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { fondo.remove(); resolve(b.getAttribute('data-r') === '1'); }));
+    document.body.appendChild(fondo);
+  });
+}
+
 // 12/11/2026 (A-6): pide al servidor el PRN pendiente de este cliente/período y lo descarga.
 // Si no se puede traer, avisa y no arma ningún archivo (nunca un PRN parcial).
 async function descargarPrnPendiente(nombreRespaldo) {
   const cuit = (clienteSeleccionado && clienteSeleccionado.cuit) || '';
   const per = periodoStr();
   if (!cuit || !per) { showAlert('Elegí cliente y período para descargar el PRN.', 'warn'); return; }
+  await aplicarRubrosElegidos();   // 17/11/2026: primero los rubros elegidos, así entran en el archivo
   try {
     const res = await fetchConTimeout(`${WEBHOOK.ultimoPrn()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`, {}, 20000);
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -543,6 +682,8 @@ async function descargarPrnPendiente(nombreRespaldo) {
       showAlert('No hay un PRN guardado para este cliente y período.', 'warn');
       return;
     }
+    if (Array.isArray(data.pendientes_rubro)) mostrarPendientesRubro(data.pendientes_rubro);
+    if (Array.isArray(data.pendientes_rubro) && data.pendientes_rubro.length && !(await confirmarDescargaConPendientes(data.pendientes_rubro.length))) return;
     descargarPrn(data.lineas, data.prn_file_name || nombreRespaldo);
   } catch (err) {
     logProceso(`No se pudo traer el PRN para descargar (${err.message}).`);
@@ -894,7 +1035,7 @@ function mostrarAlertaPopupMultiple(items) {
 // ──────────────────────────────────────────────────────────────────────────────
 // CLIENTES
 // ──────────────────────────────────────────────────────────────────────────────
-const CLIENTES_CACHE_KEY = 'holistor_clientes_v3_test';
+const CLIENTES_CACHE_KEY = 'holistor_clientes_v4_test';   // v4 (17/11/2026): la lista trae la actividad del cliente
 const CLIENTES_CACHE_TTL = 5 * 60 * 1000;
 
 async function loadClientes(forzar = false) {
@@ -951,6 +1092,7 @@ function poblarSelectClientes(sel, lista) {
     const opt = document.createElement('option');
     opt.value = escapeHtml(c.cuit);
     opt.dataset.nombre = escapeHtml(c.nombre);
+    opt.dataset.actividad = String(c.actividad || '');
     opt.textContent = escapeHtml(c.nombre);
     frag.appendChild(opt);
   }
@@ -976,7 +1118,7 @@ function onClienteChange() {
   }
 
   if (sel.value) {
-    clienteSeleccionado = { cuit: sel.value, nombre: opt.dataset.nombre };
+    clienteSeleccionado = { cuit: sel.value, nombre: opt.dataset.nombre, actividad: opt.dataset.actividad || '' };
     if (_archivoExcelPendiente) {
       const f = _archivoExcelPendiente;
       _archivoExcelPendiente = null;
@@ -2027,6 +2169,8 @@ function iniciarPolling() {
       // backend, pero nada lo guardaba en ningún lado -- el link nunca se
       // activaba. Guardar acá la respuesta completa del último sondeo.
       window._ultimoEstado = data;
+      // 17/11/2026: facturas sin rubro, apenas aparecen (la corrida sigue).
+      if (Array.isArray(data.pendientes_rubro) && data.pendientes_rubro.length) mostrarPendientesRubro(data.pendientes_rubro);
       (Array.isArray(data.pdfs_drive) ? data.pdfs_drive : []).forEach(d => { if (d && d.pdf && d.drive_url) _mapaDriveAcum[d.pdf] = d.drive_url; });
 
       // Si el total real que devuelve el servidor es mayor al que se usó para
@@ -2079,6 +2223,8 @@ function iniciarPolling() {
 
         _resultadoYaMostrado = true;
         stopPolling();
+        // 17/11/2026: terminó la tanda: aplicar los rubros elegidos y traer la lista actualizada.
+        aplicarRubrosElegidos().then(refrescarPendientesRubro);
         if (data.solo_escaneo === true) {
           // FIX 18/09/2026: el escaneo terminó, así que el candado local
           // anti-doble-orden (bloque v19 al final del archivo) se abre ACÁ,
@@ -3204,6 +3350,7 @@ async function startUpload() {
       showAlert(`No se pudo iniciar el procesamiento de la tanda ${t + 1}. Los PDF ya subidos quedaron en Drive sin procesar: no los vuelvas a subir (se duplicarían en Drive). Usá "Liberar proceso" y avisá para que se dispare el procesamiento de lo que ya está en Drive.`, 'error');
       return;
     }
+    await aplicarRubrosElegidos();   // 17/11/2026: antes de la tanda siguiente (que lee el PRN pendiente al arrancar)
     if (tandas.length > 1) logProceso(`Tanda ${t + 1} de ${tandas.length} terminada.`);
   }
   if (tandas.length > 1) {
@@ -3448,6 +3595,7 @@ async function sendFlush(forzar, soloEscanear, reintentarPdfs) {
         periodo: periodoStr(),
         cliente_cuit: clienteSeleccionado.cuit,
         cliente_nombre: clienteSeleccionado.nombre || '',
+        cliente_actividad: clienteSeleccionado.actividad || '',   // 17/11/2026: para que Gemini distinga uso propio de reventa
         tiene_registro: registroSubido,
         forzar: forzar === true,
         soloEscanear: soloEscanear === true,

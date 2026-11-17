@@ -487,7 +487,7 @@ function nombrePrnPorDefecto() {
   return `${cliente}_${periodoStr().replace('-', '')}_${marca}.prn`;
 }
 
-function descargarPrn(lineas, nombreArchivo) {
+function descargarPrn(lineas, nombreArchivo, cuitClic, perClic) {
   const blob = armarPrnBlob(lineas);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -498,7 +498,7 @@ function descargarPrn(lineas, nombreArchivo) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   // Si el aviso al servidor falla no importa: la persona ya tiene el archivo.
-  marcarPrnDescargado();
+  marcarPrnDescargado(cuitClic, perClic);   // 17/11/2026 (hallazgo 27): el cliente/período del momento del clic
 }
 
 // Botón "Descargar PRN" del cartel final de la corrida (única forma de bajar el PRN). Aparece solo si la
@@ -574,6 +574,7 @@ function renderPanelRubros() {
     return `<div style="padding:.6rem 1rem;border-top:1px solid #e5e5e0;font-size:13px;line-height:1.4;">
       <div><b>${escapeHtml(x.proveedor || '')}</b> · ${escapeHtml(x.comprobante || '')} · $ ${escapeHtml(x.total || '')}</div>
       <div style="color:#5f5e5a;margin:2px 0 6px;">${x.descripcion ? escapeHtml(x.descripcion) : '<i>(sin descripción)</i>'}</div>
+      ${x.sin_linea ? '<div style="font-size:12px;color:#b36b00;margin:0 0 6px;">No entra en el PRN automático: al elegir el rubro se pasa a carga manual en Holistor.</div>' : ''}
       <select data-k="${escapeHtml(k)}" class="selRubroPend" style="width:100%;">
         <option value="">— Elegir rubro —</option>${opciones}
       </select>
@@ -616,8 +617,21 @@ async function aplicarRubrosElegidos() {
         _reintentosAplicar = 0;
         for (const a of (data.aplicadas || [])) { _pendRubro.delete(String(a.k)); _rubroElegido.delete(String(a.k)); }
         const n = (data.aplicadas || []).length;
-        logProceso(`Rubro aplicado a ${n} factura(s): ya están en el PRN pendiente de descarga.`);
-        showAlert(`Rubro aplicado a ${n} ${pluralizar(n, 'factura')}: ya ${n === 1 ? 'está' : 'están'} en el PRN.`, 'success', true);
+        if (n) {
+          logProceso(`Rubro aplicado a ${n} factura(s): ya están en el PRN pendiente de descarga.`);
+          showAlert(`Rubro aplicado a ${n} ${pluralizar(n, 'factura')}: ya ${n === 1 ? 'está' : 'están'} en el PRN.`, 'success', true);
+        }
+        // 17/11/2026 (hallazgo 6): facturas que el servidor guardó sin la línea del PRN (la lista no entraba
+        // en la hoja): no se pueden agregar desde acá, se cargan a mano en Holistor.
+        const aMano = Array.isArray(data.a_mano) ? data.a_mano : [];
+        for (const a of aMano) { _pendRubro.delete(String(a.k)); _rubroElegido.delete(String(a.k)); }
+        if (aMano.length) {
+          const det = aMano.map(a => `${escapeHtml(a.proveedor || a.pdf || a.k)} ${escapeHtml(a.comprobante || '')} $ ${escapeHtml(a.total || '')}`).join('<br>');
+          showAlert(`${aMano.length} ${pluralizar(aMano.length, 'factura')} sin rubro no ${aMano.length === 1 ? 'entra' : 'entran'} en el PRN automático: ${aMano.length === 1 ? 'cargala' : 'cargalas'} a mano en Holistor con el rubro elegido.<br>${det}`, 'warn');
+        }
+        // 17/11/2026 (hallazgo 17): avisos del servidor sobre REGISTRO_ESPERADO / PRN_LINEAS.
+        if (Array.isArray(data.sin_fila_registro) && data.sin_fila_registro.length) logProceso(`Rubro aplicado, pero ${data.sin_fila_registro.length} factura(s) no se encontraron en REGISTRO_ESPERADO para marcarlas procesadas.`);
+        if (data.prn_lineas_error === true) logProceso('Rubro aplicado y PRN guardado, pero no se pudo anotar la línea en PRN_LINEAS.');
       } else if (data && data.codigo === 'en_curso') {
         logProceso('Rubros elegidos: hay una tanda procesándose, se aplican cuando termine.');
         if (_reintentosAplicar < 6 && !pollingInterval) { _reintentosAplicar++; setTimeout(aplicarRubrosElegidos, 10000); }
@@ -684,7 +698,7 @@ async function descargarPrnPendiente(nombreRespaldo) {
     }
     if (Array.isArray(data.pendientes_rubro)) mostrarPendientesRubro(data.pendientes_rubro);
     if (Array.isArray(data.pendientes_rubro) && data.pendientes_rubro.length && !(await confirmarDescargaConPendientes(data.pendientes_rubro.length))) return;
-    descargarPrn(data.lineas, data.prn_file_name || nombreRespaldo);
+    descargarPrn(data.lineas, data.prn_file_name || nombreRespaldo, cuit, per);   // 17/11/2026 (hallazgo 27)
   } catch (err) {
     logProceso(`No se pudo traer el PRN para descargar (${err.message}).`);
     showAlert(`No se pudo traer el PRN (${escapeHtml(err.message)}). Probá de nuevo en unos segundos.`, 'error');
@@ -692,9 +706,11 @@ async function descargarPrnPendiente(nombreRespaldo) {
 }
 
 // Avisa al servidor que el PRN ya se descargó y oculta el cartel pase lo que pase.
-async function marcarPrnDescargado() {
-  const cuit = (clienteSeleccionado && clienteSeleccionado.cuit) || '';
-  const per = periodoStr();
+async function marcarPrnDescargado(cuitClic, perClic) {
+  // 17/11/2026 (hallazgo 27): si viene del clic de descarga, se marca ese cliente/período (no el que esté
+  // elegido cuando termina la descarga).
+  const cuit = cuitClic || (clienteSeleccionado && clienteSeleccionado.cuit) || '';
+  const per = perClic || periodoStr();
   ocultarCartelPrn();
   if (!cuit || !per) return;
   try {
@@ -708,6 +724,7 @@ async function marcarPrnDescargado() {
   } catch (err) {
     logProceso(`No se pudo marcar el PRN como descargado (${err.message}).`);
   }
+  refrescarPendientesRubro();   // 17/11/2026 (hallazgo 30): después de descargar, el recuadro se pone al día
 }
 
 // Cartel "Tenés un PRN listo". _prnConsultaSeq descarta respuestas viejas (cambió el cliente/período
@@ -738,13 +755,22 @@ function mostrarCartelPrn(data) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'btn-p';
     b.innerHTML = '<i class="ti ti-download"></i> Descargar PRN';
-    b.addEventListener('click', () => descargarPrn(data.lineas || [], data.prn_file_name));
+    // 17/11/2026 (hallazgo 3): el PRN se trae del servidor en el momento (aplica antes los rubros elegidos
+    // y avisa si quedan facturas sin rubro), no de las líneas que trajo la consulta al mostrar el cartel.
+    b.addEventListener('click', () => descargarPrnPendiente(data.prn_file_name));
     btns.appendChild(b);
   }
   const ya = document.createElement('button');
   ya.type = 'button'; ya.className = 'btn-l';
   ya.textContent = 'Ya lo tengo, ocultar';
-  ya.addEventListener('click', () => marcarPrnDescargado());
+  // 17/11/2026 (hallazgo 4): si quedan facturas sin rubro, se avisa antes de dar el PRN por descargado.
+  ya.addEventListener('click', async () => {
+    const cuitClic = (clienteSeleccionado && clienteSeleccionado.cuit) || '';
+    const perClic = periodoStr();
+    const nPend = Array.isArray(data.pendientes_rubro) ? data.pendientes_rubro.length : 0;
+    if (nPend && !(await confirmarDescargaConPendientes(nPend))) return;
+    marcarPrnDescargado(cuitClic, perClic);
+  });
   btns.appendChild(ya);
   box.style.display = 'flex';
 }
@@ -753,6 +779,7 @@ async function consultarUltimoPrn() {
   const mi = ++_prnConsultaSeq;
   const box = document.getElementById('prnListo');
   if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+  renderPanelRubros();   // 17/11/2026 (hallazgo 30): el recuadro de otro cliente/período se saca enseguida
   const cuit = (clienteSeleccionado && clienteSeleccionado.cuit) || '';
   const per = periodoStr();
   if (!cuit || !per) return;
@@ -762,6 +789,9 @@ async function consultarUltimoPrn() {
     const data = await jsonSeguro(res);
     if (mi !== _prnConsultaSeq || uploading) return; // llegó tarde: cambió el cliente/período o arrancó una corrida
     if (data.ok === false) { logProceso(`No se pudo consultar el último PRN (${data.mensaje || 'respuesta con error'}).`); return; }
+    // 17/11/2026 (hallazgo 30): la misma consulta trae las facturas sin rubro de este cliente/período
+    // (al cambiar de cliente o período, al cargar la página y después de descargar).
+    if (Array.isArray(data.pendientes_rubro)) mostrarPendientesRubro(data.pendientes_rubro);
     if (data.existe === true && data.terminado === true && data.descargado !== true) mostrarCartelPrn(data);
   } catch (err) {
     logProceso(`No se pudo consultar el último PRN (${err.message}).`);
@@ -791,6 +821,8 @@ let uploading = false;
 let subidos = 0;
 let errores = 0;
 let pollingInterval = null;
+let _sondeoGen = 0;          // 17/11/2026 (hallazgo 28): número del sondeo vigente
+let _sondeoEnVuelo = false;  // 17/11/2026 (hallazgo 28): hay una consulta de estado sin respuesta
 let pollingTimeoutMax = null;
 let countdownInterval = null;
 let _procesoInicioTs = null;
@@ -824,7 +856,7 @@ function crearResumenTandasVacio() {
     prnNombre: '',        // nombre del PRN (el del consolidado si lo hay)
     prnDriveFallo: false, // true si alguna tanda devolvió prn_guardado:false (Drive no respondió)
     // Conciliación (verificacion.resumen + sus listas) — se suman/concatenan tanda a tanda.
-    verifResumen: { conciliadas:0, total_a_revisar:0, falta_procesar:0, fuera_de_arca:0, en_registro:null },
+    verifResumen: { conciliadas:0, total_a_revisar:0, falta_procesar:0, fuera_de_arca:0, en_registro:null, procesadas_antes:0 },
     verifConciliadas: [],
     verifTotalARevisar: [],
     verifFaltaProcesar: [],
@@ -872,6 +904,8 @@ let _claveRechazada = false;
 // 13/11/2026 (A-5): true cuando la tanda terminó porque la página se cansó de esperar (no porque
 // n8n avisara que terminó). En ese caso no se sube la tanda siguiente.
 let _corridaVencida = false;
+// 17/11/2026 (bajas): true cuando el escaneo terminó sin PDF de este cliente/período en la carpeta de entrada.
+let _corridaSinFacturas = false;
 function _corridaTerminada(ok) {
   if (typeof _resolverCorridaActual === 'function') { const r = _resolverCorridaActual; _resolverCorridaActual = null; r(ok !== false); }
 }
@@ -1713,7 +1747,8 @@ function parsearRegistroARCA(file) {
         for (let i = 2; i < rows.length; i++) {
           const r = rows[i];
           if (!r || r[0] === null) continue;
-          const rc = String(r[10]||'').replace(/[^0-9]/g,'').padStart(11,'0');
+          const _rcCrudo = rowsRaw[i] ? rowsRaw[i][10] : null;   // 17/11/2026 (bajas): valor crudo si es número
+          const rc = ((typeof _rcCrudo === 'number' && isFinite(_rcCrudo)) ? String(Math.round(_rcCrudo)) : String(r[10]||'')).replace(/[^0-9]/g,'').padStart(11,'0');
           if (rc && rc !== '00000000000') receptoresSet.add(rc);
         }
 
@@ -1740,10 +1775,14 @@ function parsearRegistroARCA(file) {
           const r = rows[i];
           if (!r || r[0] === null) continue;
 
+          // 17/11/2026 (bajas): las columnas de la clave (CUIT, punto de venta, número) salen del valor crudo
+          // de la celda cuando es un número: con raw:false un formato de Excel ("12,345", "3,07E+10") cambiaba
+          // la clave. Si la celda es texto, se usa como siempre.
+          const _crudo = (idx) => { const v = rowsRaw[i] ? rowsRaw[i][idx] : null; return (typeof v === 'number' && isFinite(v)) ? String(Math.round(v)) : String(r[idx] || ''); };
           const tipoCod = String(r[1]||'').split(' - ')[0].trim();
-          const cuitEm = String(r[7]||'').replace(/[^0-9]/g,'').padStart(11,'0');
-          const ptoVta = String(r[2]||'');
-          const numHasta = String(r[4]||'');
+          const cuitEm = _crudo(7).replace(/[^0-9]/g,'').padStart(11,'0');
+          const ptoVta = _crudo(2);
+          const numHasta = _crudo(4);
           const clave = `${cuitEm}-${parseInt(tipoCod)||0}-${parseInt(ptoVta)||0}-${parseInt(numHasta)||0}`;
 
           // Preferir el valor numérico crudo de la celda (rowsRaw) para
@@ -2138,11 +2177,18 @@ function iniciarPolling() {
   }
   pollingTimeoutMax = setTimeout(_timeoutProcesoVencido, _timeoutProcesoMs);
 
+  // 17/11/2026 (hallazgo 28): una sola consulta a la vez, y una respuesta que llega cuando este sondeo ya
+  // terminó (o arrancó el de la tanda siguiente) se descarta: así una tanda no se suma dos veces.
+  const _genSondeo = ++_sondeoGen;
+  _sondeoEnVuelo = false;
   pollingInterval = setInterval(async () => {
+    if (_sondeoEnVuelo) return;
+    _sondeoEnVuelo = true;
     try {
       const cuit = clienteSeleccionado?.cuit || '';
       const per = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
       const res = await fetchConTimeout(`${WEBHOOK.estado()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`, {}, 30000);
+      if (_genSondeo !== _sondeoGen || !pollingInterval) return;   // 17/11/2026 (hallazgo 28)
       // FIX 02/10/2026: si la clave de acceso dejó de ser válida a mitad de la
       // espera (caso real de septiembre de 2026 — el proceso en realidad
       // había terminado bien, pero la página se quedó sin poder preguntar y
@@ -2155,13 +2201,14 @@ function iniciarPolling() {
         stopPolling();
         logProceso('Sondeo interrumpido: hay que volver a ingresar la clave de acceso.');
         mostrarEstadoProceso('listo', [], null);
-        _corridaTerminada();
+        _corridaTerminada(false);   // 17/11/2026 (hallazgo 29): sin confirmar el fin, no se sube la tanda siguiente
         if (window.__holistorLiberarGuardaLocal) window.__holistorLiberarGuardaLocal();
         return;
       }
       if (!res.ok) return;
       const data = await jsonSeguro(res);
             if (!data) return;
+      if (_genSondeo !== _sondeoGen || !pollingInterval) return;   // 17/11/2026 (hallazgo 28)
 
       // FIX 07/10/2026: fuente de datos para el link "Ver en Drive" de
       // renderListaDetalle() (fallidas, carga manual, otro cliente). El campo
@@ -2213,6 +2260,10 @@ function iniciarPolling() {
           // FIX 09/10/2026: un lote donde todas las facturas son de otro cliente no genera PRN ni
           // fallidas; sin esta línea la página nunca daba el proceso por terminado y quedaba en "Procesando…".
           || (Array.isArray(data.otro_cliente) && data.otro_cliente.length > 0)
+          // 17/11/2026: una tanda cortada por un error crítico (lectura del registro, hoja) solo trae ese aviso.
+          || String(data.error_critico || '').trim() !== ''
+          // 17/11/2026 (bajas): hubo líneas pero Drive no guardó el archivo: antes se esperaba hasta el tiempo límite.
+          || (data.prn_guardado === false && Number(data.lineas_finales_generadas) > 0)
           || (data.conciliacion && Array.isArray(data.conciliacion.procesadas_registradas)
               && data.conciliacion.procesadas_registradas.length > 0);
         if (!_tieneContenido) {
@@ -2244,7 +2295,9 @@ function iniciarPolling() {
         const fallidosVisibles = (data.fallidos || []).filter(x => {
           const sx = splitNombreMotivo(x);
           const txt = (sx.motivo || sx.pdf_nombre || '').toLowerCase();
-          return !txt.includes('otro cliente') && !txt.includes('cargar manualmente');
+          // 17/11/2026 (hallazgo 18): las facturas sin rubro no son errores ni entran en "Reintentar fallidas":
+          // se ven solo en el recuadro "Facturas sin rubro".
+          return !txt.includes('otro cliente') && !txt.includes('cargar manualmente') && !txt.trim().startsWith('sin rubro:');
         });
         const nf = fallidosVisibles.length > 0;
         const naCount = Array.isArray(data.no_en_arca) ? data.no_en_arca.length : 0;
@@ -2293,7 +2346,10 @@ function iniciarPolling() {
           const vr = data.verificacion.resumen;
           R.verifResumen.conciliadas += Number(vr.conciliadas) || 0;
           R.verifResumen.total_a_revisar += Number(vr.total_a_revisar) || 0;
-          R.verifResumen.falta_procesar += Number(vr.falta_procesar) || 0;
+          // 17/11/2026 (hallazgo 14): el servidor ya descuenta lo procesado antes: "falta procesar" (número y
+          // lista) es el de la ÚLTIMA tanda, no la suma.
+          R.verifResumen.falta_procesar = Number(vr.falta_procesar) || 0;
+          R.verifResumen.procesadas_antes = Number(vr.procesadas_antes) || 0;
           R.verifResumen.fuera_de_arca += Number(vr.fuera_de_arca) || 0;
           // Filas del registro ARCA que vio el servidor: se guarda el MENOR valor de las tandas,
           // así una sola tanda que no vio el registro alcanza para avisar.
@@ -2303,7 +2359,7 @@ function iniciarPolling() {
           }
           R.verifConciliadas = R.verifConciliadas.concat(data.verificacion.conciliadas || []);
           R.verifTotalARevisar = R.verifTotalARevisar.concat(data.verificacion.total_a_revisar || []);
-          R.verifFaltaProcesar = R.verifFaltaProcesar.concat(data.verificacion.falta_procesar || []);
+          R.verifFaltaProcesar = (data.verificacion.falta_procesar || []).slice();   // 17/11/2026 (hallazgo 14)
           R.verifFueraDeArca = R.verifFueraDeArca.concat(data.verificacion.fuera_de_arca || []);
         }
 
@@ -2346,6 +2402,7 @@ function iniciarPolling() {
         }
       }
     } catch(e) { console.warn('Polling error:', e); }
+    finally { _sondeoEnVuelo = false; }   // 17/11/2026 (hallazgo 28)
   }, POLLING_INTERVAL_MS);
 }
 
@@ -2531,6 +2588,7 @@ function mostrarConciliacion(verif, concil, noEnArca, yaProcesadas, duplicadosEn
       + `<span class="concil-badge cb-ok">✓ ${r.conciliadas||0} conciliadas</span>`
       + `<span class="concil-badge cb-warn">⚠ ${r.total_a_revisar||0} total a revisar</span>`
       + `<span class="concil-badge cb-err">✗ ${r.falta_procesar||0} falta procesar</span>`
+      + ((Number(r.procesadas_antes) || 0) > 0 ? `<span class="concil-badge cb-ok">↺ ${Number(r.procesadas_antes)} ya procesadas antes</span>` : '')   // 17/11/2026 (hallazgo 14)
       + (_mostrarFuera ? `<span class="concil-badge cb-warn">↗ ${r.fuera_de_arca||0} en el PRN sin figurar en ARCA</span>` : '')
       + `</div>`;
     html += buildConcilSection('circle-check', 'Conciliadas — clave y total OK', (verif.conciliadas || []).map(x => ({ clave:x.clave, total:x.total })), 'ok');
@@ -2609,6 +2667,12 @@ async function reintentar() {
   if (!exigirRegistro()) return;
   if (_reintentoCliente) clienteSeleccionado = _reintentoCliente;
   if (_reintentoPeriodo) periodo = _reintentoPeriodo;
+  // 17/11/2026 (hallazgo 31): los selectores muestran el cliente/período de la corrida que falló; si no,
+  // al releer el período durante el reintento se tomaba el que estuviera elegido en pantalla.
+  try {
+    if (_reintentoCliente) document.getElementById('selCliente').value = _reintentoCliente.cuit;
+    if (_reintentoPeriodo) { document.getElementById('selMes').value = _reintentoPeriodo.mes; document.getElementById('selAnio').value = _reintentoPeriodo.anio; }
+  } catch (e) {}
   document.querySelectorAll('#cardFallidos button').forEach(b => b.disabled = true);
   showAlert('Reintentando fallidas… esperando indexación de Drive', 'info');
    try {
@@ -3074,6 +3138,7 @@ function clearPending() {
 // UPLOAD Y PROCESAMIENTO
 // ──────────────────────────────────────────────────────────────────────────────
 function setUploadControlsDisabled(disabled) {
+  if (!disabled && window.__holistorBucleTandas) return;   // 17/11/2026 (hallazgo 11): bloqueados hasta que termine el bucle de tandas
     ['btnSubir', 'btnProcesar', 'selCliente', 'selMes', 'selAnio'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = disabled;
@@ -3151,7 +3216,22 @@ async function consultarCandado() {
   }
 }
 
+// 17/11/2026 (hallazgos 11 y 26): el botón y los selectores se bloquean en el mismo clic (antes del primer
+// await, así un doble clic no arranca dos corridas) y siguen bloqueados durante TODAS las tandas; se
+// liberan solo al terminar o cortar el bucle.
 async function startUpload() {
+  if (uploading || window.__holistorBucleTandas) return;
+  window.__holistorBucleTandas = true;
+  setUploadControlsDisabled(true);
+  try {
+    await _startUploadTandas();
+  } finally {
+    window.__holistorBucleTandas = false;
+    if (!pollingInterval) setUploadControlsDisabled(false);
+  }
+}
+
+async function _startUploadTandas() {
   actualizarPeriodo(true); // mismo motivo
   if (uploading) return;
   if (!validarPrecondiciones()) return;
@@ -3187,16 +3267,23 @@ async function startUpload() {
   const tandas = [];
   for (let i = 0; i < pendingTotal.length; i += BATCH_FRONTEND_SIZE) tandas.push(pendingTotal.slice(i, i + BATCH_FRONTEND_SIZE));
   if (tandas.length > 1) {
-    showAlert(`${pendingTotal.length} PDFs: se procesan en ${tandas.length} tandas de hasta ${BATCH_FRONTEND_SIZE}. Cada tanda genera su propio archivo PRN.`, 'info');
+    showAlert(`${pendingTotal.length} PDFs: se procesan en ${tandas.length} tandas de hasta ${BATCH_FRONTEND_SIZE}. Todas se suman al mismo PRN: al final se descarga un solo archivo.`, 'info');   // 17/11/2026 (bajas)
     logProceso(`Lote grande: ${tandas.length} tandas de hasta ${BATCH_FRONTEND_SIZE} archivos.`);
   }
 
   _prnDeTandas = [];
   _resumenTandas = crearResumenTandasVacio();
   _mapaDriveAcum = {};
+  // 17/11/2026 (hallazgo 11): cliente y período fijados al empezar; si cambian entre tandas, se corta.
+  const _cuitBucle = clienteSeleccionado.cuit, _perBucle = periodoStr();
   for (let t = 0; t < tandas.length; t++) {
     const pending = tandas[t];
     const etiquetaTanda = tandas.length > 1 ? ` (tanda ${t + 1} de ${tandas.length})` : '';
+    if (!clienteSeleccionado || clienteSeleccionado.cuit !== _cuitBucle || periodoStr() !== _perBucle) {
+      logProceso(`Tanda ${t + 1}: cambió el cliente o el período durante la corrida. Se corta acá.`);
+      showAlert('Cambió el cliente o el período en medio de la corrida: no se subieron las tandas que faltaban. Volvé a elegir el cliente y el período de la corrida y tocá "Subir y procesar" con los PDF que quedaron.', 'error');
+      return;
+    }
     if (t > 0) {
       resetProcesoUX();
       document.getElementById('loteResultado').style.display = 'none';
@@ -3314,6 +3401,7 @@ async function startUpload() {
     if (!fallidosNombres.length) showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
     await sleep(calcularEsperaIndexacion(pending.length));
     _corridaVencida = false;
+    _corridaSinFacturas = false;
     const finDeCorrida = esperarFinDeCorrida();
     await escanearYProcesar();
     const corridaOk = await finDeCorrida;
@@ -3341,6 +3429,15 @@ async function startUpload() {
         const restantesV = tandas.length - (t + 1);
         logProceso(`Tanda ${t + 1} de ${tandas.length}: se dejó de esperar por tiempo. Se corta acá${restantesV > 0 ? ` (quedan ${restantesV} ${pluralizar(restantesV, 'tanda', 'tandas')} sin subir)` : ''}.`);
         if (restantesV > 0) showAlert(`La tanda ${t + 1} tardó más de lo esperado y la página dejó de esperarla; n8n puede seguir procesándola. Por eso no se subieron las ${restantesV} ${pluralizar(restantesV, 'tanda', 'tandas')} siguientes. Los PDF ya subidos quedaron en Drive: <b>no los vuelvas a subir</b>. Esperá unos minutos y volvé a tocar Procesar: lo que ya esté hecho se reconoce como repetido y lo nuevo se procesa.`, 'warn');
+        return;
+      }
+      // 17/11/2026 (bajas): el escaneo no encontró PDF de este cliente/período (la orden sí salió). Se corta
+      // con ese motivo, sin el cartel de "la orden no salió" (que sugería liberar el proceso).
+      if (_corridaSinFacturas) {
+        _corridaSinFacturas = false;
+        const restantesS = tandas.length - (t + 1);
+        logProceso(`Tanda ${t + 1} de ${tandas.length}: el escaneo no encontró PDF para procesar. Se corta acá${restantesS > 0 ? ` (quedan ${restantesS} ${pluralizar(restantesS, 'tanda', 'tandas')} sin subir)` : ''}.`);
+        if (restantesS > 0) showAlert(`En la tanda ${t + 1} el servidor no encontró los PDF subidos (Drive puede tardar en mostrarlos). No se subieron las ${restantesS} ${pluralizar(restantesS, 'tanda', 'tandas')} siguientes. Esperá un minuto y volvé a tocar Procesar: lo ya hecho se reconoce como repetido.`, 'warn');
         return;
       }
       // FIX 18/09/2026: la orden de procesar no salió. Los PDF de esta tanda ya
@@ -3446,6 +3543,7 @@ function manejarResultadoEscaneo(data) {
     showAlert('No hay facturas para procesar: la carpeta de entrada no tiene PDFs de este cliente y período.', 'warn');
     // FIX 09/10/2026: el panel de progreso quedaba en "Escaneando… 65 %" aunque ya no había nada para hacer.
     updateProcesoUX('final', 100, 'Sin facturas', 'La carpeta de entrada no tiene PDFs de este cliente y período.', { progressText:'Sin facturas para procesar.' });
+    _corridaSinFacturas = true;   // 17/11/2026 (bajas): el bucle de tandas no lo trata como "la orden no salió"
     _corridaTerminada(false);
     return;
   }
@@ -3664,6 +3762,8 @@ function actualizarPeriodo(sinConsultaPrn) {
     if (_ultimoExcelParseado && !registroSubido) {
       validarPeriodoYGuardarExcel();
     }
+    // 17/11/2026 (hallazgo 31): cambiar el período a mano limpia el resultado del período anterior.
+    if (sinConsultaPrn !== true && !uploading && !pollingInterval) resetProcesoUX();
     if (sinConsultaPrn !== true) consultarUltimoPrn(); // cartel "Tenés un PRN listo"
   }
 }
@@ -3771,7 +3871,7 @@ console.log('[TEST] Holistor uploader inline JS cargado OK');
   function periodoActual(){ const mes=qs('selMes')?.value||''; const anio=qs('selAnio')?.value||''; return anio && mes ? `${anio}-${String(mes).padStart(2,'0')}` : ''; }
   function clienteActual(){ return qs('selCliente')?.value || ''; }
   function keyActual(body){ return String(body?.cliente_cuit || clienteActual() || '') + '|' + String(body?.periodo || periodoActual() || ''); }
-  function setProcesarDisabled(disabled){ ['btnSubir','btnProcesar','selCliente','selMes','selAnio'].forEach(id => { const el=qs(id); if (el) el.disabled = !!disabled; }); }
+  function setProcesarDisabled(disabled){ if (!disabled && window.__holistorBucleTandas) return; /* 17/11/2026 (hallazgo 11) */ ['btnSubir','btnProcesar','selCliente','selMes','selAnio'].forEach(id => { const el=qs(id); if (el) el.disabled = !!disabled; }); }
   function jsonResponse(obj){ return new Response(JSON.stringify(obj), { status:200, headers:{'Content-Type':'application/json'} }); }
   // Hook para que el timeout de iniciarPolling() (definido en el otro bloque
   // <script>, fuera de esta IIFE, sin acceso a `state`) pueda liberar el
@@ -3826,6 +3926,8 @@ console.log('[TEST] Holistor uploader inline JS cargado OK');
           || (Array.isArray(data?.otro_cliente) && data.otro_cliente.length > 0)
           || (Array.isArray(data?.duplicados_en_lote) && data.duplicados_en_lote.length > 0)
           || (Array.isArray(data?.nuevas_en_escaneo)  && data.nuevas_en_escaneo.length  > 0)
+          || String(data?.error_critico || '').trim() !== ''   // 17/11/2026: tanda cortada por error crítico
+          || (data?.prn_guardado === false && Number(data?.lineas_finales_generadas) > 0)   // 17/11/2026 (bajas): solo falló Drive
           || (data?.conciliacion && Array.isArray(data.conciliacion.procesadas_registradas)
               && data.conciliacion.procesadas_registradas.length > 0);
         if (data?.listo === true && !tieneContenido) return;  // listo prematuro, seguir esperando

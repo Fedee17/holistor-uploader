@@ -358,7 +358,6 @@ const WEBHOOK = {
   reset:     () => BASE_WEBHOOK + '/holistor-reset-test',
   syncProv:  () => BASE_WEBHOOK + '/holistor-sync-proveedores-pendientes-test',
   proveedores: () => BASE_WEBHOOK + '/holistor-proveedores-test',
-  consolidar: () => BASE_WEBHOOK + '/holistor-prn-consolidar-test',
   // 01/10/2026: consulta del candado compartido, se llama ANTES de subir PDFs.
   candado:   () => BASE_WEBHOOK + '/holistor-candado-test',
   // Último PRN guardado en el servidor para un cliente/período, y marca de "ya lo descargué".
@@ -689,7 +688,7 @@ async function descargarPrnPendiente(nombreRespaldo) {
     const data = await jsonSeguro(res);
     if (!data || data.ok === false) throw new Error((data && data.mensaje) || 'respuesta con error');
     if (data.lineas_recortadas === true) {
-      showAlert('No se puede descargar desde acá: el PRN tiene demasiadas facturas o no se pudo leer. Buscá el PRN consolidado en la carpeta PRN de Drive.', 'warn');
+      showAlert('No se puede descargar desde acá: el PRN tiene demasiadas facturas o no se pudo leer. Importá los PRN de cada tanda que están en la carpeta PRN de Drive.', 'warn');
       return;
     }
     if (!Array.isArray(data.lineas) || !data.lineas.length) {
@@ -748,7 +747,7 @@ function mostrarCartelPrn(data) {
   box.innerHTML = '<i class="ti ti-file-check"></i><div class="prn-listo-body">'
     + '<div class="prn-listo-title">Tenés un PRN listo que todavía no descargaste</div>'
     + `<div class="prn-listo-line">${escapeHtml(linea)}</div>`
-    + (recortado ? '<div class="prn-listo-nota">No se puede descargar desde acá: el PRN tiene demasiadas facturas o no se pudo leer. Buscá el PRN consolidado en la carpeta PRN de Drive, importalo y apretá «Ya lo tengo».</div>' : '')
+    + (recortado ? '<div class="prn-listo-nota">No se puede descargar desde acá: el PRN tiene demasiadas facturas o no se pudo leer. Importá los PRN de cada tanda que están en la carpeta PRN de Drive y apretá «Ya lo tengo».</div>' : '')
     + '<div class="prn-listo-btns"></div></div>';
   const btns = box.querySelector('.prn-listo-btns');
   if (!recortado) {
@@ -827,9 +826,6 @@ let pollingTimeoutMax = null;
 let countdownInterval = null;
 let _procesoInicioTs = null;
 let _procesoTimeoutTotalMs = null;
-// 21/09/2026: PRN generados por cada tanda de la corrida actual (id y nombre en Drive),
-// para pedirle a n8n el archivo consolidado cuando terminan todas las tandas.
-let _prnDeTandas = [];
 // FIX 21/09/2026 ("24 facturas"): cuando una corrida se parte en varias tandas,
 // cada tanda mostraba SOLO sus propios resultados en el cartel final y en los
 // paneles de errores/carga manual/otro cliente/discrepancias — al pasar a la
@@ -837,7 +833,7 @@ let _prnDeTandas = [];
 // anterior se perdía para siempre. Este acumulador junta los resultados de
 // TODAS las tandas de la corrida actual, para que el cartel final siempre se
 // arme con el total real (todas las tandas juntas), no solo la última.
-// Se vacía en cada startUpload() nueva, junto con _prnDeTandas.
+// Se vacía en cada startUpload() nueva.
 function crearResumenTandasVacio() {
   return {
     facturasCount: 0,
@@ -853,7 +849,7 @@ function crearResumenTandasVacio() {
     duplicadosEnLote: [],
     // Líneas del PRN de todas las tandas (resultados_por_pdf, estado al_prn) para armar el .prn en la página.
     lineasPrn: [],
-    prnNombre: '',        // nombre del PRN (el del consolidado si lo hay)
+    prnNombre: '',        // nombre del PRN de Drive de la última tanda
     prnDriveFallo: false, // true si alguna tanda devolvió prn_guardado:false (Drive no respondió)
     // Conciliación (verificacion.resumen + sus listas) — se suman/concatenan tanda a tanda.
     verifResumen: { conciliadas:0, total_a_revisar:0, falta_procesar:0, fuera_de_arca:0, en_registro:null, procesadas_antes:0 },
@@ -2368,7 +2364,6 @@ function iniciarPolling() {
         // acumulado alcanza con R.prnReal (true si CUALQUIER tanda generó PRN real).
         mostrarEstadoProceso('listo', R.fallidos, R.prnReal, R.naCount, data.prn_file_id, data.prn_file_name, data.lineas_finales_generadas, R.manuales, R.otrosCliente, R.facturasCount, R.yaProcesadas.length, R.duplicadosEnLote.length);
         agregarBotonDescargaPrnFinal();
-        if (prnReal && data.prn_file_id) _prnDeTandas.push({ id: String(data.prn_file_id), name: String(data.prn_file_name || '') });
         mostrarDiagnostico(data);
         if (R.fallidos.length > 0) mostrarFallidos(R.fallidos);
         else { const cf = document.getElementById('cardFallidos'); if (cf) cf.style.display = 'none'; }
@@ -3271,7 +3266,6 @@ async function _startUploadTandas() {
     logProceso(`Lote grande: ${tandas.length} tandas de hasta ${BATCH_FRONTEND_SIZE} archivos.`);
   }
 
-  _prnDeTandas = [];
   _resumenTandas = crearResumenTandasVacio();
   _mapaDriveAcum = {};
   // 17/11/2026 (hallazgo 11): cliente y período fijados al empezar; si cambian entre tandas, se corta.
@@ -3451,49 +3445,13 @@ async function _startUploadTandas() {
     if (tandas.length > 1) logProceso(`Tanda ${t + 1} de ${tandas.length} terminada.`);
   }
   if (tandas.length > 1) {
-    showAlert(`Listo: se procesaron ${tandas.length} tandas.`, 'success');
-    await consolidarPrnTandas(tandas.length);
+    // 17/11/2026 (poda): ya no se arma un PRN "consolidado" en Drive: las tandas se suman en un solo PRN
+    // pendiente en la hoja (desde el 12/11) y "Descargar PRN" baja ese. Cada tanda deja igual su PRN en Drive.
+    showAlert(`Listo: se procesaron ${tandas.length} tandas. Todas están en un solo PRN.`, 'success');
   }
   // 12/11/2026: si hubo PRN pero la página no recibió sus líneas (resultado recortado), no hay botón
   // "Descargar PRN": se muestra el cartel "Tenés un PRN listo", que las lee de la hoja.
   if (_resumenTandas.prnReal && !_resumenTandas.lineasPrn.length) consultarUltimoPrn();
-}
-
-// 21/09/2026: cuando la corrida se partió en tandas, cada tanda dejó su propio PRN
-// en Drive. Se le pide a n8n (webhook holistor-prn-consolidar, workflow aparte)
-// que una las líneas de todos en un solo archivo CONSOLIDADO. Los PRN por tanda
-// quedan como respaldo. Si falla, se avisa y se sigue: no bloquea nada.
-async function consolidarPrnTandas(cantTandas) {
-  const prns = _prnDeTandas.slice();
-  if (prns.length === 0) { logProceso('Consolidado: ninguna tanda generó PRN, no hay nada que unir.'); return; }
-  if (prns.length === 1) { logProceso(`Consolidado: solo 1 de ${cantTandas} tandas generó PRN (${prns[0].name}); ese archivo ya es el único, no hace falta unir.`); return; }
-  logProceso(`Consolidado: pidiendo a n8n que una ${prns.length} PRN en un solo archivo…`);
-  showAlert(`Armando el PRN consolidado con las ${prns.length} tandas…`, 'info');
-  try {
-    const res = await fetchConTimeout(WEBHOOK.consolidar(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cliente_cuit: clienteSeleccionado.cuit,
-        cliente_nombre: clienteSeleccionado.nombre || '',
-        periodo: periodoStr(),
-        prn_file_ids: prns.map(p => p.id)
-      })
-    }, FETCH_TIMEOUT_MS);
-    const data = await jsonSeguro(res);
-    if (!res.ok || data.ok !== true || !data.prn_file_id) {
-      throw new Error(data.mensaje || `HTTP ${res.status}`);
-    }
-    const avisos = Array.isArray(data.avisos) ? data.avisos : [];
-    logProceso(`Consolidado listo: ${data.prn_file_name} (${data.lineas} líneas de ${data.archivos_unidos} archivos).` + (avisos.length ? ' Avisos: ' + avisos.join(' | ') : ''));
-    showAlert(`✓ PRN consolidado listo: ${data.lineas} líneas de ${data.archivos_unidos} tandas.` + (avisos.length ? ' Revisá los avisos en el detalle.' : ''), avisos.length ? 'warn' : 'success');
-    // 12/11/2026: el consolidado queda en Drive como copia; la página no ofrece enlace.
-    if (data.prn_file_name) _resumenTandas.prnNombre = String(data.prn_file_name); // el botón Descargar PRN usa el nombre del consolidado
-  } catch (err) {
-    const detalle = err.name === 'AbortError' ? 'tiempo de espera agotado' : err.message;
-    logProceso(`Consolidado: no se pudo armar el archivo único (${detalle}). Los PRN por tanda siguen en Drive: ${prns.map(p => p.name || p.id).join(', ')}.`);
-    showAlert(`No se pudo armar el PRN consolidado: ${escapeHtml(detalle)}. Los ${prns.length} PRN por tanda están en Drive y se pueden importar uno por uno.`, 'warn');
-  }
 }
 
 async function autoSyncProveedores() {

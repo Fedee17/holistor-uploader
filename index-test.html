@@ -177,16 +177,48 @@
 
   /* Banner de TEST -- para que no se confunda nunca con la página real */
   .test-banner { position: sticky; top: 0; z-index: 10000; background: repeating-linear-gradient(45deg, #b91c1c, #b91c1c 12px, #7f1d1d 12px, #7f1d1d 24px); color: #fff; text-align: center; font-weight: 700; font-size: 13px; letter-spacing: 0.05em; padding: 8px 12px; margin: -2rem -1rem 1.25rem; text-transform: uppercase; }
+
+  /* 18/11/2026: menú "Facturas" y pantalla "Clientes y proveedores" */
+  .menu-fact { position: absolute; right: 0; top: 22px; background: #fff; border: 0.5px solid #e0e0d8; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); min-width: 200px; padding: 6px; z-index: 9500; }
+  .menu-fact a { display: block; padding: 8px 10px; border-radius: 6px; color: #1a1a1a; text-decoration: none; font-weight: 400; }
+  .menu-fact a:hover, .menu-fact a.on { background: #f4f4ef; }
+  .menu-fact a.on { font-weight: 600; }
+  .mae-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .mae-tab { padding: 7px 14px; border-radius: 8px; font-size: 13px; border: 0.5px solid #ccc; background: #fff; cursor: pointer; color: #1a1a1a; }
+  .mae-tab.on { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .mae-filtro { margin-left: auto; padding: 7px 12px; border-radius: 8px; font-size: 13px; border: 0.5px solid #ccc; background: #fff; cursor: pointer; color: #1a1a1a; }
+  .mae-filtro.on { background: #fdf1dc; border-color: #f0c674; color: #8a5a00; }
+  .mae-buscar { width: 100%; box-sizing: border-box; padding: 8px 12px; border: 0.5px solid #ccc; border-radius: 8px; font-size: 13px; margin-bottom: 6px; }
+  .mae-cuenta { color: #888; font-size: 12px; margin: 2px 4px 6px; }
+  .mae-lista { max-height: 60vh; overflow-y: auto; overscroll-behavior: contain; border-top: 0.5px solid #eee; }
+  .mae-fila { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 4px; border-bottom: 0.5px solid #eee; font-size: 14px; cursor: pointer; }
+  .mae-fila:hover, .mae-fila:focus { background: #fafaf7; outline: none; }
+  .mae-fila.recien { background: #e6f4ea; transition: background 1.5s; }
+  .mae-izq { min-width: 0; overflow-wrap: anywhere; }
+  .mae-gris { color: #888; font-size: 12px; }
+  .mae-der { flex-shrink: 1; max-width: 45%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+  .mae-chip { flex-shrink: 0; font-size: 12px; padding: 3px 9px; border-radius: 20px; background: #f0f0ea; white-space: nowrap; }
+  .mae-chip.siempre { background: #fdf1dc; color: #8a5a00; }
+  .mae-falta { color: #b36b00; }
+  .mae-aviso { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 9999; padding: 10px 16px; border-radius: 8px; font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,.2); display: none; }
+  @media (max-width: 520px) { .mae-chip { white-space: normal; text-align: right; max-width: 45%; } .mae-filtro { margin-left: 0; } }
 </style>
 </head>
 <body>
 <div class="test-banner"><i class="ti ti-flask" style="vertical-align:-2px;"></i> Ambiente de PRUEBA — no es la página real que usan los clientes — datos y Drive separados de producción</div>
 <div class="container">
  <div class="container">
-  <div style="display:flex;justify-content:flex-end;gap:16px;margin-bottom:10px;font-size:13px;">
-    <a href="index.html" style="color:#1a1a1a;font-weight:600;text-decoration:none;">Facturas</a>
+  <div id="navPrincipal" style="display:flex;justify-content:flex-end;gap:16px;margin-bottom:10px;font-size:13px;">
+    <span style="position:relative;">
+      <a href="#" id="btnMenuFacturas" onclick="toggleMenuFacturas(event)" aria-haspopup="true" aria-expanded="false" style="color:#1a1a1a;font-weight:600;text-decoration:none;">Facturas <i class="ti ti-chevron-down" style="font-size:12px;"></i></a>
+      <div id="menuFacturasLista" class="menu-fact" style="display:none;">
+        <a href="#" id="menuOpcFacturas" class="on" onclick="irAVista('facturas');return false;">Subir facturas</a>
+        <a href="#clientes-y-proveedores" id="menuOpcMaestros" onclick="irAVista('maestros');return false;">Clientes y proveedores</a>
+      </div>
+    </span>
     <a href="balances.html" style="color:#888;text-decoration:none;">Balances Bancarios</a>
   </div>
+  <div id="vistaFacturas">
   <h1 style="margin-bottom:1.5rem;"><i class="ti ti-flask"></i> [TEST] Holistor — Subir facturas</h1>
   <div id="alert" class="alert"></div>
   <div class="stats">
@@ -335,6 +367,21 @@
     <div class="card-header"><i class="ti ti-history"></i> Historial de esta sesión</div>
     <div id="historyList"><div class="empty"><i class="ti ti-inbox"></i>Todavía no se subieron archivos</div></div>
   </div>
+  </div>
+  <div id="vistaMaestros" style="display:none;">
+    <h1 style="margin-bottom:1.5rem;"><i class="ti ti-flask"></i> [TEST] Clientes y proveedores</h1>
+    <div class="card">
+      <div class="mae-tabs">
+        <button type="button" id="tabMaeClientes" class="mae-tab on" onclick="elegirPestanaMaestros('clientes')">Clientes</button>
+        <button type="button" id="tabMaeProveedores" class="mae-tab" onclick="elegirPestanaMaestros('proveedores')">Proveedores</button>
+        <button type="button" id="btnMaeFaltan" class="mae-filtro" onclick="alternarSoloFaltan()">Solo sin actividad</button>
+      </div>
+      <input id="buscarMaestros" class="mae-buscar" type="search" placeholder="Buscar por nombre o CUIT" oninput="renderMaestros(true)" autocomplete="off">
+      <div id="cuentaMaestros" class="mae-cuenta"></div>
+      <div id="listaMaestros" class="mae-lista"><div class="empty"><i class="ti ti-loader"></i>Cargando…</div></div>
+    </div>
+  </div>
+  <div id="maestrosAviso" class="mae-aviso" role="status"></div>
 </div>
 <script>
 // ──────────────────────────────────────────────────────────────────────────────
@@ -363,6 +410,9 @@ const WEBHOOK = {
   // Último PRN guardado en el servidor para un cliente/período, y marca de "ya lo descargué".
   ultimoPrn:      () => BASE_WEBHOOK + '/holistor-ultimo-prn-test',
   asignarRubro:   () => BASE_WEBHOOK + '/holistor-asignar-rubro-test',
+  // 18/11/2026: pantalla "Clientes y proveedores" (flujo "Holistor Clientes y Proveedores - TEST").
+  maestros:        () => BASE_WEBHOOK + '/holistor-maestros-test',
+  maestrosGuardar: () => BASE_WEBHOOK + '/holistor-maestros-guardar-test',
   prnDescargado:  () => BASE_WEBHOOK + '/holistor-prn-descargado-test'
 };
 
@@ -1115,6 +1165,287 @@ function mostrarAlertaPopupMultiple(items) {
   render();
 
   fondo.addEventListener('click', (e) => { if (e.target === fondo) cerrar(); });
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// CLIENTES Y PROVEEDORES (18/11/2026): ver y corregir la actividad de cada cliente y el rubro de
+// cada proveedor. Se lee y se guarda por n8n; las reglas (rubros válidos, "usar siempre" solo con
+// rubro elegido, largo de la actividad) las vuelve a controlar la base al guardar.
+// La pantalla tiene su propia dirección (#clientes-y-proveedores): "Atrás" del navegador vuelve a
+// "Subir facturas" sin salir de la página, y al recargar se queda donde estaba.
+// ──────────────────────────────────────────────────────────────────────────────
+const MAESTROS_HASH = '#clientes-y-proveedores';
+let _maestros = null;              // { clientes: [...], proveedores: [...] } como lo manda el servidor
+let _pestanaMaestros = 'clientes';
+let _soloFaltan = false;           // "Solo sin actividad" / "Solo sin rubro"
+let _cargandoMaestros = false;
+let _avisoMaestrosTimer = null;
+const _tituloFacturas = document.title;
+
+function toggleMenuFacturas(ev) {
+  ev.preventDefault(); ev.stopPropagation();
+  const m = document.getElementById('menuFacturasLista');
+  const abrir = m.style.display === 'none';
+  m.style.display = abrir ? 'block' : 'none';
+  document.getElementById('btnMenuFacturas').setAttribute('aria-expanded', abrir ? 'true' : 'false');
+}
+function _cerrarMenuFacturas() {
+  const m = document.getElementById('menuFacturasLista'); if (m) m.style.display = 'none';
+  const b = document.getElementById('btnMenuFacturas'); if (b) b.setAttribute('aria-expanded', 'false');
+}
+document.addEventListener('click', _cerrarMenuFacturas);
+
+// Cambia la dirección; el cambio de vista lo hace el aviso 'hashchange' (así funciona también "Atrás").
+function irAVista(vista) {
+  _cerrarMenuFacturas();
+  const destino = vista === 'maestros' ? MAESTROS_HASH : '';
+  if ((location.hash || '') === destino) { mostrarVista(vista); return; }
+  if (destino) location.hash = destino;
+  else history.pushState('', document.title, location.pathname + location.search);
+  mostrarVista(vista);
+}
+window.addEventListener('hashchange', () => mostrarVista(location.hash === MAESTROS_HASH ? 'maestros' : 'facturas'));
+window.addEventListener('popstate', () => mostrarVista(location.hash === MAESTROS_HASH ? 'maestros' : 'facturas'));
+
+function mostrarVista(vista) {
+  const enMaestros = vista === 'maestros';
+  const vm = document.getElementById('vistaMaestros');
+  const yaEstaba = vm.style.display !== 'none';
+  document.getElementById('vistaFacturas').style.display = enMaestros ? 'none' : '';
+  vm.style.display = enMaestros ? 'block' : 'none';
+  document.getElementById('menuOpcFacturas').classList.toggle('on', !enMaestros);
+  document.getElementById('menuOpcMaestros').classList.toggle('on', enMaestros);
+  document.title = enMaestros ? '[TEST] Holistor — Clientes y proveedores' : _tituloFacturas;
+  if (!enMaestros) { const f = document.getElementById('modalMaestroFondo'); if (f && !f.dataset.guardando) f.remove(); }
+  if (enMaestros && !yaEstaba) { window.scrollTo(0, 0); cargarMaestros(); }   // siempre trae la lista al día
+}
+document.addEventListener('DOMContentLoaded', () => { if (location.hash === MAESTROS_HASH) mostrarVista('maestros'); });
+
+// Aviso chico abajo al centro (no corre la lista de lugar).
+function avisoMaestros(msg, tipo) {
+  const el = document.getElementById('maestrosAviso');
+  clearTimeout(_avisoMaestrosTimer);
+  if (!msg) { el.style.display = 'none'; return; }
+  el.className = 'mae-aviso a-' + tipo;
+  el.innerHTML = `<i class="ti ti-${tipo === 'success' ? 'circle-check' : 'alert-circle'}"></i> ${msg}`;
+  el.style.display = 'block';
+  _avisoMaestrosTimer = setTimeout(() => { el.style.display = 'none'; }, tipo === 'success' ? 3000 : 6000);
+}
+
+async function cargarMaestros() {
+  if (_cargandoMaestros) return;
+  _cargandoMaestros = true;
+  if (!_maestros) {
+    document.getElementById('listaMaestros').innerHTML = '<div class="empty"><i class="ti ti-loader"></i>Cargando…</div>';
+    document.getElementById('cuentaMaestros').textContent = '';
+  }
+  try {
+    const res = await fetchConTimeout(WEBHOOK.maestros(), {}, 30000);
+    if (res.status === 401 || res.status === 403) throw new Error('clave');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data || data.ok !== true || !Array.isArray(data.clientes) || !Array.isArray(data.proveedores)) {
+      throw new Error((data && data.error) || 'respuesta inválida');
+    }
+    _maestros = { clientes: data.clientes, proveedores: data.proveedores };
+    renderMaestros();
+  } catch (e) {
+    // Sin lista confiable no se muestra nada para editar (nunca una lista a medias).
+    _maestros = null;
+    document.getElementById('cuentaMaestros').textContent = '';
+    document.getElementById('listaMaestros').innerHTML = e.message === 'clave'
+      ? '<div class="empty"><i class="ti ti-lock"></i>La clave de acceso no es válida o venció. Recargá la página e ingresala de nuevo.</div>'
+      : '<div class="empty"><i class="ti ti-alert-circle"></i>No se pudo cargar la lista. <a href="#" onclick="cargarMaestros();return false;" style="color:inherit;text-decoration:underline;">Reintentar</a></div>';
+  } finally {
+    _cargandoMaestros = false;
+  }
+}
+
+function elegirPestanaMaestros(p) {
+  if (p === _pestanaMaestros) return;
+  _pestanaMaestros = p;
+  document.getElementById('tabMaeClientes').classList.toggle('on', p === 'clientes');
+  document.getElementById('tabMaeProveedores').classList.toggle('on', p === 'proveedores');
+  document.getElementById('btnMaeFaltan').textContent = p === 'clientes' ? 'Solo sin actividad' : 'Solo sin rubro';
+  document.getElementById('buscarMaestros').value = '';   // cada pestaña arranca sin búsqueda
+  renderMaestros(true);
+}
+function alternarSoloFaltan() {
+  _soloFaltan = !_soloFaltan;
+  document.getElementById('btnMaeFaltan').classList.toggle('on', _soloFaltan);
+  renderMaestros(true);
+}
+
+function _cuitConGuiones(c) {
+  const d = String(c || '').replace(/[^0-9]/g, '');
+  return d.length === 11 ? `${d.slice(0, 2)}-${d.slice(2, 10)}-${d.slice(10)}` : d;
+}
+function _nombreRubro(cod) {
+  const r = RUBROS_OPCIONES.find(([c]) => c === cod);
+  return r ? `${cod} — ${r[1]}` : cod;
+}
+// Para buscar sin importar mayúsculas ni tildes ("garcia" encuentra "GARCÍA").
+function _sinTildes(t) {
+  return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+function renderMaestros(volverArriba) {
+  const cont = document.getElementById('listaMaestros');
+  if (!_maestros) return;
+  const q = _sinTildes(document.getElementById('buscarMaestros').value).trim();
+  const qDig = q.replace(/[^0-9]/g, '');
+  const coincide = (nombre, cuit) => !q || _sinTildes(nombre).includes(q) || (qDig.length >= 3 && String(cuit || '').includes(qDig));
+  const esCli = _pestanaMaestros === 'clientes';
+  const todos = esCli ? _maestros.clientes : _maestros.proveedores;
+  const falta = esCli ? (c => !c.actividad) : (p => !p.cod_neto);
+  const lista = todos.filter(x => coincide(esCli ? x.nombre : x.denominacion, x.cuit) && (!_soloFaltan || falta(x)));
+  const nFaltan = todos.filter(falta).length;
+  const fila = (id, nombre, cuit, derecha) => `<div class="mae-fila" id="maeFila${id}" tabindex="0" role="button"
+      onclick="${esCli ? 'abrirEditarCliente' : 'abrirEditarProveedor'}(${id})"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+      <div class="mae-izq"><div>${escapeHtml(nombre)}</div><div class="mae-gris">${escapeHtml(_cuitConGuiones(cuit))}</div></div>${derecha}</div>`;
+  const html = lista.map(x => esCli
+    ? fila(Number(x.id), x.nombre, x.cuit, `<div class="mae-gris mae-der${x.actividad ? '' : ' mae-falta'}" title="${escapeHtml(x.actividad || '')}">${x.actividad ? escapeHtml(x.actividad) : 'Sin actividad'}</div>`)
+    : fila(Number(x.id), x.denominacion, x.cuit, x.cod_neto
+        ? `<span class="mae-chip${x.forzar_rubro === 'SI' ? ' siempre' : ''}">${escapeHtml(_nombreRubro(x.cod_neto))}${x.forzar_rubro === 'SI' ? ' · siempre' : ''}</span>`
+        : `<span class="mae-chip mae-falta">Sin rubro</span>`)
+  ).join('');
+  let vacio = '<div class="empty"><i class="ti ti-search"></i>Sin resultados</div>';
+  if (!todos.length) vacio = `<div class="empty"><i class="ti ti-inbox"></i>No hay ${esCli ? 'clientes' : 'proveedores'} cargados</div>`;
+  else if (_soloFaltan && !nFaltan) vacio = `<div class="empty"><i class="ti ti-circle-check"></i>${esCli ? 'Todos los clientes tienen actividad' : 'Todos los proveedores tienen rubro'}</div>`;
+  cont.innerHTML = html || vacio;
+  const nombreTotal = `${todos.length} ${esCli ? pluralizar(todos.length, 'cliente') : pluralizar(todos.length, 'proveedor', 'proveedores')}`;
+  const faltanTxt = `${nFaltan} ${esCli ? 'sin actividad' : 'sin rubro'}`;
+  document.getElementById('cuentaMaestros').textContent =
+    (lista.length !== todos.length ? `${lista.length} de ${nombreTotal}` : nombreTotal) + ' · ' + faltanTxt;
+  if (volverArriba) cont.scrollTop = 0;
+}
+
+// Ventana para editar (mismo estilo que la de "Factura sin rubro").
+function _ventanaMaestro(titulo, cuit, cuerpo, alGuardar) {
+  const previa = document.getElementById('modalMaestroFondo'); if (previa) previa.remove();
+  const volverFoco = document.activeElement;
+  const fondo = document.createElement('div');
+  fondo.id = 'modalMaestroFondo';
+  fondo.setAttribute('role', 'dialog');
+  fondo.setAttribute('aria-modal', 'true');
+  fondo.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,20,18,.5);display:flex;align-items:center;justify-content:center;z-index:9998;padding:1rem;';
+  fondo.innerHTML = `<div class="card" style="max-width:460px;width:100%;padding:0;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.3);">
+      <div style="padding:1.25rem 1.25rem 0;">
+        <div style="font-size:15px;font-weight:600;overflow-wrap:anywhere;">${escapeHtml(titulo)}</div>
+        <div class="mae-gris">${escapeHtml(_cuitConGuiones(cuit))}</div>
+        ${cuerpo}
+        <div id="maestroError" class="field-error" style="margin-top:10px;display:none;"></div>
+      </div>
+      <div style="padding:1.25rem;display:flex;gap:8px;">
+        <button type="button" id="btnMaestroCancelar" class="btn-secondary" style="flex:1;">Cancelar</button>
+        <button type="button" id="btnMaestroGuardar" class="btn-primary" style="flex:1;">Guardar</button>
+      </div></div>`;
+  document.body.appendChild(fondo);
+  const cerrar = () => {
+    fondo.remove();
+    document.removeEventListener('keydown', teclas);
+    if (volverFoco && document.body.contains(volverFoco)) volverFoco.focus();
+  };
+  const teclas = (e) => { if (e.key === 'Escape' && !fondo.dataset.guardando) cerrar(); };
+  document.addEventListener('keydown', teclas);
+  document.getElementById('btnMaestroCancelar').addEventListener('click', cerrar);
+  fondo.addEventListener('click', (e) => { if (e.target === fondo && !fondo.dataset.guardando) cerrar(); });
+  document.getElementById('btnMaestroGuardar').addEventListener('click', async () => {
+    const btn = document.getElementById('btnMaestroGuardar');
+    const err = document.getElementById('maestroError');
+    if (fondo.dataset.guardando) return;               // nunca dos guardados a la vez
+    fondo.dataset.guardando = '1';
+    btn.disabled = true; btn.textContent = 'Guardando…';
+    document.getElementById('btnMaestroCancelar').disabled = true;
+    err.style.display = 'none';
+    try {
+      const res = await fetchConTimeout(WEBHOOK.maestrosGuardar(), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(alGuardar.datos())
+      }, 30000);
+      if (res.status === 401 || res.status === 403) throw new Error('La clave de acceso no es válida o venció. Recargá la página e ingresala de nuevo.');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (!data || data.ok !== true || !data.fila) throw new Error((data && data.error) || 'No se pudo guardar.');
+      alGuardar.listo(data.fila);
+      delete fondo.dataset.guardando;
+      cerrar();
+      renderMaestros();
+      const f = document.getElementById('maeFila' + Number(data.fila.id));
+      if (f) { f.classList.add('recien'); f.focus({ preventScroll: true }); setTimeout(() => f.classList.remove('recien'), 1500); }
+      avisoMaestros('Cambio guardado.', 'success');
+    } catch (e) {
+      // El cambio NO se guardó: la ventana queda abierta con lo que se había elegido.
+      err.textContent = /^HTTP |Failed to fetch|aborted/i.test(e.message) ? 'No se pudo guardar. Probá de nuevo.' : e.message.charAt(0).toUpperCase() + e.message.slice(1);
+      err.style.display = 'block';
+      delete fondo.dataset.guardando;
+      btn.disabled = false; btn.textContent = 'Guardar';
+      document.getElementById('btnMaestroCancelar').disabled = false;
+    }
+  });
+}
+
+function abrirEditarCliente(id) {
+  const c = _maestros && _maestros.clientes.find(x => Number(x.id) === id);
+  if (!c) return;
+  _ventanaMaestro(c.nombre, c.cuit,
+    `<label class="field-label" for="txtActividad" style="margin-top:14px;display:block;">Actividad</label>
+     <textarea id="txtActividad" rows="3" maxlength="500" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d8d8d0;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;">${escapeHtml(c.actividad || '')}</textarea>
+     <div id="cuentaActividad" class="mae-gris" style="text-align:right;"></div>`,
+    {
+      datos: () => ({ tipo: 'cliente', id: c.id, actividad: document.getElementById('txtActividad').value }),
+      listo: (fila) => {
+        c.actividad = String(fila.actividad || '');
+        // La lista de clientes de "Subir facturas" también usa la actividad: se actualiza ya.
+        try { sessionStorage.removeItem(CLIENTES_CACHE_KEY); } catch (e) {}
+        const sel = document.getElementById('selCliente');
+        for (const opt of sel.options) {
+          if (opt.value === escapeHtml(c.cuit) && opt.dataset.nombre === escapeHtml(c.nombre)) opt.dataset.actividad = c.actividad;
+        }
+        if (clienteSeleccionado && clienteSeleccionado.cuit === escapeHtml(c.cuit) && clienteSeleccionado.nombre === escapeHtml(c.nombre)) {
+          clienteSeleccionado.actividad = c.actividad;
+        }
+      }
+    });
+  const txt = document.getElementById('txtActividad');
+  const cuenta = () => { document.getElementById('cuentaActividad').textContent = `${txt.value.length}/500`; };
+  txt.addEventListener('input', cuenta);
+  cuenta();
+  txt.focus();
+  txt.setSelectionRange(txt.value.length, txt.value.length);
+}
+
+function abrirEditarProveedor(id) {
+  const p = _maestros && _maestros.proveedores.find(x => Number(x.id) === id);
+  if (!p) return;
+  const opciones = RUBROS_OPCIONES.map(([c, t]) => `<option value="${c}">${c} — ${escapeHtml(t)}</option>`).join('');
+  _ventanaMaestro(p.denominacion, p.cuit,
+    `<label class="field-label" for="selRubroMaestro" style="margin-top:14px;display:block;">Rubro</label>
+     <select id="selRubroMaestro" style="width:100%;padding:8px 10px;border:1px solid #d8d8d0;border-radius:8px;background:#fff;font-size:14px;"><option value="">Sin rubro</option>${opciones}</select>
+     <label style="display:flex;gap:8px;align-items:center;margin-top:14px;font-size:14px;cursor:pointer;"><input type="checkbox" id="chkRubroSiempre" style="width:16px;height:16px;"> Usar siempre este rubro</label>`,
+    {
+      datos: () => {
+        const rubro = document.getElementById('selRubroMaestro').value;
+        return { tipo: 'proveedor', id: p.id, cod_neto: rubro, forzar_rubro: (rubro && document.getElementById('chkRubroSiempre').checked) ? 'SI' : '' };
+      },
+      listo: (fila) => { p.cod_neto = String(fila.cod_neto || ''); p.forzar_rubro = String(fila.forzar_rubro || ''); }
+    });
+  const sel = document.getElementById('selRubroMaestro');
+  const chk = document.getElementById('chkRubroSiempre');
+  // Un rubro que no está en la lista de la página se muestra igual, para no borrarlo sin querer.
+  if (p.cod_neto && !RUBROS_OPCIONES.some(([c]) => c === p.cod_neto)) {
+    const o = document.createElement('option'); o.value = p.cod_neto; o.textContent = p.cod_neto; sel.appendChild(o);
+  }
+  sel.value = p.cod_neto || '';
+  chk.checked = p.forzar_rubro === 'SI';
+  const sincronizar = () => {
+    chk.disabled = !sel.value;
+    if (!sel.value) chk.checked = false;
+    chk.parentElement.style.opacity = sel.value ? '1' : '.45';
+  };
+  sel.addEventListener('change', sincronizar);
+  sincronizar();
+  sel.focus();
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

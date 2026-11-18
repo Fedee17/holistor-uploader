@@ -377,7 +377,30 @@ function calcularEsperaIndexacion(cantidadArchivos) {
   return Math.min(20000, DRIVE_INDEX_DELAY_MS + (cantidadArchivos - 5) * 400);
 }
 const FETCH_TIMEOUT_MS = 90000;
-const POLLING_INTERVAL_MS = 10000;  // 21/10/2026: era 5000; cada consulta es una ejecución de n8n (plan con tope mensual)
+const POLLING_INTERVAL_MS = 5000;   // 18/11/2026: cada 5 s se mira el avance en Supabase (no gasta ejecuciones de n8n)
+// 18/11/2026 (etapa 1 Supabase): el avance de la tanda se lee de Supabase con la clave pública, que solo
+// permite pedir el avance de UNA tanda conociendo su código al azar (sin nombres, CUIT ni importes).
+// A n8n (cada consulta = una ejecución) se le pregunta solo cuando hace falta: ver iniciarPolling().
+const SUPABASE_URL = 'https://pgjzscsobnrkewrdlwue.supabase.co';
+const SUPABASE_CLAVE_PUBLICA = 'sb_publishable_ghyUGDYJdfrxi99sjTZdjw_KJLFJ-HP';   // clave pública: solo sirve para leer_progreso
+const N8N_RESPALDO_MS = 20000;    // Supabase no responde: a n8n cada 20 s
+const N8N_EVENTO_MS = 10000;      // terminó la tanda o cambiaron las facturas sin rubro: a n8n, como mucho cada 10 s
+const N8N_SEGURIDAD_MS = 120000;  // igual, a n8n cada 2 minutos por si algo no llegó a Supabase
+async function leerProgresoSupabase(id) {
+  if (!id || !SUPABASE_CLAVE_PUBLICA) return null;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/rpc/leer_progreso', {
+      method: 'POST', signal: ctrl.signal,
+      headers: { 'apikey': SUPABASE_CLAVE_PUBLICA, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_id: id })
+    });
+    if (!res.ok) return null;
+    const a = await res.json();
+    return (Array.isArray(a) && a[0]) ? a[0] : null;
+  } catch (e) { return null; } finally { clearTimeout(t); }
+}
 const POLLING_TIMEOUT_MS = 15 * 60 * 1000;
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
@@ -2177,10 +2200,33 @@ function iniciarPolling() {
   // terminó (o arrancó el de la tanda siguiente) se descarta: así una tanda no se suma dos veces.
   const _genSondeo = ++_sondeoGen;
   _sondeoEnVuelo = false;
+  let _ultimaN8n = Date.now();        // 18/11/2026: hora de la última consulta a n8n de este sondeo
+  let _sbPendUltimo = null;           // 18/11/2026: cantidad de facturas sin rubro vista la última vez en Supabase
+  let _sbEventoPendiente = false;     // 18/11/2026: hay que avisarle a n8n de un cambio todavía no consultado
   pollingInterval = setInterval(async () => {
     if (_sondeoEnVuelo) return;
     _sondeoEnVuelo = true;
     try {
+      // 18/11/2026 (etapa 1 Supabase): primero el avance desde Supabase; a n8n solo si terminó la tanda,
+      // cambiaron las facturas sin rubro, pasaron 2 minutos, o (si Supabase no responde) cada 20 s.
+      const _ahoraSondeo = Date.now();
+      const _sb = await leerProgresoSupabase(window.__holistorProgresoId || '');
+      if (_genSondeo !== _sondeoGen || !pollingInterval) return;
+      let _preguntarN8n;
+      if (_sb) {
+        if (Number(_sb.total) > 0) actualizarProgresoProceso(Number(_sb.hechos) || 0, Number(_sb.total) || 0);
+        const _pend = Number(_sb.pendientes_rubro) || 0;
+        if ((_sbPendUltimo === null) ? _pend !== 0 : _pend !== _sbPendUltimo) _sbEventoPendiente = true;
+        _sbPendUltimo = _pend;
+        if (String(_sb.estado || '') !== 'procesando') _sbEventoPendiente = true;
+        _preguntarN8n = (_sbEventoPendiente && (_ahoraSondeo - _ultimaN8n) >= N8N_EVENTO_MS)
+          || (_ahoraSondeo - _ultimaN8n) >= N8N_SEGURIDAD_MS;
+      } else {
+        _preguntarN8n = (_ahoraSondeo - _ultimaN8n) >= N8N_RESPALDO_MS;
+      }
+      if (!_preguntarN8n) return;
+      _ultimaN8n = _ahoraSondeo;
+      if (_sb && String(_sb.estado || '') === 'procesando') _sbEventoPendiente = false;
       const cuit = clienteSeleccionado?.cuit || '';
       const per = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
       const res = await fetchConTimeout(`${WEBHOOK.estado()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`, {}, 30000);
@@ -3853,8 +3899,10 @@ console.log('[TEST] Holistor uploader inline JS cargado OK');
       // distinguía una corrida de la anterior).
       state.inFlight = true; state.activeKey = key; state.finalizado = false; state.requestId = `${Date.now()}_${Math.random().toString(36).slice(2,10)}`;
       window.__holistorActiveRunId = state.requestId;
+      // 18/11/2026 (etapa 1 Supabase): código al azar de esta tanda; n8n lo guarda y la página lee el avance con él.
+      window.__holistorProgresoId = (window.crypto && typeof window.crypto.randomUUID === 'function') ? window.crypto.randomUUID() : '';
       setProcesarDisabled(true);
-      if (init && typeof init.body === 'string') init = { ...init, body: JSON.stringify({ ...body, request_id: state.requestId, frontend_run_id: state.requestId }) };
+      if (init && typeof init.body === 'string') init = { ...init, body: JSON.stringify({ ...body, request_id: state.requestId, frontend_run_id: state.requestId, progreso_id: window.__holistorProgresoId }) };
       try {
         const res = await originalFetch(input, init);
        try {

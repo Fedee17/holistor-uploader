@@ -556,68 +556,100 @@ function agregarBotonDescargaPrnFinal() {
 // línea al PRN pendiente: no se vuelve a leer el PDF.
 // ──────────────────────────────────────────────────────────────────────────────
 const RUBROS_OPCIONES = [
-  ['CMG','Compras gravadas (reventa, materia prima, papelería, mesadas)'], ['INS','Insumos agropecuarios y granos'],
-  ['REP','Repuestos (uso propio)'], ['SER','Servicios y reparaciones'], ['ENG','Energía eléctrica'], ['AGU','Agua'],
-  ['COM','Combustible'], ['FLT','Fletes y transporte'], ['SEG','Seguros'], ['ALQ','Alquileres'], ['HON','Honorarios'],
-  ['GB','Gastos bancarios'], ['GF','Gastos financieros'], ['CBU','Bienes de uso'], ['CGG','Gastos gravados (publicidad, dif. de cambio)']
+  ['CMG','Compras gravadas'], ['INS','Insumos agropecuarios'], ['REP','Repuestos'], ['SER','Servicios'],
+  ['ENG','Energía eléctrica'], ['AGU','Agua'], ['COM','Combustible'], ['FLT','Fletes'], ['SEG','Seguros'],
+  ['ALQ','Alquileres'], ['HON','Honorarios'], ['GB','Gastos bancarios'], ['GF','Gastos financieros'],
+  ['CBU','Bienes de uso'], ['CGG','Gastos gravados']
 ];
 let _pendRubro = new Map();      // clave de la factura -> datos que manda el servidor
 let _rubroElegido = new Map();   // clave de la factura -> rubro elegido y todavía no aplicado
-let _pendRubroDe = '';           // cliente|período al que pertenecen las dos listas
+let _pendRubroDe = '';           // cliente|período al que pertenecen las listas
 let _aplicandoRubros = null;     // promesa del envío en curso (nunca dos envíos a la vez)
 let _reintentosAplicar = 0;
+let _rubroAvisadas = new Set();  // 18/11/2026: facturas que ya se mostraron en la ventana (no se reabre sola por ellas)
 
 function _clavePendRubro() {
   return ((clienteSeleccionado && clienteSeleccionado.cuit) || '') + '|' + periodoStr();
 }
 function mostrarPendientesRubro(lista) {
   const clave = _clavePendRubro();
-  if (_pendRubroDe !== clave) { _pendRubro = new Map(); _rubroElegido = new Map(); _pendRubroDe = clave; }
+  if (_pendRubroDe !== clave) { _pendRubro = new Map(); _rubroElegido = new Map(); _rubroAvisadas = new Set(); _pendRubroDe = clave; }
   // El servidor es la fuente: lo que ya no está pendiente allá, se saca de acá.
   _pendRubro = new Map((Array.isArray(lista) ? lista : []).filter(x => x && x.k).map(x => [String(x.k), x]));
   for (const k of [..._rubroElegido.keys()]) if (!_pendRubro.has(k)) _rubroElegido.delete(k);
   renderPanelRubros();
 }
+// 18/11/2026: ventana emergente (como la de "¿Las volvés a procesar?") + un botón chico abajo a la derecha
+// para volver a abrirla. Se abre sola cuando aparecen facturas sin rubro que todavía no se mostraron.
 function renderPanelRubros() {
-  let panel = document.getElementById('panelSinRubro');
-  if (_pendRubroDe !== _clavePendRubro() || !_pendRubro.size) { if (panel) panel.remove(); return; }
-  if (!panel) {
-    panel = document.createElement('div');
-    panel.id = 'panelSinRubro';
-    panel.className = 'card';
-    panel.style.cssText = 'position:fixed;right:16px;bottom:16px;width:min(460px,calc(100vw - 32px));max-height:70vh;overflow:auto;z-index:9000;padding:0;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.25);';
-    document.body.appendChild(panel);
+  const viejo = document.getElementById('panelSinRubro'); if (viejo) viejo.remove();
+  const activo = _pendRubroDe === _clavePendRubro();
+  const sinElegir = activo ? [..._pendRubro.keys()].filter(k => !_rubroElegido.has(k)) : [];
+  let chip = document.getElementById('chipSinRubro');
+  if (!sinElegir.length) {
+    if (chip) chip.remove();
+    const f = document.getElementById('modalRubrosFondo'); if (f) f.remove();
+    return;
   }
-  const enCurso = !!pollingInterval;
+  if (!chip) {
+    chip = document.createElement('button');
+    chip.id = 'chipSinRubro';
+    chip.className = 'btn-secondary';
+    chip.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:9000;box-shadow:0 6px 20px rgba(0,0,0,.2);';
+    chip.addEventListener('click', abrirVentanaRubros);
+    document.body.appendChild(chip);
+  }
+  chip.innerHTML = `<i class="ti ti-alert-triangle" style="color:#b36b00;"></i> ${sinElegir.length} sin rubro`;
+  if (sinElegir.some(k => !_rubroAvisadas.has(k)) && !document.getElementById('modalRubrosFondo')) abrirVentanaRubros();
+}
+function abrirVentanaRubros() {
+  const previa = document.getElementById('modalRubrosFondo'); if (previa) previa.remove();
+  const lista = [..._pendRubro.values()].filter(x => !_rubroElegido.has(String(x.k)));
+  if (!lista.length) return;
+  lista.forEach(x => _rubroAvisadas.add(String(x.k)));
   const opciones = RUBROS_OPCIONES.map(([c, t]) => `<option value="${c}">${c} — ${escapeHtml(t)}</option>`).join('');
-  const filas = [..._pendRubro.values()].map(x => {
+  const elegidos = new Map();   // rubros elegidos en esta ventana (se guardan al cerrar)
+  let i = 0;
+  const fondo = document.createElement('div');
+  fondo.id = 'modalRubrosFondo';
+  fondo.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,20,18,.5);display:flex;align-items:center;justify-content:center;z-index:9998;padding:1rem;';
+  document.body.appendChild(fondo);
+  // 18/11/2026: de a una factura. "Siguiente" se habilita recién cuando se elige el rubro; "Después" cierra
+  // y deja para más tarde las que falten (las ya elegidas se aplican igual).
+  const cerrar = () => {
+    fondo.remove();
+    for (const [k, r] of elegidos) _rubroElegido.set(k, r);
+    renderPanelRubros();
+    if (elegidos.size && !pollingInterval) aplicarRubrosElegidos();   // con una tanda en curso, se aplican al terminar
+  };
+  const pintar = () => {
+    const x = lista[i];
     const k = String(x.k);
-    const elegido = _rubroElegido.get(k) || '';
-    return `<div style="padding:.6rem 1rem;border-top:1px solid #e5e5e0;font-size:13px;line-height:1.4;">
-      <div><b>${escapeHtml(x.proveedor || '')}</b> · ${escapeHtml(x.comprobante || '')} · $ ${escapeHtml(x.total || '')}</div>
-      <div style="color:#5f5e5a;margin:2px 0 6px;">${x.descripcion ? escapeHtml(x.descripcion) : '<i>(sin descripción)</i>'}</div>
-      ${x.sin_linea ? '<div style="font-size:12px;color:#b36b00;margin:0 0 6px;">No entra en el PRN automático: al elegir el rubro se pasa a carga manual en Holistor.</div>' : ''}
-      <select data-k="${escapeHtml(k)}" class="selRubroPend" style="width:100%;">
-        <option value="">— Elegir rubro —</option>${opciones}
-      </select>
-      ${elegido ? `<div style="font-size:12px;color:#3b6d11;margin-top:4px;">Elegido: ${escapeHtml(elegido)}${enCurso ? ' — se aplica cuando termine la tanda' : ''}</div>` : ''}
-    </div>`;
-  }).join('');
-  panel.innerHTML = `<div style="padding:.8rem 1rem;display:flex;gap:8px;align-items:center;">
-      <i class="ti ti-alert-triangle" style="color:#b36b00;font-size:18px;"></i>
-      <b style="font-size:14px;flex:1;">Facturas sin rubro (${_pendRubro.size})</b>
-    </div>
-    <div style="padding:0 1rem .6rem;font-size:12px;color:#5f5e5a;">No van al PRN hasta que les elijas el rubro.${enCurso ? ' La corrida sigue mientras tanto.' : ''}</div>
-    ${filas}`;
-  panel.querySelectorAll('select.selRubroPend').forEach(s => {
-    const k = s.getAttribute('data-k');
-    s.value = _rubroElegido.get(k) || '';
-    s.addEventListener('change', () => {
-      if (s.value) _rubroElegido.set(k, s.value); else _rubroElegido.delete(k);
-      renderPanelRubros();
-      if (!pollingInterval) aplicarRubrosElegidos();
-    });
-  });
+    const ultima = i === lista.length - 1;
+    const desc = [x.descripcion, x.sin_linea ? 'carga manual' : ''].filter(Boolean).map(v => escapeHtml(String(v))).join(' · ');
+    fondo.innerHTML = `<div class="card" style="max-width:460px;width:100%;padding:0;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.3);">
+      <div style="padding:1.25rem 1.25rem .25rem;display:flex;justify-content:space-between;align-items:baseline;">
+        <b style="font-size:14px;">Factura sin rubro</b>${lista.length > 1 ? `<span style="font-size:12px;color:#777;">${i + 1} de ${lista.length}</span>` : ''}
+      </div>
+      <div style="padding:.75rem 1.25rem 0;">
+        <div style="font-size:15px;font-weight:600;">${escapeHtml(x.proveedor || '')}</div>
+        <div style="font-size:14px;margin:2px 0 8px;">$ ${escapeHtml(x.total || '')}</div>
+        ${desc ? `<div style="font-size:12px;color:#777;margin-bottom:14px;">${desc}</div>` : ''}
+        <select id="selRubroVentana" style="width:100%;padding:8px 10px;border:1px solid #d8d8d0;border-radius:8px;background:#fff;font-size:14px;"><option value="">Elegir rubro</option>${opciones}</select>
+      </div>
+      <div style="padding:1.25rem;display:flex;gap:8px;">
+        <button id="btnRubrosDespues" class="btn-secondary" style="flex:1;">Después</button>
+        <button id="btnRubrosSeguir" class="btn-primary" style="flex:1;">${ultima ? 'Aplicar' : 'Siguiente'}</button>
+      </div></div>`;
+    const sel = document.getElementById('selRubroVentana');
+    const seguir = document.getElementById('btnRubrosSeguir');
+    sel.value = elegidos.get(k) || '';
+    seguir.disabled = !sel.value;
+    sel.addEventListener('change', () => { if (sel.value) elegidos.set(k, sel.value); else elegidos.delete(k); seguir.disabled = !sel.value; });
+    document.getElementById('btnRubrosDespues').addEventListener('click', cerrar);
+    seguir.addEventListener('click', () => { if (!sel.value) return; if (ultima) cerrar(); else { i++; pintar(); } });
+  };
+  pintar();
 }
 // Manda al servidor los rubros elegidos. Nunca hay dos envíos a la vez. Si hay una tanda
 // procesándose, el servidor no toca nada y se vuelve a intentar en unos segundos.
@@ -688,12 +720,12 @@ function confirmarDescargaConPendientes(n) {
     const fondo = document.createElement('div');
     fondo.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,20,18,.5);display:flex;align-items:center;justify-content:center;z-index:10001;padding:1rem;';
     fondo.innerHTML = `<div class="card" style="max-width:420px;width:100%;padding:0;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.3);">
-      <div style="padding:1.25rem 1.25rem .5rem;font-size:14px;line-height:1.5;">Hay <b>${n} ${pluralizar(n, 'factura')} sin rubro</b> que no ${n === 1 ? 'va' : 'van'} en este PRN. Elegile el rubro en el recuadro "Facturas sin rubro", o descargá igual y cargala${n === 1 ? '' : 's'} a mano en Holistor.</div>
+      <div style="padding:1.25rem 1.25rem .5rem;font-size:14px;line-height:1.5;"><b>${n} ${pluralizar(n, 'factura')} sin rubro</b> no ${n === 1 ? 'va' : 'van'} en este PRN.</div>
       <div style="padding:1rem 1.25rem;display:flex;gap:8px;">
-        <button class="btn-secondary" style="flex:1;" data-r="0">Volver</button>
+        <button class="btn-secondary" style="flex:1;" data-r="0">Elegir rubro</button>
         <button class="btn-primary" style="flex:1;" data-r="1">Descargar igual</button>
       </div></div>`;
-    fondo.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { fondo.remove(); resolve(b.getAttribute('data-r') === '1'); }));
+    fondo.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { fondo.remove(); const ok = b.getAttribute('data-r') === '1'; if (!ok) abrirVentanaRubros(); resolve(ok); }));
     document.body.appendChild(fondo);
   });
 }

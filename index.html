@@ -175,15 +175,47 @@
   .btn-s { background: #fff; color: #1a1a1a; border: 0.5px solid #ccc; border-radius: 8px; padding: 7px 14px; font-size: 13px; cursor: pointer; text-decoration: none; display: inline-block; }
   .btn-l { background: none; border: none; color: #3f6b4f; font-size: 12px; text-decoration: underline; cursor: pointer; padding: 7px 4px; }
 
+
+  /* 18/11/2026: menú "Facturas" y pantalla "Clientes y proveedores" */
+  .menu-fact { position: absolute; right: 0; top: 22px; background: #fff; border: 0.5px solid #e0e0d8; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); min-width: 200px; padding: 6px; z-index: 9500; }
+  .menu-fact a { display: block; padding: 8px 10px; border-radius: 6px; color: #1a1a1a; text-decoration: none; font-weight: 400; }
+  .menu-fact a:hover, .menu-fact a.on { background: #f4f4ef; }
+  .menu-fact a.on { font-weight: 600; }
+  .mae-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .mae-tab { padding: 7px 14px; border-radius: 8px; font-size: 13px; border: 0.5px solid #ccc; background: #fff; cursor: pointer; color: #1a1a1a; }
+  .mae-tab.on { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .mae-filtro { margin-left: auto; padding: 7px 12px; border-radius: 8px; font-size: 13px; border: 0.5px solid #ccc; background: #fff; cursor: pointer; color: #1a1a1a; }
+  .mae-filtro.on { background: #fdf1dc; border-color: #f0c674; color: #8a5a00; }
+  .mae-buscar { width: 100%; box-sizing: border-box; padding: 8px 12px; border: 0.5px solid #ccc; border-radius: 8px; font-size: 13px; margin-bottom: 6px; }
+  .mae-cuenta { color: #888; font-size: 12px; margin: 2px 4px 6px; }
+  .mae-lista { max-height: 60vh; overflow-y: auto; overscroll-behavior: contain; border-top: 0.5px solid #eee; }
+  .mae-fila { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 4px; border-bottom: 0.5px solid #eee; font-size: 14px; cursor: pointer; }
+  .mae-fila:hover, .mae-fila:focus { background: #fafaf7; outline: none; }
+  .mae-fila.recien { background: #e6f4ea; transition: background 1.5s; }
+  .mae-izq { min-width: 0; overflow-wrap: anywhere; }
+  .mae-gris { color: #888; font-size: 12px; }
+  .mae-der { flex-shrink: 1; max-width: 45%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+  .mae-chip { flex-shrink: 0; font-size: 12px; padding: 3px 9px; border-radius: 20px; background: #f0f0ea; white-space: nowrap; }
+  .mae-chip.siempre { background: #fdf1dc; color: #8a5a00; }
+  .mae-falta { color: #b36b00; }
+  .mae-aviso { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 9999; padding: 10px 16px; border-radius: 8px; font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,.2); display: none; }
+  @media (max-width: 520px) { .mae-chip { white-space: normal; text-align: right; max-width: 45%; } .mae-filtro { margin-left: 0; } }
 </style>
 </head>
 <body>
 <div class="container">
  <div class="container">
-  <div style="display:flex;justify-content:flex-end;gap:16px;margin-bottom:10px;font-size:13px;">
-    <a href="index.html" style="color:#1a1a1a;font-weight:600;text-decoration:none;">Facturas</a>
+  <div id="navPrincipal" style="display:flex;justify-content:flex-end;gap:16px;margin-bottom:10px;font-size:13px;">
+    <span style="position:relative;">
+      <a href="#" id="btnMenuFacturas" onclick="toggleMenuFacturas(event)" aria-haspopup="true" aria-expanded="false" style="color:#1a1a1a;font-weight:600;text-decoration:none;">Facturas <i class="ti ti-chevron-down" style="font-size:12px;"></i></a>
+      <div id="menuFacturasLista" class="menu-fact" style="display:none;">
+        <a href="#" id="menuOpcFacturas" class="on" onclick="irAVista('facturas');return false;">Subir facturas</a>
+        <a href="#clientes-y-proveedores" id="menuOpcMaestros" onclick="irAVista('maestros');return false;">Clientes y proveedores</a>
+      </div>
+    </span>
     <a href="balances.html" style="color:#888;text-decoration:none;">Balances Bancarios</a>
   </div>
+  <div id="vistaFacturas">
   <h1 style="margin-bottom:1.5rem;"><i class="ti ti-file-invoice"></i> Holistor — Subir facturas</h1>
   <div id="alert" class="alert"></div>
   <div class="stats">
@@ -332,10 +364,26 @@
     <div class="card-header"><i class="ti ti-history"></i> Historial de esta sesión</div>
     <div id="historyList"><div class="empty"><i class="ti ti-inbox"></i>Todavía no se subieron archivos</div></div>
   </div>
+  </div>
+  <div id="vistaMaestros" style="display:none;">
+    <h1 style="margin-bottom:1.5rem;"><i class="ti ti-users"></i> Clientes y proveedores</h1>
+    <div class="card">
+      <div class="mae-tabs">
+        <button type="button" id="tabMaeClientes" class="mae-tab on" onclick="elegirPestanaMaestros('clientes')">Clientes</button>
+        <button type="button" id="tabMaeProveedores" class="mae-tab" onclick="elegirPestanaMaestros('proveedores')">Proveedores</button>
+        <button type="button" id="btnMaeFaltan" class="mae-filtro" onclick="alternarSoloFaltan()">Solo sin actividad</button>
+      </div>
+      <input id="buscarMaestros" class="mae-buscar" type="search" placeholder="Buscar por nombre o CUIT" oninput="renderMaestros(true)" autocomplete="off">
+      <div id="cuentaMaestros" class="mae-cuenta"></div>
+      <div id="listaMaestros" class="mae-lista"><div class="empty"><i class="ti ti-loader"></i>Cargando…</div></div>
+    </div>
+  </div>
+  <div id="maestrosAviso" class="mae-aviso" role="status"></div>
 </div>
 <script>
 // ──────────────────────────────────────────────────────────────────────────────
-// WEBHOOKS (sin entornos - solo producción)
+// WEBHOOKS -- PRODUCCIÓN
+// Apunta al flujo de producción de n8n (datos en la base Supabase de producción).
 // ──────────────────────────────────────────────────────────────────────────────
 const BASE_WEBHOOK = 'https://fede123.app.n8n.cloud/webhook';
 // (16/10/2026) Carpeta de Drive donde el servidor deja los PDF que no figuran en ARCA
@@ -352,12 +400,14 @@ const WEBHOOK = {
   reset:     () => BASE_WEBHOOK + '/holistor-reset',
   syncProv:  () => BASE_WEBHOOK + '/holistor-sync-proveedores-pendientes',
   proveedores: () => BASE_WEBHOOK + '/holistor-proveedores',
-  // 21/09/2026: une los PRN por tanda en un solo archivo CONSOLIDADO (workflow aparte en n8n).
-  consolidar: () => BASE_WEBHOOK + '/holistor-prn-consolidar',
-  // 02/10/2026: consulta del candado compartido, se llama ANTES de subir PDFs.
+  // 01/10/2026: consulta del candado compartido, se llama ANTES de subir PDFs.
   candado:   () => BASE_WEBHOOK + '/holistor-candado',
   // Último PRN guardado en el servidor para un cliente/período, y marca de "ya lo descargué".
   ultimoPrn:      () => BASE_WEBHOOK + '/holistor-ultimo-prn',
+  asignarRubro:   () => BASE_WEBHOOK + '/holistor-asignar-rubro',
+  // 18/11/2026: pantalla "Clientes y proveedores" (flujo "Holistor Clientes y Proveedores").
+  maestros:        () => BASE_WEBHOOK + '/holistor-maestros',
+  maestrosGuardar: () => BASE_WEBHOOK + '/holistor-maestros-guardar',
   prnDescargado:  () => BASE_WEBHOOK + '/holistor-prn-descargado'
 };
 
@@ -372,7 +422,30 @@ function calcularEsperaIndexacion(cantidadArchivos) {
   return Math.min(20000, DRIVE_INDEX_DELAY_MS + (cantidadArchivos - 5) * 400);
 }
 const FETCH_TIMEOUT_MS = 90000;
-const POLLING_INTERVAL_MS = 10000;  // 21/10/2026: era 5000; cada consulta es una ejecución de n8n (plan con tope mensual)
+const POLLING_INTERVAL_MS = 5000;   // 18/11/2026: cada 5 s se mira el avance en Supabase (no gasta ejecuciones de n8n)
+// 18/11/2026 (etapa 1 Supabase): el avance de la tanda se lee de Supabase con la clave pública, que solo
+// permite pedir el avance de UNA tanda conociendo su código al azar (sin nombres, CUIT ni importes).
+// A n8n (cada consulta = una ejecución) se le pregunta solo cuando hace falta: ver iniciarPolling().
+const SUPABASE_URL = 'https://kdqylalvfikfpwjdwdvt.supabase.co';
+const SUPABASE_CLAVE_PUBLICA = 'sb_publishable_KgQSmiJFGqGaJ2pZjAy4dA_7OcsJalA';   // clave pública: solo sirve para leer_progreso
+const N8N_RESPALDO_MS = 20000;    // Supabase no responde: a n8n cada 20 s
+const N8N_EVENTO_MS = 10000;      // terminó la tanda o cambiaron las facturas sin rubro: a n8n, como mucho cada 10 s
+const N8N_SEGURIDAD_MS = 120000;  // igual, a n8n cada 2 minutos por si algo no llegó a Supabase
+async function leerProgresoSupabase(id) {
+  if (!id || !SUPABASE_CLAVE_PUBLICA) return null;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/rpc/leer_progreso', {
+      method: 'POST', signal: ctrl.signal,
+      headers: { 'apikey': SUPABASE_CLAVE_PUBLICA, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_id: id })
+    });
+    if (!res.ok) return null;
+    const a = await res.json();
+    return (Array.isArray(a) && a[0]) ? a[0] : null;
+  } catch (e) { return null; } finally { clearTimeout(t); }
+}
 const POLLING_TIMEOUT_MS = 15 * 60 * 1000;
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
@@ -481,7 +554,7 @@ function nombrePrnPorDefecto() {
   return `${cliente}_${periodoStr().replace('-', '')}_${marca}.prn`;
 }
 
-function descargarPrn(lineas, nombreArchivo) {
+function descargarPrn(lineas, nombreArchivo, cuitClic, perClic) {
   const blob = armarPrnBlob(lineas);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -492,12 +565,13 @@ function descargarPrn(lineas, nombreArchivo) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   // Si el aviso al servidor falla no importa: la persona ya tiene el archivo.
-  marcarPrnDescargado();
+  marcarPrnDescargado(cuitClic, perClic);   // 17/11/2026 (hallazgo 27): el cliente/período del momento del clic
 }
 
 // Botón "Descargar PRN" del cartel final de la corrida (única forma de bajar el PRN). Aparece solo si la
 // página recibió líneas del PRN (_resumenTandas.lineasPrn), pero el archivo lo baja del servidor con
 // descargarPrnPendiente(), no de esas líneas. Si Drive no guardó el archivo, igual aparece.
+// Si la página no recibió las líneas, al terminar la corrida se muestra el cartel "Tenés un PRN listo".
 function agregarBotonDescargaPrnFinal() {
   const R = _resumenTandas;
   const el = document.getElementById('estadoProceso');
@@ -518,26 +592,212 @@ function agregarBotonDescargaPrnFinal() {
   }
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// 17/11/2026: FACTURAS SIN RUBRO
+// Cuando Gemini no encuentra rubro y PROVEEDORES no lo tiene, el servidor arma igual la línea del PRN
+// (con el rubro en blanco) y la deja APARTE. Acá se muestra enseguida un recuadro con un desplegable por
+// factura; lo elegido se manda al servidor (holistor-asignar-rubro) recién cuando no hay una tanda
+// procesándose (si no, la tanda al cerrar pisaría el cambio). El servidor escribe el rubro y suma la
+// línea al PRN pendiente: no se vuelve a leer el PDF.
+// ──────────────────────────────────────────────────────────────────────────────
+const RUBROS_OPCIONES = [
+  ['CMG','Compras gravadas'], ['INS','Insumos agropecuarios'], ['REP','Repuestos'], ['SER','Servicios'],
+  ['ENG','Energía eléctrica'], ['AGU','Agua'], ['COM','Combustible'], ['FLT','Fletes'], ['SEG','Seguros'],
+  ['ALQ','Alquileres'], ['HON','Honorarios'], ['GB','Gastos bancarios'], ['GF','Gastos financieros'],
+  ['CBU','Bienes de uso'], ['CGG','Gastos gravados']
+];
+let _pendRubro = new Map();      // clave de la factura -> datos que manda el servidor
+let _rubroElegido = new Map();   // clave de la factura -> rubro elegido y todavía no aplicado
+let _pendRubroDe = '';           // cliente|período al que pertenecen las listas
+let _aplicandoRubros = null;     // promesa del envío en curso (nunca dos envíos a la vez)
+let _reintentosAplicar = 0;
+let _rubroAvisadas = new Set();  // 18/11/2026: facturas que ya se mostraron en la ventana (no se reabre sola por ellas)
+
+function _clavePendRubro() {
+  return ((clienteSeleccionado && clienteSeleccionado.cuit) || '') + '|' + periodoStr();
+}
+function mostrarPendientesRubro(lista) {
+  const clave = _clavePendRubro();
+  if (_pendRubroDe !== clave) { _pendRubro = new Map(); _rubroElegido = new Map(); _rubroAvisadas = new Set(); _pendRubroDe = clave; }
+  // El servidor es la fuente: lo que ya no está pendiente allá, se saca de acá.
+  _pendRubro = new Map((Array.isArray(lista) ? lista : []).filter(x => x && x.k).map(x => [String(x.k), x]));
+  for (const k of [..._rubroElegido.keys()]) if (!_pendRubro.has(k)) _rubroElegido.delete(k);
+  renderPanelRubros();
+}
+// 18/11/2026: ventana emergente (como la de "¿Las volvés a procesar?") + un botón chico abajo a la derecha
+// para volver a abrirla. Se abre sola cuando aparecen facturas sin rubro que todavía no se mostraron.
+function renderPanelRubros() {
+  const viejo = document.getElementById('panelSinRubro'); if (viejo) viejo.remove();
+  const activo = _pendRubroDe === _clavePendRubro();
+  const sinElegir = activo ? [..._pendRubro.keys()].filter(k => !_rubroElegido.has(k)) : [];
+  let chip = document.getElementById('chipSinRubro');
+  if (!sinElegir.length) {
+    if (chip) chip.remove();
+    const f = document.getElementById('modalRubrosFondo'); if (f) f.remove();
+    return;
+  }
+  if (!chip) {
+    chip = document.createElement('button');
+    chip.id = 'chipSinRubro';
+    chip.className = 'btn-secondary';
+    chip.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:9000;box-shadow:0 6px 20px rgba(0,0,0,.2);';
+    chip.addEventListener('click', abrirVentanaRubros);
+    document.body.appendChild(chip);
+  }
+  chip.innerHTML = `<i class="ti ti-alert-triangle" style="color:#b36b00;"></i> ${sinElegir.length} sin rubro`;
+  if (sinElegir.some(k => !_rubroAvisadas.has(k)) && !document.getElementById('modalRubrosFondo')) abrirVentanaRubros();
+}
+function abrirVentanaRubros() {
+  const previa = document.getElementById('modalRubrosFondo'); if (previa) previa.remove();
+  const lista = [..._pendRubro.values()].filter(x => !_rubroElegido.has(String(x.k)));
+  if (!lista.length) return;
+  lista.forEach(x => _rubroAvisadas.add(String(x.k)));
+  const opciones = RUBROS_OPCIONES.map(([c, t]) => `<option value="${c}">${c} — ${escapeHtml(t)}</option>`).join('');
+  const elegidos = new Map();   // rubros elegidos en esta ventana (se guardan al cerrar)
+  let i = 0;
+  const fondo = document.createElement('div');
+  fondo.id = 'modalRubrosFondo';
+  fondo.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,20,18,.5);display:flex;align-items:center;justify-content:center;z-index:9998;padding:1rem;';
+  document.body.appendChild(fondo);
+  // 18/11/2026: de a una factura. "Siguiente" se habilita recién cuando se elige el rubro; "Después" cierra
+  // y deja para más tarde las que falten (las ya elegidas se aplican igual).
+  const cerrar = () => {
+    fondo.remove();
+    for (const [k, r] of elegidos) _rubroElegido.set(k, r);
+    renderPanelRubros();
+    if (elegidos.size && !pollingInterval) aplicarRubrosElegidos();   // con una tanda en curso, se aplican al terminar
+  };
+  const pintar = () => {
+    const x = lista[i];
+    const k = String(x.k);
+    const ultima = i === lista.length - 1;
+    const desc = [x.descripcion, x.sin_linea ? 'carga manual' : ''].filter(Boolean).map(v => escapeHtml(String(v))).join(' · ');
+    fondo.innerHTML = `<div class="card" style="max-width:460px;width:100%;padding:0;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.3);">
+      <div style="padding:1.25rem 1.25rem .25rem;display:flex;justify-content:space-between;align-items:baseline;">
+        <b style="font-size:14px;">Factura sin rubro</b>${lista.length > 1 ? `<span style="font-size:12px;color:#777;">${i + 1} de ${lista.length}</span>` : ''}
+      </div>
+      <div style="padding:.75rem 1.25rem 0;">
+        <div style="font-size:15px;font-weight:600;">${escapeHtml(x.proveedor || '')}</div>
+        <div style="font-size:14px;margin:2px 0 8px;">$ ${escapeHtml(x.total || '')}</div>
+        ${desc ? `<div style="font-size:12px;color:#777;margin-bottom:14px;">${desc}</div>` : ''}
+        <select id="selRubroVentana" style="width:100%;padding:8px 10px;border:1px solid #d8d8d0;border-radius:8px;background:#fff;font-size:14px;"><option value="">Elegir rubro</option>${opciones}</select>
+      </div>
+      <div style="padding:1.25rem;display:flex;gap:8px;">
+        <button id="btnRubrosDespues" class="btn-secondary" style="flex:1;">Después</button>
+        <button id="btnRubrosSeguir" class="btn-primary" style="flex:1;">${ultima ? 'Aplicar' : 'Siguiente'}</button>
+      </div></div>`;
+    const sel = document.getElementById('selRubroVentana');
+    const seguir = document.getElementById('btnRubrosSeguir');
+    sel.value = elegidos.get(k) || '';
+    seguir.disabled = !sel.value;
+    sel.addEventListener('change', () => { if (sel.value) elegidos.set(k, sel.value); else elegidos.delete(k); seguir.disabled = !sel.value; });
+    document.getElementById('btnRubrosDespues').addEventListener('click', cerrar);
+    seguir.addEventListener('click', () => { if (!sel.value) return; if (ultima) cerrar(); else { i++; pintar(); } });
+  };
+  pintar();
+}
+// Manda al servidor los rubros elegidos. Nunca hay dos envíos a la vez. Si hay una tanda
+// procesándose, el servidor no toca nada y se vuelve a intentar en unos segundos.
+async function aplicarRubrosElegidos() {
+  if (_aplicandoRubros) { await _aplicandoRubros; return; }
+  if (_pendRubroDe !== _clavePendRubro()) return;
+  const asignaciones = [..._rubroElegido].filter(([k]) => _pendRubro.has(k)).map(([k, rubro]) => ({ k, rubro }));
+  if (!asignaciones.length) return;
+  const [cuit, per] = _pendRubroDe.split('|');
+  _aplicandoRubros = (async () => {
+    try {
+      const res = await fetchConTimeout(WEBHOOK.asignarRubro(), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cliente_cuit: cuit, periodo: per, asignaciones })
+      }, 30000);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await jsonSeguro(res);
+      if (data && data.ok === true) {
+        _reintentosAplicar = 0;
+        for (const a of (data.aplicadas || [])) { _pendRubro.delete(String(a.k)); _rubroElegido.delete(String(a.k)); }
+        const n = (data.aplicadas || []).length;
+        if (n) {
+          logProceso(`Rubro aplicado a ${n} factura(s): ya están en el PRN pendiente de descarga.`);
+          showAlert(`Rubro aplicado a ${n} ${pluralizar(n, 'factura')}: ya ${n === 1 ? 'está' : 'están'} en el PRN.`, 'success', true);
+        }
+        // 17/11/2026 (hallazgo 6): facturas que el servidor guardó sin la línea del PRN (la lista no entraba
+        // en la hoja): no se pueden agregar desde acá, se cargan a mano en Holistor.
+        const aMano = Array.isArray(data.a_mano) ? data.a_mano : [];
+        for (const a of aMano) { _pendRubro.delete(String(a.k)); _rubroElegido.delete(String(a.k)); }
+        if (aMano.length) {
+          const det = aMano.map(a => `${escapeHtml(a.proveedor || a.pdf || a.k)} ${escapeHtml(a.comprobante || '')} $ ${escapeHtml(a.total || '')}`).join('<br>');
+          showAlert(`${aMano.length} ${pluralizar(aMano.length, 'factura')} sin rubro no ${aMano.length === 1 ? 'entra' : 'entran'} en el PRN automático: ${aMano.length === 1 ? 'cargala' : 'cargalas'} a mano en Holistor con el rubro elegido.<br>${det}`, 'warn');
+        }
+        // 17/11/2026 (hallazgo 17): avisos del servidor sobre REGISTRO_ESPERADO / PRN_LINEAS.
+        if (Array.isArray(data.sin_fila_registro) && data.sin_fila_registro.length) logProceso(`Rubro aplicado, pero ${data.sin_fila_registro.length} factura(s) no se encontraron en REGISTRO_ESPERADO para marcarlas procesadas.`);
+        if (data.prn_lineas_error === true) logProceso('Rubro aplicado y PRN guardado, pero no se pudo anotar la línea en PRN_LINEAS.');
+      } else if (data && data.codigo === 'en_curso') {
+        logProceso('Rubros elegidos: hay una tanda procesándose, se aplican cuando termine.');
+        if (_reintentosAplicar < 6 && !pollingInterval) { _reintentosAplicar++; setTimeout(aplicarRubrosElegidos, 10000); }
+      } else if (data && data.codigo === 'nada_aplicado') {
+        for (const a of asignaciones) { _pendRubro.delete(a.k); _rubroElegido.delete(a.k); }
+      } else {
+        showAlert(escapeHtml((data && data.mensaje) || 'No se pudo aplicar el rubro.'), 'warn');
+      }
+    } catch (e) {
+      logProceso(`No se pudo aplicar el rubro (${e.message}); queda elegido para el próximo intento.`);
+    } finally {
+      renderPanelRubros();
+    }
+  })();
+  try { await _aplicandoRubros; } finally { _aplicandoRubros = null; }
+}
+// Lista actual del servidor (después de cada corrida y al cambiar de cliente/período).
+async function refrescarPendientesRubro() {
+  const cuit = (clienteSeleccionado && clienteSeleccionado.cuit) || '';
+  const per = periodoStr();
+  if (!cuit || !per) return;
+  try {
+    const res = await fetchConTimeout(`${WEBHOOK.ultimoPrn()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`, {}, 20000);
+    if (!res.ok) return;
+    const data = await jsonSeguro(res);
+    if (data && Array.isArray(data.pendientes_rubro)) mostrarPendientesRubro(data.pendientes_rubro);
+  } catch (e) {}
+}
+// Antes de descargar: si quedan facturas sin rubro, se avisa (no van en este PRN).
+function confirmarDescargaConPendientes(n) {
+  return new Promise(resolve => {
+    const fondo = document.createElement('div');
+    fondo.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,20,18,.5);display:flex;align-items:center;justify-content:center;z-index:10001;padding:1rem;';
+    fondo.innerHTML = `<div class="card" style="max-width:420px;width:100%;padding:0;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.3);">
+      <div style="padding:1.25rem 1.25rem .5rem;font-size:14px;line-height:1.5;"><b>${n} ${pluralizar(n, 'factura')} sin rubro</b> no ${n === 1 ? 'va' : 'van'} en este PRN.</div>
+      <div style="padding:1rem 1.25rem;display:flex;gap:8px;">
+        <button class="btn-secondary" style="flex:1;" data-r="0">Elegir rubro</button>
+        <button class="btn-primary" style="flex:1;" data-r="1">Descargar igual</button>
+      </div></div>`;
+    fondo.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { fondo.remove(); const ok = b.getAttribute('data-r') === '1'; if (!ok) abrirVentanaRubros(); resolve(ok); }));
+    document.body.appendChild(fondo);
+  });
+}
+
 // 12/11/2026 (A-6): pide al servidor el PRN pendiente de este cliente/período y lo descarga.
 // Si no se puede traer, avisa y no arma ningún archivo (nunca un PRN parcial).
 async function descargarPrnPendiente(nombreRespaldo) {
   const cuit = (clienteSeleccionado && clienteSeleccionado.cuit) || '';
   const per = periodoStr();
   if (!cuit || !per) { showAlert('Elegí cliente y período para descargar el PRN.', 'warn'); return; }
+  await aplicarRubrosElegidos();   // 17/11/2026: primero los rubros elegidos, así entran en el archivo
   try {
     const res = await fetchConTimeout(`${WEBHOOK.ultimoPrn()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`, {}, 20000);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await jsonSeguro(res);
     if (!data || data.ok === false) throw new Error((data && data.mensaje) || 'respuesta con error');
     if (data.lineas_recortadas === true) {
-      showAlert('No se puede descargar desde acá: el PRN tiene demasiadas facturas o no se pudo leer. Buscá el PRN consolidado en la carpeta PRN de Drive.', 'warn');
+      showAlert('No se puede descargar desde acá: el PRN tiene demasiadas facturas o no se pudo leer. Importá los PRN de cada tanda que están en la carpeta PRN de Drive.', 'warn');
       return;
     }
     if (!Array.isArray(data.lineas) || !data.lineas.length) {
       showAlert('No hay un PRN guardado para este cliente y período.', 'warn');
       return;
     }
-    descargarPrn(data.lineas, data.prn_file_name || nombreRespaldo);
+    if (Array.isArray(data.pendientes_rubro)) mostrarPendientesRubro(data.pendientes_rubro);
+    if (Array.isArray(data.pendientes_rubro) && data.pendientes_rubro.length && !(await confirmarDescargaConPendientes(data.pendientes_rubro.length))) return;
+    descargarPrn(data.lineas, data.prn_file_name || nombreRespaldo, cuit, per);   // 17/11/2026 (hallazgo 27)
   } catch (err) {
     logProceso(`No se pudo traer el PRN para descargar (${err.message}).`);
     showAlert(`No se pudo traer el PRN (${escapeHtml(err.message)}). Probá de nuevo en unos segundos.`, 'error');
@@ -545,9 +805,11 @@ async function descargarPrnPendiente(nombreRespaldo) {
 }
 
 // Avisa al servidor que el PRN ya se descargó y oculta el cartel pase lo que pase.
-async function marcarPrnDescargado() {
-  const cuit = (clienteSeleccionado && clienteSeleccionado.cuit) || '';
-  const per = periodoStr();
+async function marcarPrnDescargado(cuitClic, perClic) {
+  // 17/11/2026 (hallazgo 27): si viene del clic de descarga, se marca ese cliente/período (no el que esté
+  // elegido cuando termina la descarga).
+  const cuit = cuitClic || (clienteSeleccionado && clienteSeleccionado.cuit) || '';
+  const per = perClic || periodoStr();
   ocultarCartelPrn();
   if (!cuit || !per) return;
   try {
@@ -561,6 +823,7 @@ async function marcarPrnDescargado() {
   } catch (err) {
     logProceso(`No se pudo marcar el PRN como descargado (${err.message}).`);
   }
+  refrescarPendientesRubro();   // 17/11/2026 (hallazgo 30): después de descargar, el recuadro se pone al día
 }
 
 // Cartel "Tenés un PRN listo". _prnConsultaSeq descarta respuestas viejas (cambió el cliente/período
@@ -584,20 +847,29 @@ function mostrarCartelPrn(data) {
   box.innerHTML = '<i class="ti ti-file-check"></i><div class="prn-listo-body">'
     + '<div class="prn-listo-title">Tenés un PRN listo que todavía no descargaste</div>'
     + `<div class="prn-listo-line">${escapeHtml(linea)}</div>`
-    + (recortado ? '<div class="prn-listo-nota">No se puede descargar desde acá: el PRN tiene demasiadas facturas o no se pudo leer. Buscá el PRN consolidado en la carpeta PRN de Drive, importalo y apretá «Ya lo tengo».</div>' : '')
+    + (recortado ? '<div class="prn-listo-nota">No se puede descargar desde acá: el PRN tiene demasiadas facturas o no se pudo leer. Importá los PRN de cada tanda que están en la carpeta PRN de Drive y apretá «Ya lo tengo».</div>' : '')
     + '<div class="prn-listo-btns"></div></div>';
   const btns = box.querySelector('.prn-listo-btns');
   if (!recortado) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'btn-p';
     b.innerHTML = '<i class="ti ti-download"></i> Descargar PRN';
-    b.addEventListener('click', () => descargarPrn(data.lineas || [], data.prn_file_name));
+    // 17/11/2026 (hallazgo 3): el PRN se trae del servidor en el momento (aplica antes los rubros elegidos
+    // y avisa si quedan facturas sin rubro), no de las líneas que trajo la consulta al mostrar el cartel.
+    b.addEventListener('click', () => descargarPrnPendiente(data.prn_file_name));
     btns.appendChild(b);
   }
   const ya = document.createElement('button');
   ya.type = 'button'; ya.className = 'btn-l';
   ya.textContent = 'Ya lo tengo, ocultar';
-  ya.addEventListener('click', () => marcarPrnDescargado());
+  // 17/11/2026 (hallazgo 4): si quedan facturas sin rubro, se avisa antes de dar el PRN por descargado.
+  ya.addEventListener('click', async () => {
+    const cuitClic = (clienteSeleccionado && clienteSeleccionado.cuit) || '';
+    const perClic = periodoStr();
+    const nPend = Array.isArray(data.pendientes_rubro) ? data.pendientes_rubro.length : 0;
+    if (nPend && !(await confirmarDescargaConPendientes(nPend))) return;
+    marcarPrnDescargado(cuitClic, perClic);
+  });
   btns.appendChild(ya);
   box.style.display = 'flex';
 }
@@ -606,6 +878,7 @@ async function consultarUltimoPrn() {
   const mi = ++_prnConsultaSeq;
   const box = document.getElementById('prnListo');
   if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+  renderPanelRubros();   // 17/11/2026 (hallazgo 30): el recuadro de otro cliente/período se saca enseguida
   const cuit = (clienteSeleccionado && clienteSeleccionado.cuit) || '';
   const per = periodoStr();
   if (!cuit || !per) return;
@@ -615,6 +888,9 @@ async function consultarUltimoPrn() {
     const data = await jsonSeguro(res);
     if (mi !== _prnConsultaSeq || uploading) return; // llegó tarde: cambió el cliente/período o arrancó una corrida
     if (data.ok === false) { logProceso(`No se pudo consultar el último PRN (${data.mensaje || 'respuesta con error'}).`); return; }
+    // 17/11/2026 (hallazgo 30): la misma consulta trae las facturas sin rubro de este cliente/período
+    // (al cambiar de cliente o período, al cargar la página y después de descargar).
+    if (Array.isArray(data.pendientes_rubro)) mostrarPendientesRubro(data.pendientes_rubro);
     if (data.existe === true && data.terminado === true && data.descargado !== true) mostrarCartelPrn(data);
   } catch (err) {
     logProceso(`No se pudo consultar el último PRN (${err.message}).`);
@@ -644,13 +920,12 @@ let uploading = false;
 let subidos = 0;
 let errores = 0;
 let pollingInterval = null;
+let _sondeoGen = 0;          // 17/11/2026 (hallazgo 28): número del sondeo vigente
+let _sondeoEnVuelo = false;  // 17/11/2026 (hallazgo 28): hay una consulta de estado sin respuesta
 let pollingTimeoutMax = null;
 let countdownInterval = null;
 let _procesoInicioTs = null;
 let _procesoTimeoutTotalMs = null;
-// 21/09/2026: PRN generados por cada tanda de la corrida actual (id y nombre en Drive),
-// para pedirle a n8n el archivo consolidado cuando terminan todas las tandas.
-let _prnDeTandas = [];
 // FIX 21/09/2026 ("24 facturas"): cuando una corrida se parte en varias tandas,
 // cada tanda mostraba SOLO sus propios resultados en el cartel final y en los
 // paneles de errores/carga manual/otro cliente/discrepancias — al pasar a la
@@ -658,7 +933,7 @@ let _prnDeTandas = [];
 // anterior se perdía para siempre. Este acumulador junta los resultados de
 // TODAS las tandas de la corrida actual, para que el cartel final siempre se
 // arme con el total real (todas las tandas juntas), no solo la última.
-// Se vacía en cada startUpload() nueva, junto con _prnDeTandas.
+// Se vacía en cada startUpload() nueva.
 function crearResumenTandasVacio() {
   return {
     facturasCount: 0,
@@ -674,10 +949,10 @@ function crearResumenTandasVacio() {
     duplicadosEnLote: [],
     // Líneas del PRN de todas las tandas (resultados_por_pdf, estado al_prn) para armar el .prn en la página.
     lineasPrn: [],
-    prnNombre: '',        // nombre del PRN (el del consolidado si lo hay)
+    prnNombre: '',        // nombre del PRN de Drive de la última tanda
     prnDriveFallo: false, // true si alguna tanda devolvió prn_guardado:false (Drive no respondió)
     // Conciliación (verificacion.resumen + sus listas) — se suman/concatenan tanda a tanda.
-    verifResumen: { conciliadas:0, total_a_revisar:0, falta_procesar:0, fuera_de_arca:0, en_registro:null },
+    verifResumen: { conciliadas:0, total_a_revisar:0, falta_procesar:0, fuera_de_arca:0, en_registro:null, procesadas_antes:0 },
     verifConciliadas: [],
     verifTotalARevisar: [],
     verifFaltaProcesar: [],
@@ -715,12 +990,6 @@ const VERIFICACION_CONCURRENCIA = 3;
 // como si la anterior hubiera terminado, y así se subieron 25 PDF más sobre
 // 40 que nunca se habían procesado.
 let _resolverCorridaActual = null;
-function _corridaTerminada(ok) {
-  if (typeof _resolverCorridaActual === 'function') { const r = _resolverCorridaActual; _resolverCorridaActual = null; r(ok !== false); }
-}
-function esperarFinDeCorrida() {
-  return new Promise(resolve => { _resolverCorridaActual = resolve; });
-}
 let _ultimoRechazoProceso = null; // {yaActivo:true, mensaje} si el servidor rechazó por proceso en curso
 // FIX 02/10/2026: se pone en true apenas fetchConTimeout() detecta una clave
 // inválida/vencida (401/403) y muestra el cartel único para eso. El resto del
@@ -731,6 +1000,14 @@ let _claveRechazada = false;
 // 13/11/2026 (A-5): true cuando la tanda terminó porque la página se cansó de esperar (no porque
 // n8n avisara que terminó). En ese caso no se sube la tanda siguiente.
 let _corridaVencida = false;
+// 17/11/2026 (bajas): true cuando el escaneo terminó sin PDF de este cliente/período en la carpeta de entrada.
+let _corridaSinFacturas = false;
+function _corridaTerminada(ok) {
+  if (typeof _resolverCorridaActual === 'function') { const r = _resolverCorridaActual; _resolverCorridaActual = null; r(ok !== false); }
+}
+function esperarFinDeCorrida() {
+  return new Promise(resolve => { _resolverCorridaActual = resolve; });
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -787,10 +1064,11 @@ function showAlert(msg, type, sinPopup) {
   // y un error de subida podía pasar desapercibido). Éxito y advertencia sí se ocultan solos.
   if (type !== 'info' && type !== 'error') setTimeout(() => el.style.display = 'none', 6000);
   // FIX 02/10/2026: el cartel vive arriba de todo, pero "Subir y procesar" está
-  // mucho más abajo en la página. Un error quedaba fuera de la vista si la persona
-  // ya había scrolleado hasta el botón, y el click parecía no hacer nada. El cartel
-  // de arriba queda como respaldo/historial, pero un error ahora también se
-  // muestra como popup modal — imposible de pasar por alto sin importar el scroll.
+  // mucho más abajo en la página. Un error (ej. candado compartido ocupado) quedaba
+  // fuera de la vista si la persona ya había scrolleado hasta el botón, y el click
+  // parecía no hacer nada. El cartel de arriba queda como respaldo/historial, pero
+  // un error ahora también se muestra como popup modal — imposible de pasar por
+  // alto sin importar el scroll, igual que el popup de "¿Querés reprocesarlas?".
   // FIX 07/10/2026: sinPopup=true lo usa quien va a mostrar en su lugar el popup
   // de mostrarAlertaPopupMultiple() (lista de archivos con problema, uno por
   // uno) -- evita que salgan los dos popups superpuestos.
@@ -885,9 +1163,290 @@ function mostrarAlertaPopupMultiple(items) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// CLIENTES Y PROVEEDORES (18/11/2026): ver y corregir la actividad de cada cliente y el rubro de
+// cada proveedor. Se lee y se guarda por n8n; las reglas (rubros válidos, "usar siempre" solo con
+// rubro elegido, largo de la actividad) las vuelve a controlar la base al guardar.
+// La pantalla tiene su propia dirección (#clientes-y-proveedores): "Atrás" del navegador vuelve a
+// "Subir facturas" sin salir de la página, y al recargar se queda donde estaba.
+// ──────────────────────────────────────────────────────────────────────────────
+const MAESTROS_HASH = '#clientes-y-proveedores';
+let _maestros = null;              // { clientes: [...], proveedores: [...] } como lo manda el servidor
+let _pestanaMaestros = 'clientes';
+let _soloFaltan = false;           // "Solo sin actividad" / "Solo sin rubro"
+let _cargandoMaestros = false;
+let _avisoMaestrosTimer = null;
+const _tituloFacturas = document.title;
+
+function toggleMenuFacturas(ev) {
+  ev.preventDefault(); ev.stopPropagation();
+  const m = document.getElementById('menuFacturasLista');
+  const abrir = m.style.display === 'none';
+  m.style.display = abrir ? 'block' : 'none';
+  document.getElementById('btnMenuFacturas').setAttribute('aria-expanded', abrir ? 'true' : 'false');
+}
+function _cerrarMenuFacturas() {
+  const m = document.getElementById('menuFacturasLista'); if (m) m.style.display = 'none';
+  const b = document.getElementById('btnMenuFacturas'); if (b) b.setAttribute('aria-expanded', 'false');
+}
+document.addEventListener('click', _cerrarMenuFacturas);
+
+// Cambia la dirección; el cambio de vista lo hace el aviso 'hashchange' (así funciona también "Atrás").
+function irAVista(vista) {
+  _cerrarMenuFacturas();
+  const destino = vista === 'maestros' ? MAESTROS_HASH : '';
+  if ((location.hash || '') === destino) { mostrarVista(vista); return; }
+  if (destino) location.hash = destino;
+  else history.pushState('', document.title, location.pathname + location.search);
+  mostrarVista(vista);
+}
+window.addEventListener('hashchange', () => mostrarVista(location.hash === MAESTROS_HASH ? 'maestros' : 'facturas'));
+window.addEventListener('popstate', () => mostrarVista(location.hash === MAESTROS_HASH ? 'maestros' : 'facturas'));
+
+function mostrarVista(vista) {
+  const enMaestros = vista === 'maestros';
+  const vm = document.getElementById('vistaMaestros');
+  const yaEstaba = vm.style.display !== 'none';
+  document.getElementById('vistaFacturas').style.display = enMaestros ? 'none' : '';
+  vm.style.display = enMaestros ? 'block' : 'none';
+  document.getElementById('menuOpcFacturas').classList.toggle('on', !enMaestros);
+  document.getElementById('menuOpcMaestros').classList.toggle('on', enMaestros);
+  document.title = enMaestros ? 'Holistor — Clientes y proveedores' : _tituloFacturas;
+  if (!enMaestros) { const f = document.getElementById('modalMaestroFondo'); if (f && !f.dataset.guardando) f.remove(); }
+  if (enMaestros && !yaEstaba) { window.scrollTo(0, 0); cargarMaestros(); }   // siempre trae la lista al día
+}
+document.addEventListener('DOMContentLoaded', () => { if (location.hash === MAESTROS_HASH) mostrarVista('maestros'); });
+
+// Aviso chico abajo al centro (no corre la lista de lugar).
+function avisoMaestros(msg, tipo) {
+  const el = document.getElementById('maestrosAviso');
+  clearTimeout(_avisoMaestrosTimer);
+  if (!msg) { el.style.display = 'none'; return; }
+  el.className = 'mae-aviso a-' + tipo;
+  el.innerHTML = `<i class="ti ti-${tipo === 'success' ? 'circle-check' : 'alert-circle'}"></i> ${msg}`;
+  el.style.display = 'block';
+  _avisoMaestrosTimer = setTimeout(() => { el.style.display = 'none'; }, tipo === 'success' ? 3000 : 6000);
+}
+
+async function cargarMaestros() {
+  if (_cargandoMaestros) return;
+  _cargandoMaestros = true;
+  if (!_maestros) {
+    document.getElementById('listaMaestros').innerHTML = '<div class="empty"><i class="ti ti-loader"></i>Cargando…</div>';
+    document.getElementById('cuentaMaestros').textContent = '';
+  }
+  try {
+    const res = await fetchConTimeout(WEBHOOK.maestros(), {}, 30000);
+    if (res.status === 401 || res.status === 403) throw new Error('clave');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data || data.ok !== true || !Array.isArray(data.clientes) || !Array.isArray(data.proveedores)) {
+      throw new Error((data && data.error) || 'respuesta inválida');
+    }
+    _maestros = { clientes: data.clientes, proveedores: data.proveedores };
+    renderMaestros();
+  } catch (e) {
+    // Sin lista confiable no se muestra nada para editar (nunca una lista a medias).
+    _maestros = null;
+    document.getElementById('cuentaMaestros').textContent = '';
+    document.getElementById('listaMaestros').innerHTML = e.message === 'clave'
+      ? '<div class="empty"><i class="ti ti-lock"></i>La clave de acceso no es válida o venció. Recargá la página e ingresala de nuevo.</div>'
+      : '<div class="empty"><i class="ti ti-alert-circle"></i>No se pudo cargar la lista. <a href="#" onclick="cargarMaestros();return false;" style="color:inherit;text-decoration:underline;">Reintentar</a></div>';
+  } finally {
+    _cargandoMaestros = false;
+  }
+}
+
+function elegirPestanaMaestros(p) {
+  if (p === _pestanaMaestros) return;
+  _pestanaMaestros = p;
+  document.getElementById('tabMaeClientes').classList.toggle('on', p === 'clientes');
+  document.getElementById('tabMaeProveedores').classList.toggle('on', p === 'proveedores');
+  document.getElementById('btnMaeFaltan').textContent = p === 'clientes' ? 'Solo sin actividad' : 'Solo sin rubro';
+  document.getElementById('buscarMaestros').value = '';   // cada pestaña arranca sin búsqueda
+  renderMaestros(true);
+}
+function alternarSoloFaltan() {
+  _soloFaltan = !_soloFaltan;
+  document.getElementById('btnMaeFaltan').classList.toggle('on', _soloFaltan);
+  renderMaestros(true);
+}
+
+function _cuitConGuiones(c) {
+  const d = String(c || '').replace(/[^0-9]/g, '');
+  return d.length === 11 ? `${d.slice(0, 2)}-${d.slice(2, 10)}-${d.slice(10)}` : d;
+}
+function _nombreRubro(cod) {
+  const r = RUBROS_OPCIONES.find(([c]) => c === cod);
+  return r ? `${cod} — ${r[1]}` : cod;
+}
+// Para buscar sin importar mayúsculas ni tildes ("garcia" encuentra "GARCÍA").
+function _sinTildes(t) {
+  return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+function renderMaestros(volverArriba) {
+  const cont = document.getElementById('listaMaestros');
+  if (!_maestros) return;
+  const q = _sinTildes(document.getElementById('buscarMaestros').value).trim();
+  const qDig = q.replace(/[^0-9]/g, '');
+  const coincide = (nombre, cuit) => !q || _sinTildes(nombre).includes(q) || (qDig.length >= 3 && String(cuit || '').includes(qDig));
+  const esCli = _pestanaMaestros === 'clientes';
+  const todos = esCli ? _maestros.clientes : _maestros.proveedores;
+  const falta = esCli ? (c => !c.actividad) : (p => !p.cod_neto);
+  const lista = todos.filter(x => coincide(esCli ? x.nombre : x.denominacion, x.cuit) && (!_soloFaltan || falta(x)));
+  const nFaltan = todos.filter(falta).length;
+  const fila = (id, nombre, cuit, derecha) => `<div class="mae-fila" id="maeFila${id}" tabindex="0" role="button"
+      onclick="${esCli ? 'abrirEditarCliente' : 'abrirEditarProveedor'}(${id})"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+      <div class="mae-izq"><div>${escapeHtml(nombre)}</div><div class="mae-gris">${escapeHtml(_cuitConGuiones(cuit))}</div></div>${derecha}</div>`;
+  const html = lista.map(x => esCli
+    ? fila(Number(x.id), x.nombre, x.cuit, `<div class="mae-gris mae-der${x.actividad ? '' : ' mae-falta'}" title="${escapeHtml(x.actividad || '')}">${x.actividad ? escapeHtml(x.actividad) : 'Sin actividad'}</div>`)
+    : fila(Number(x.id), x.denominacion, x.cuit, x.cod_neto
+        ? `<span class="mae-chip${x.forzar_rubro === 'SI' ? ' siempre' : ''}">${escapeHtml(_nombreRubro(x.cod_neto))}${x.forzar_rubro === 'SI' ? ' · siempre' : ''}</span>`
+        : `<span class="mae-chip mae-falta">Sin rubro</span>`)
+  ).join('');
+  let vacio = '<div class="empty"><i class="ti ti-search"></i>Sin resultados</div>';
+  if (!todos.length) vacio = `<div class="empty"><i class="ti ti-inbox"></i>No hay ${esCli ? 'clientes' : 'proveedores'} cargados</div>`;
+  else if (_soloFaltan && !nFaltan) vacio = `<div class="empty"><i class="ti ti-circle-check"></i>${esCli ? 'Todos los clientes tienen actividad' : 'Todos los proveedores tienen rubro'}</div>`;
+  cont.innerHTML = html || vacio;
+  const nombreTotal = `${todos.length} ${esCli ? pluralizar(todos.length, 'cliente') : pluralizar(todos.length, 'proveedor', 'proveedores')}`;
+  const faltanTxt = `${nFaltan} ${esCli ? 'sin actividad' : 'sin rubro'}`;
+  document.getElementById('cuentaMaestros').textContent =
+    (lista.length !== todos.length ? `${lista.length} de ${nombreTotal}` : nombreTotal) + ' · ' + faltanTxt;
+  if (volverArriba) cont.scrollTop = 0;
+}
+
+// Ventana para editar (mismo estilo que la de "Factura sin rubro").
+function _ventanaMaestro(titulo, cuit, cuerpo, alGuardar) {
+  const previa = document.getElementById('modalMaestroFondo'); if (previa) previa.remove();
+  const volverFoco = document.activeElement;
+  const fondo = document.createElement('div');
+  fondo.id = 'modalMaestroFondo';
+  fondo.setAttribute('role', 'dialog');
+  fondo.setAttribute('aria-modal', 'true');
+  fondo.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(20,20,18,.5);display:flex;align-items:center;justify-content:center;z-index:9998;padding:1rem;';
+  fondo.innerHTML = `<div class="card" style="max-width:460px;width:100%;padding:0;margin:0;box-shadow:0 12px 40px rgba(0,0,0,.3);">
+      <div style="padding:1.25rem 1.25rem 0;">
+        <div style="font-size:15px;font-weight:600;overflow-wrap:anywhere;">${escapeHtml(titulo)}</div>
+        <div class="mae-gris">${escapeHtml(_cuitConGuiones(cuit))}</div>
+        ${cuerpo}
+        <div id="maestroError" class="field-error" style="margin-top:10px;display:none;"></div>
+      </div>
+      <div style="padding:1.25rem;display:flex;gap:8px;">
+        <button type="button" id="btnMaestroCancelar" class="btn-secondary" style="flex:1;">Cancelar</button>
+        <button type="button" id="btnMaestroGuardar" class="btn-primary" style="flex:1;">Guardar</button>
+      </div></div>`;
+  document.body.appendChild(fondo);
+  const cerrar = () => {
+    fondo.remove();
+    document.removeEventListener('keydown', teclas);
+    if (volverFoco && document.body.contains(volverFoco)) volverFoco.focus();
+  };
+  const teclas = (e) => { if (e.key === 'Escape' && !fondo.dataset.guardando) cerrar(); };
+  document.addEventListener('keydown', teclas);
+  document.getElementById('btnMaestroCancelar').addEventListener('click', cerrar);
+  fondo.addEventListener('click', (e) => { if (e.target === fondo && !fondo.dataset.guardando) cerrar(); });
+  document.getElementById('btnMaestroGuardar').addEventListener('click', async () => {
+    const btn = document.getElementById('btnMaestroGuardar');
+    const err = document.getElementById('maestroError');
+    if (fondo.dataset.guardando) return;               // nunca dos guardados a la vez
+    fondo.dataset.guardando = '1';
+    btn.disabled = true; btn.textContent = 'Guardando…';
+    document.getElementById('btnMaestroCancelar').disabled = true;
+    err.style.display = 'none';
+    try {
+      const res = await fetchConTimeout(WEBHOOK.maestrosGuardar(), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(alGuardar.datos())
+      }, 30000);
+      if (res.status === 401 || res.status === 403) throw new Error('La clave de acceso no es válida o venció. Recargá la página e ingresala de nuevo.');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (!data || data.ok !== true || !data.fila) throw new Error((data && data.error) || 'No se pudo guardar.');
+      alGuardar.listo(data.fila);
+      delete fondo.dataset.guardando;
+      cerrar();
+      renderMaestros();
+      const f = document.getElementById('maeFila' + Number(data.fila.id));
+      if (f) { f.classList.add('recien'); f.focus({ preventScroll: true }); setTimeout(() => f.classList.remove('recien'), 1500); }
+      avisoMaestros('Cambio guardado.', 'success');
+    } catch (e) {
+      // El cambio NO se guardó: la ventana queda abierta con lo que se había elegido.
+      err.textContent = /^HTTP |Failed to fetch|aborted/i.test(e.message) ? 'No se pudo guardar. Probá de nuevo.' : e.message.charAt(0).toUpperCase() + e.message.slice(1);
+      err.style.display = 'block';
+      delete fondo.dataset.guardando;
+      btn.disabled = false; btn.textContent = 'Guardar';
+      document.getElementById('btnMaestroCancelar').disabled = false;
+    }
+  });
+}
+
+function abrirEditarCliente(id) {
+  const c = _maestros && _maestros.clientes.find(x => Number(x.id) === id);
+  if (!c) return;
+  _ventanaMaestro(c.nombre, c.cuit,
+    `<label class="field-label" for="txtActividad" style="margin-top:14px;display:block;">Actividad</label>
+     <textarea id="txtActividad" rows="3" maxlength="500" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d8d8d0;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;">${escapeHtml(c.actividad || '')}</textarea>
+     <div id="cuentaActividad" class="mae-gris" style="text-align:right;"></div>`,
+    {
+      datos: () => ({ tipo: 'cliente', id: c.id, actividad: document.getElementById('txtActividad').value }),
+      listo: (fila) => {
+        c.actividad = String(fila.actividad || '');
+        // La lista de clientes de "Subir facturas" también usa la actividad: se actualiza ya.
+        try { sessionStorage.removeItem(CLIENTES_CACHE_KEY); } catch (e) {}
+        const sel = document.getElementById('selCliente');
+        for (const opt of sel.options) {
+          if (opt.value === escapeHtml(c.cuit) && opt.dataset.nombre === escapeHtml(c.nombre)) opt.dataset.actividad = c.actividad;
+        }
+        if (clienteSeleccionado && clienteSeleccionado.cuit === escapeHtml(c.cuit) && clienteSeleccionado.nombre === escapeHtml(c.nombre)) {
+          clienteSeleccionado.actividad = c.actividad;
+        }
+      }
+    });
+  const txt = document.getElementById('txtActividad');
+  const cuenta = () => { document.getElementById('cuentaActividad').textContent = `${txt.value.length}/500`; };
+  txt.addEventListener('input', cuenta);
+  cuenta();
+  txt.focus();
+  txt.setSelectionRange(txt.value.length, txt.value.length);
+}
+
+function abrirEditarProveedor(id) {
+  const p = _maestros && _maestros.proveedores.find(x => Number(x.id) === id);
+  if (!p) return;
+  const opciones = RUBROS_OPCIONES.map(([c, t]) => `<option value="${c}">${c} — ${escapeHtml(t)}</option>`).join('');
+  _ventanaMaestro(p.denominacion, p.cuit,
+    `<label class="field-label" for="selRubroMaestro" style="margin-top:14px;display:block;">Rubro</label>
+     <select id="selRubroMaestro" style="width:100%;padding:8px 10px;border:1px solid #d8d8d0;border-radius:8px;background:#fff;font-size:14px;"><option value="">Sin rubro</option>${opciones}</select>
+     <label style="display:flex;gap:8px;align-items:center;margin-top:14px;font-size:14px;cursor:pointer;"><input type="checkbox" id="chkRubroSiempre" style="width:16px;height:16px;"> Usar siempre este rubro</label>`,
+    {
+      datos: () => {
+        const rubro = document.getElementById('selRubroMaestro').value;
+        return { tipo: 'proveedor', id: p.id, cod_neto: rubro, forzar_rubro: (rubro && document.getElementById('chkRubroSiempre').checked) ? 'SI' : '' };
+      },
+      listo: (fila) => { p.cod_neto = String(fila.cod_neto || ''); p.forzar_rubro = String(fila.forzar_rubro || ''); }
+    });
+  const sel = document.getElementById('selRubroMaestro');
+  const chk = document.getElementById('chkRubroSiempre');
+  // Un rubro que no está en la lista de la página se muestra igual, para no borrarlo sin querer.
+  if (p.cod_neto && !RUBROS_OPCIONES.some(([c]) => c === p.cod_neto)) {
+    const o = document.createElement('option'); o.value = p.cod_neto; o.textContent = p.cod_neto; sel.appendChild(o);
+  }
+  sel.value = p.cod_neto || '';
+  chk.checked = p.forzar_rubro === 'SI';
+  const sincronizar = () => {
+    chk.disabled = !sel.value;
+    if (!sel.value) chk.checked = false;
+    chk.parentElement.style.opacity = sel.value ? '1' : '.45';
+  };
+  sel.addEventListener('change', sincronizar);
+  sincronizar();
+  sel.focus();
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // CLIENTES
 // ──────────────────────────────────────────────────────────────────────────────
-const CLIENTES_CACHE_KEY = 'holistor_clientes_v3';
+const CLIENTES_CACHE_KEY = 'holistor_clientes_v4';   // v4 (17/11/2026): la lista trae la actividad del cliente
 const CLIENTES_CACHE_TTL = 5 * 60 * 1000;
 
 async function loadClientes(forzar = false) {
@@ -944,6 +1503,7 @@ function poblarSelectClientes(sel, lista) {
     const opt = document.createElement('option');
     opt.value = escapeHtml(c.cuit);
     opt.dataset.nombre = escapeHtml(c.nombre);
+    opt.dataset.actividad = String(c.actividad || '');
     opt.textContent = escapeHtml(c.nombre);
     frag.appendChild(opt);
   }
@@ -969,7 +1529,7 @@ function onClienteChange() {
   }
 
   if (sel.value) {
-    clienteSeleccionado = { cuit: sel.value, nombre: opt.dataset.nombre };
+    clienteSeleccionado = { cuit: sel.value, nombre: opt.dataset.nombre, actividad: opt.dataset.actividad || '' };
     if (_archivoExcelPendiente) {
       const f = _archivoExcelPendiente;
       _archivoExcelPendiente = null;
@@ -1564,7 +2124,8 @@ function parsearRegistroARCA(file) {
         for (let i = 2; i < rows.length; i++) {
           const r = rows[i];
           if (!r || r[0] === null) continue;
-          const rc = String(r[10]||'').replace(/[^0-9]/g,'').padStart(11,'0');
+          const _rcCrudo = rowsRaw[i] ? rowsRaw[i][10] : null;   // 17/11/2026 (bajas): valor crudo si es número
+          const rc = ((typeof _rcCrudo === 'number' && isFinite(_rcCrudo)) ? String(Math.round(_rcCrudo)) : String(r[10]||'')).replace(/[^0-9]/g,'').padStart(11,'0');
           if (rc && rc !== '00000000000') receptoresSet.add(rc);
         }
 
@@ -1591,10 +2152,14 @@ function parsearRegistroARCA(file) {
           const r = rows[i];
           if (!r || r[0] === null) continue;
 
+          // 17/11/2026 (bajas): las columnas de la clave (CUIT, punto de venta, número) salen del valor crudo
+          // de la celda cuando es un número: con raw:false un formato de Excel ("12,345", "3,07E+10") cambiaba
+          // la clave. Si la celda es texto, se usa como siempre.
+          const _crudo = (idx) => { const v = rowsRaw[i] ? rowsRaw[i][idx] : null; return (typeof v === 'number' && isFinite(v)) ? String(Math.round(v)) : String(r[idx] || ''); };
           const tipoCod = String(r[1]||'').split(' - ')[0].trim();
-          const cuitEm = String(r[7]||'').replace(/[^0-9]/g,'').padStart(11,'0');
-          const ptoVta = String(r[2]||'');
-          const numHasta = String(r[4]||'');
+          const cuitEm = _crudo(7).replace(/[^0-9]/g,'').padStart(11,'0');
+          const ptoVta = _crudo(2);
+          const numHasta = _crudo(4);
           const clave = `${cuitEm}-${parseInt(tipoCod)||0}-${parseInt(ptoVta)||0}-${parseInt(numHasta)||0}`;
 
           // Preferir el valor numérico crudo de la celda (rowsRaw) para
@@ -1989,11 +2554,41 @@ function iniciarPolling() {
   }
   pollingTimeoutMax = setTimeout(_timeoutProcesoVencido, _timeoutProcesoMs);
 
+  // 17/11/2026 (hallazgo 28): una sola consulta a la vez, y una respuesta que llega cuando este sondeo ya
+  // terminó (o arrancó el de la tanda siguiente) se descarta: así una tanda no se suma dos veces.
+  const _genSondeo = ++_sondeoGen;
+  _sondeoEnVuelo = false;
+  let _ultimaN8n = Date.now();        // 18/11/2026: hora de la última consulta a n8n de este sondeo
+  let _sbPendUltimo = null;           // 18/11/2026: cantidad de facturas sin rubro vista la última vez en Supabase
+  let _sbEventoPendiente = false;     // 18/11/2026: hay que avisarle a n8n de un cambio todavía no consultado
   pollingInterval = setInterval(async () => {
+    if (_sondeoEnVuelo) return;
+    _sondeoEnVuelo = true;
     try {
+      // 18/11/2026 (etapa 1 Supabase): primero el avance desde Supabase; a n8n solo si terminó la tanda,
+      // cambiaron las facturas sin rubro, pasaron 2 minutos, o (si Supabase no responde) cada 20 s.
+      const _ahoraSondeo = Date.now();
+      const _sb = await leerProgresoSupabase(window.__holistorProgresoId || '');
+      if (_genSondeo !== _sondeoGen || !pollingInterval) return;
+      let _preguntarN8n;
+      if (_sb) {
+        if (Number(_sb.total) > 0) actualizarProgresoProceso(Number(_sb.hechos) || 0, Number(_sb.total) || 0);
+        const _pend = Number(_sb.pendientes_rubro) || 0;
+        if ((_sbPendUltimo === null) ? _pend !== 0 : _pend !== _sbPendUltimo) _sbEventoPendiente = true;
+        _sbPendUltimo = _pend;
+        if (String(_sb.estado || '') !== 'procesando') _sbEventoPendiente = true;
+        _preguntarN8n = (_sbEventoPendiente && (_ahoraSondeo - _ultimaN8n) >= N8N_EVENTO_MS)
+          || (_ahoraSondeo - _ultimaN8n) >= N8N_SEGURIDAD_MS;
+      } else {
+        _preguntarN8n = (_ahoraSondeo - _ultimaN8n) >= N8N_RESPALDO_MS;
+      }
+      if (!_preguntarN8n) return;
+      _ultimaN8n = _ahoraSondeo;
+      if (_sb && String(_sb.estado || '') === 'procesando') _sbEventoPendiente = false;
       const cuit = clienteSeleccionado?.cuit || '';
       const per = periodo ? `${periodo.anio}-${String(periodo.mes).padStart(2,'0')}` : '';
       const res = await fetchConTimeout(`${WEBHOOK.estado()}?cliente_cuit=${encodeURIComponent(cuit)}&periodo=${encodeURIComponent(per)}`, {}, 30000);
+      if (_genSondeo !== _sondeoGen || !pollingInterval) return;   // 17/11/2026 (hallazgo 28)
       // FIX 02/10/2026: si la clave de acceso dejó de ser válida a mitad de la
       // espera (caso real de septiembre de 2026 — el proceso en realidad
       // había terminado bien, pero la página se quedó sin poder preguntar y
@@ -2006,13 +2601,14 @@ function iniciarPolling() {
         stopPolling();
         logProceso('Sondeo interrumpido: hay que volver a ingresar la clave de acceso.');
         mostrarEstadoProceso('listo', [], null);
-        _corridaTerminada();
+        _corridaTerminada(false);   // 17/11/2026 (hallazgo 29): sin confirmar el fin, no se sube la tanda siguiente
         if (window.__holistorLiberarGuardaLocal) window.__holistorLiberarGuardaLocal();
         return;
       }
       if (!res.ok) return;
       const data = await jsonSeguro(res);
             if (!data) return;
+      if (_genSondeo !== _sondeoGen || !pollingInterval) return;   // 17/11/2026 (hallazgo 28)
 
       // FIX 07/10/2026: fuente de datos para el link "Ver en Drive" de
       // renderListaDetalle() (fallidas, carga manual, otro cliente). El campo
@@ -2020,6 +2616,8 @@ function iniciarPolling() {
       // backend, pero nada lo guardaba en ningún lado -- el link nunca se
       // activaba. Guardar acá la respuesta completa del último sondeo.
       window._ultimoEstado = data;
+      // 17/11/2026: facturas sin rubro, apenas aparecen (la corrida sigue).
+      if (Array.isArray(data.pendientes_rubro) && data.pendientes_rubro.length) mostrarPendientesRubro(data.pendientes_rubro);
       (Array.isArray(data.pdfs_drive) ? data.pdfs_drive : []).forEach(d => { if (d && d.pdf && d.drive_url) _mapaDriveAcum[d.pdf] = d.drive_url; });
 
       // Si el total real que devuelve el servidor es mayor al que se usó para
@@ -2062,6 +2660,10 @@ function iniciarPolling() {
           // FIX 09/10/2026: un lote donde todas las facturas son de otro cliente no genera PRN ni
           // fallidas; sin esta línea la página nunca daba el proceso por terminado y quedaba en "Procesando…".
           || (Array.isArray(data.otro_cliente) && data.otro_cliente.length > 0)
+          // 17/11/2026: una tanda cortada por un error crítico (lectura del registro, hoja) solo trae ese aviso.
+          || String(data.error_critico || '').trim() !== ''
+          // 17/11/2026 (bajas): hubo líneas pero Drive no guardó el archivo: antes se esperaba hasta el tiempo límite.
+          || (data.prn_guardado === false && Number(data.lineas_finales_generadas) > 0)
           || (data.conciliacion && Array.isArray(data.conciliacion.procesadas_registradas)
               && data.conciliacion.procesadas_registradas.length > 0);
         if (!_tieneContenido) {
@@ -2072,6 +2674,8 @@ function iniciarPolling() {
 
         _resultadoYaMostrado = true;
         stopPolling();
+        // 17/11/2026: terminó la tanda: aplicar los rubros elegidos y traer la lista actualizada.
+        aplicarRubrosElegidos().then(refrescarPendientesRubro);
         if (data.solo_escaneo === true) {
           // FIX 18/09/2026: el escaneo terminó, así que el candado local
           // anti-doble-orden (bloque v19 al final del archivo) se abre ACÁ,
@@ -2091,7 +2695,9 @@ function iniciarPolling() {
         const fallidosVisibles = (data.fallidos || []).filter(x => {
           const sx = splitNombreMotivo(x);
           const txt = (sx.motivo || sx.pdf_nombre || '').toLowerCase();
-          return !txt.includes('otro cliente') && !txt.includes('cargar manualmente');
+          // 17/11/2026 (hallazgo 18): las facturas sin rubro no son errores ni entran en "Reintentar fallidas":
+          // se ven solo en el recuadro "Facturas sin rubro".
+          return !txt.includes('otro cliente') && !txt.includes('cargar manualmente') && !txt.trim().startsWith('sin rubro:');
         });
         const nf = fallidosVisibles.length > 0;
         const naCount = Array.isArray(data.no_en_arca) ? data.no_en_arca.length : 0;
@@ -2140,7 +2746,10 @@ function iniciarPolling() {
           const vr = data.verificacion.resumen;
           R.verifResumen.conciliadas += Number(vr.conciliadas) || 0;
           R.verifResumen.total_a_revisar += Number(vr.total_a_revisar) || 0;
-          R.verifResumen.falta_procesar += Number(vr.falta_procesar) || 0;
+          // 17/11/2026 (hallazgo 14): el servidor ya descuenta lo procesado antes: "falta procesar" (número y
+          // lista) es el de la ÚLTIMA tanda, no la suma.
+          R.verifResumen.falta_procesar = Number(vr.falta_procesar) || 0;
+          R.verifResumen.procesadas_antes = Number(vr.procesadas_antes) || 0;
           R.verifResumen.fuera_de_arca += Number(vr.fuera_de_arca) || 0;
           // Filas del registro ARCA que vio el servidor: se guarda el MENOR valor de las tandas,
           // así una sola tanda que no vio el registro alcanza para avisar.
@@ -2150,7 +2759,7 @@ function iniciarPolling() {
           }
           R.verifConciliadas = R.verifConciliadas.concat(data.verificacion.conciliadas || []);
           R.verifTotalARevisar = R.verifTotalARevisar.concat(data.verificacion.total_a_revisar || []);
-          R.verifFaltaProcesar = R.verifFaltaProcesar.concat(data.verificacion.falta_procesar || []);
+          R.verifFaltaProcesar = (data.verificacion.falta_procesar || []).slice();   // 17/11/2026 (hallazgo 14)
           R.verifFueraDeArca = R.verifFueraDeArca.concat(data.verificacion.fuera_de_arca || []);
         }
 
@@ -2159,7 +2768,6 @@ function iniciarPolling() {
         // acumulado alcanza con R.prnReal (true si CUALQUIER tanda generó PRN real).
         mostrarEstadoProceso('listo', R.fallidos, R.prnReal, R.naCount, data.prn_file_id, data.prn_file_name, data.lineas_finales_generadas, R.manuales, R.otrosCliente, R.facturasCount, R.yaProcesadas.length, R.duplicadosEnLote.length);
         agregarBotonDescargaPrnFinal();
-        if (prnReal && data.prn_file_id) _prnDeTandas.push({ id: String(data.prn_file_id), name: String(data.prn_file_name || '') });
         mostrarDiagnostico(data);
         if (R.fallidos.length > 0) mostrarFallidos(R.fallidos);
         else { const cf = document.getElementById('cardFallidos'); if (cf) cf.style.display = 'none'; }
@@ -2193,6 +2801,7 @@ function iniciarPolling() {
         }
       }
     } catch(e) { console.warn('Polling error:', e); }
+    finally { _sondeoEnVuelo = false; }   // 17/11/2026 (hallazgo 28)
   }, POLLING_INTERVAL_MS);
 }
 
@@ -2378,6 +2987,7 @@ function mostrarConciliacion(verif, concil, noEnArca, yaProcesadas, duplicadosEn
       + `<span class="concil-badge cb-ok">✓ ${r.conciliadas||0} conciliadas</span>`
       + `<span class="concil-badge cb-warn">⚠ ${r.total_a_revisar||0} total a revisar</span>`
       + `<span class="concil-badge cb-err">✗ ${r.falta_procesar||0} falta procesar</span>`
+      + ((Number(r.procesadas_antes) || 0) > 0 ? `<span class="concil-badge cb-ok">↺ ${Number(r.procesadas_antes)} ya procesadas antes</span>` : '')   // 17/11/2026 (hallazgo 14)
       + (_mostrarFuera ? `<span class="concil-badge cb-warn">↗ ${r.fuera_de_arca||0} en el PRN sin figurar en ARCA</span>` : '')
       + `</div>`;
     html += buildConcilSection('circle-check', 'Conciliadas — clave y total OK', (verif.conciliadas || []).map(x => ({ clave:x.clave, total:x.total })), 'ok');
@@ -2456,13 +3066,20 @@ async function reintentar() {
   if (!exigirRegistro()) return;
   if (_reintentoCliente) clienteSeleccionado = _reintentoCliente;
   if (_reintentoPeriodo) periodo = _reintentoPeriodo;
+  // 17/11/2026 (hallazgo 31): los selectores muestran el cliente/período de la corrida que falló; si no,
+  // al releer el período durante el reintento se tomaba el que estuviera elegido en pantalla.
+  try {
+    if (_reintentoCliente) document.getElementById('selCliente').value = _reintentoCliente.cuit;
+    if (_reintentoPeriodo) { document.getElementById('selMes').value = _reintentoPeriodo.mes; document.getElementById('selAnio').value = _reintentoPeriodo.anio; }
+  } catch (e) {}
   document.querySelectorAll('#cardFallidos button').forEach(b => b.disabled = true);
   showAlert('Reintentando fallidas… esperando indexación de Drive', 'info');
    try {
     const _cantidadReintentar = archivosFallidos.length;
-    // FIX 07/10/2026: capturar los nombres ANTES de vaciar archivosFallidos --
-    // si se calculan después (como se hacía antes), siempre da una lista vacía
-    // y nunca se le dice a n8n qué PDFs puntuales reintentar.
+    // FIX 07/10/2026 (auditoría): capturar los nombres ANTES de vaciar archivosFallidos.
+    // Calculados después (como estaba), la lista llegaba siempre vacía a n8n y
+    // "Reintentar fallidas" nunca pedía reintentar PDFs puntuales. Misma corrección
+    // que ya tiene index.html (commit bcae97b).
     const nombresReintentar = _cantidadReintentar
       ? archivosFallidos.map(x => splitNombreMotivo(x).pdf_nombre).filter(Boolean)
       : [];
@@ -2920,6 +3537,7 @@ function clearPending() {
 // UPLOAD Y PROCESAMIENTO
 // ──────────────────────────────────────────────────────────────────────────────
 function setUploadControlsDisabled(disabled) {
+  if (!disabled && window.__holistorBucleTandas) return;   // 17/11/2026 (hallazgo 11): bloqueados hasta que termine el bucle de tandas
     ['btnSubir', 'btnProcesar', 'selCliente', 'selMes', 'selAnio'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = disabled;
@@ -2954,7 +3572,7 @@ async function subirUnPDF(item) {
       const res = await fetchConTimeout(WEBHOOK.upload(), { method: 'POST', body: fd }, FETCH_TIMEOUT_MS);
       const data = await jsonSeguro(res);
       if (!res.ok || data.ok === false) {
-        const e = new Error(data.mensaje || `HTTP ${res.status}`); e.rechazado = (data.rechazado === true); throw e;
+       const e = new Error(data.mensaje || `HTTP ${res.status}`); e.rechazado = (data.rechazado === true); throw e;
       }
       if (intento > 1) logProceso(`Subida de ${item.name} funcionó en el reintento ${intento}.`);
       return data;
@@ -2964,9 +3582,6 @@ async function subirUnPDF(item) {
       // inválida), reintentar no sirve de nada -- va a fallar igual las
       // veces que haga falta. Cortar acá evita quemar hasta 1 minuto de
       // esperas inútiles antes de avisarle al usuario.
-      // FIX 07/10/2026: lo mismo si el backend rechazó la subida de entrada
-      // (PDF vacío/inválido, ver 'Validar Subida' en n8n) -- es un rechazo
-      // definitivo, no un error transitorio de Drive.
       if (_claveRechazada || err.rechazado === true) break;
       if (intento < INTENTOS_MAX) {
         const esperaMs = ESPERAS_ENTRE_INTENTOS_MS[intento - 1];
@@ -2979,7 +3594,7 @@ async function subirUnPDF(item) {
   throw ultimoError;
 }
 
-// 02/10/2026: consulta el candado compartido (hoja PROCESOS_ACTIVOS, nodo
+// 01/10/2026: consulta el candado compartido (hoja PROCESOS_ACTIVOS, nodo
 // 'Webhook Candado' en n8n) antes de subir nada, para no pisar una corrida
 // que otra sesión/usuario ya tiene en curso para este mismo cliente/período.
 // Si la consulta en sí falla (red, timeout, backend caído) se deja seguir:
@@ -3000,7 +3615,22 @@ async function consultarCandado() {
   }
 }
 
+// 17/11/2026 (hallazgos 11 y 26): el botón y los selectores se bloquean en el mismo clic (antes del primer
+// await, así un doble clic no arranca dos corridas) y siguen bloqueados durante TODAS las tandas; se
+// liberan solo al terminar o cortar el bucle.
 async function startUpload() {
+  if (uploading || window.__holistorBucleTandas) return;
+  window.__holistorBucleTandas = true;
+  setUploadControlsDisabled(true);
+  try {
+    await _startUploadTandas();
+  } finally {
+    window.__holistorBucleTandas = false;
+    if (!pollingInterval) setUploadControlsDisabled(false);
+  }
+}
+
+async function _startUploadTandas() {
   actualizarPeriodo(true); // mismo motivo
   if (uploading) return;
   if (!validarPrecondiciones()) return;
@@ -3013,7 +3643,7 @@ async function startUpload() {
     return;
   }
 
-  // 02/10/2026: consultar el candado compartido ANTES de subir nada.
+  // 01/10/2026: consultar el candado compartido ANTES de subir nada.
   showAlert('Verificando que nadie más esté procesando este cliente…', 'info');
   const candado = await consultarCandado();
   // FIX 02/10/2026: si la clave ya venció, fetchConTimeout() ya mostró el
@@ -3028,7 +3658,6 @@ async function startUpload() {
     showAlert(`${escapeHtml(candado.mensaje)}<br><br>No se subió ningún PDF. Volvé a intentar cuando esa corrida termine.`, 'error');
     return;
   }
-
   // Se sube y procesa de a tandas de BATCH_FRONTEND_SIZE archivos: cada tanda
   // se sube, se escanea/procesa y se espera su resultado antes de subir la
   // siguiente. Motivo: el backend procesa TODO lo que haya en la carpeta de
@@ -3037,16 +3666,22 @@ async function startUpload() {
   const tandas = [];
   for (let i = 0; i < pendingTotal.length; i += BATCH_FRONTEND_SIZE) tandas.push(pendingTotal.slice(i, i + BATCH_FRONTEND_SIZE));
   if (tandas.length > 1) {
-    showAlert(`${pendingTotal.length} PDFs: se procesan en ${tandas.length} tandas de hasta ${BATCH_FRONTEND_SIZE}. Cada tanda genera su propio archivo PRN.`, 'info');
+    showAlert(`${pendingTotal.length} PDFs: se procesan en ${tandas.length} tandas de hasta ${BATCH_FRONTEND_SIZE}. Todas se suman al mismo PRN: al final se descarga un solo archivo.`, 'info');   // 17/11/2026 (bajas)
     logProceso(`Lote grande: ${tandas.length} tandas de hasta ${BATCH_FRONTEND_SIZE} archivos.`);
   }
 
-  _prnDeTandas = [];
   _resumenTandas = crearResumenTandasVacio();
   _mapaDriveAcum = {};
+  // 17/11/2026 (hallazgo 11): cliente y período fijados al empezar; si cambian entre tandas, se corta.
+  const _cuitBucle = clienteSeleccionado.cuit, _perBucle = periodoStr();
   for (let t = 0; t < tandas.length; t++) {
     const pending = tandas[t];
     const etiquetaTanda = tandas.length > 1 ? ` (tanda ${t + 1} de ${tandas.length})` : '';
+    if (!clienteSeleccionado || clienteSeleccionado.cuit !== _cuitBucle || periodoStr() !== _perBucle) {
+      logProceso(`Tanda ${t + 1}: cambió el cliente o el período durante la corrida. Se corta acá.`);
+      showAlert('Cambió el cliente o el período en medio de la corrida: no se subieron las tandas que faltaban. Volvé a elegir el cliente y el período de la corrida y tocá "Subir y procesar" con los PDF que quedaron.', 'error');
+      return;
+    }
     if (t > 0) {
       resetProcesoUX();
       document.getElementById('loteResultado').style.display = 'none';
@@ -3098,9 +3733,6 @@ async function startUpload() {
         console.error('Error subiendo PDF', item.name, err);
         item.error = detalle;
         item.rechazado = (err && err.rechazado === true);
-        // FIX 07/10/2026: si el backend rechazó el archivo (ver 'Validar Subida'
-        // en n8n), no mostrar acá el cartel individual -- se muestra uno solo
-        // al final de la tanda con el detalle de todos los rechazados (carrusel).
         if (!(err && err.rechazado === true)) showAlert(`Error subiendo ${escapeHtml(item.name)}: ${escapeHtml(detalle)}`, 'error');
         logProceso(`Error subiendo ${item.name}: ${detalle}`);
       }
@@ -3167,6 +3799,7 @@ async function startUpload() {
     if (!fallidosNombres.length) showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
     await sleep(calcularEsperaIndexacion(pending.length));
     _corridaVencida = false;
+    _corridaSinFacturas = false;
     const finDeCorrida = esperarFinDeCorrida();
     await escanearYProcesar();
     const corridaOk = await finDeCorrida;
@@ -3196,6 +3829,15 @@ async function startUpload() {
         if (restantesV > 0) showAlert(`La tanda ${t + 1} tardó más de lo esperado y la página dejó de esperarla; n8n puede seguir procesándola. Por eso no se subieron las ${restantesV} ${pluralizar(restantesV, 'tanda', 'tandas')} siguientes. Los PDF ya subidos quedaron en Drive: <b>no los vuelvas a subir</b>. Esperá unos minutos y volvé a tocar Procesar: lo que ya esté hecho se reconoce como repetido y lo nuevo se procesa.`, 'warn');
         return;
       }
+      // 17/11/2026 (bajas): el escaneo no encontró PDF de este cliente/período (la orden sí salió). Se corta
+      // con ese motivo, sin el cartel de "la orden no salió" (que sugería liberar el proceso).
+      if (_corridaSinFacturas) {
+        _corridaSinFacturas = false;
+        const restantesS = tandas.length - (t + 1);
+        logProceso(`Tanda ${t + 1} de ${tandas.length}: el escaneo no encontró PDF para procesar. Se corta acá${restantesS > 0 ? ` (quedan ${restantesS} ${pluralizar(restantesS, 'tanda', 'tandas')} sin subir)` : ''}.`);
+        if (restantesS > 0) showAlert(`En la tanda ${t + 1} el servidor no encontró los PDF subidos (Drive puede tardar en mostrarlos). No se subieron las ${restantesS} ${pluralizar(restantesS, 'tanda', 'tandas')} siguientes. Esperá un minuto y volvé a tocar Procesar: lo ya hecho se reconoce como repetido.`, 'warn');
+        return;
+      }
       // FIX 18/09/2026: la orden de procesar no salió. Los PDF de esta tanda ya
       // están en Drive pero nadie los procesó: cortar acá, no subir más tandas.
       const restantes = tandas.length - (t + 1);
@@ -3203,52 +3845,17 @@ async function startUpload() {
       showAlert(`No se pudo iniciar el procesamiento de la tanda ${t + 1}. Los PDF ya subidos quedaron en Drive sin procesar: no los vuelvas a subir (se duplicarían en Drive). Usá "Liberar proceso" y avisá para que se dispare el procesamiento de lo que ya está en Drive.`, 'error');
       return;
     }
+    await aplicarRubrosElegidos();   // 17/11/2026: antes de la tanda siguiente (que lee el PRN pendiente al arrancar)
     if (tandas.length > 1) logProceso(`Tanda ${t + 1} de ${tandas.length} terminada.`);
   }
   if (tandas.length > 1) {
-    showAlert(`Listo: se procesaron ${tandas.length} tandas.`, 'success');
-    await consolidarPrnTandas(tandas.length);
+    // 17/11/2026 (poda): ya no se arma un PRN "consolidado" en Drive: las tandas se suman en un solo PRN
+    // pendiente en la hoja (desde el 12/11) y "Descargar PRN" baja ese. Cada tanda deja igual su PRN en Drive.
+    showAlert(`Listo: se procesaron ${tandas.length} tandas. Todas están en un solo PRN.`, 'success');
   }
   // 12/11/2026: si hubo PRN pero la página no recibió sus líneas (resultado recortado), no hay botón
   // "Descargar PRN": se muestra el cartel "Tenés un PRN listo", que las lee de la hoja.
   if (_resumenTandas.prnReal && !_resumenTandas.lineasPrn.length) consultarUltimoPrn();
-}
-
-// 21/09/2026: cuando la corrida se partió en tandas, cada tanda dejó su propio PRN
-// en Drive. Se le pide a n8n (webhook holistor-prn-consolidar, workflow aparte)
-// que una las líneas de todos en un solo archivo CONSOLIDADO. Los PRN por tanda
-// quedan como respaldo. Si falla, se avisa y se sigue: no bloquea nada.
-async function consolidarPrnTandas(cantTandas) {
-  const prns = _prnDeTandas.slice();
-  if (prns.length === 0) { logProceso('Consolidado: ninguna tanda generó PRN, no hay nada que unir.'); return; }
-  if (prns.length === 1) { logProceso(`Consolidado: solo 1 de ${cantTandas} tandas generó PRN (${prns[0].name}); ese archivo ya es el único, no hace falta unir.`); return; }
-  logProceso(`Consolidado: pidiendo a n8n que una ${prns.length} PRN en un solo archivo…`);
-  showAlert(`Armando el PRN consolidado con las ${prns.length} tandas…`, 'info');
-  try {
-    const res = await fetchConTimeout(WEBHOOK.consolidar(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cliente_cuit: clienteSeleccionado.cuit,
-        cliente_nombre: clienteSeleccionado.nombre || '',
-        periodo: periodoStr(),
-        prn_file_ids: prns.map(p => p.id)
-      })
-    }, FETCH_TIMEOUT_MS);
-    const data = await jsonSeguro(res);
-    if (!res.ok || data.ok !== true || !data.prn_file_id) {
-      throw new Error(data.mensaje || `HTTP ${res.status}`);
-    }
-    const avisos = Array.isArray(data.avisos) ? data.avisos : [];
-    logProceso(`Consolidado listo: ${data.prn_file_name} (${data.lineas} líneas de ${data.archivos_unidos} archivos).` + (avisos.length ? ' Avisos: ' + avisos.join(' | ') : ''));
-    showAlert(`✓ PRN consolidado listo: ${data.lineas} líneas de ${data.archivos_unidos} tandas.` + (avisos.length ? ' Revisá los avisos en el detalle.' : ''), avisos.length ? 'warn' : 'success');
-    // 12/11/2026: el consolidado queda en Drive como copia; la página no ofrece enlace.
-    if (data.prn_file_name) _resumenTandas.prnNombre = String(data.prn_file_name); // el botón Descargar PRN usa el nombre del consolidado
-  } catch (err) {
-    const detalle = err.name === 'AbortError' ? 'tiempo de espera agotado' : err.message;
-    logProceso(`Consolidado: no se pudo armar el archivo único (${detalle}). Los PRN por tanda siguen en Drive: ${prns.map(p => p.name || p.id).join(', ')}.`);
-    showAlert(`No se pudo armar el PRN consolidado: ${escapeHtml(detalle)}. Los ${prns.length} PRN por tanda están en Drive y se pueden importar uno por uno.`, 'warn');
-  }
 }
 
 async function autoSyncProveedores() {
@@ -3298,10 +3905,11 @@ function manejarResultadoEscaneo(data) {
     showAlert('No hay facturas para procesar: la carpeta de entrada no tiene PDFs de este cliente y período.', 'warn');
     // FIX 09/10/2026: el panel de progreso quedaba en "Escaneando… 65 %" aunque ya no había nada para hacer.
     updateProcesoUX('final', 100, 'Sin facturas', 'La carpeta de entrada no tiene PDFs de este cliente y período.', { progressText:'Sin facturas para procesar.' });
+    _corridaSinFacturas = true;   // 17/11/2026 (bajas): el bucle de tandas no lo trata como "la orden no salió"
     _corridaTerminada(false);
     return;
   }
-
+ 
   if (repetidas === 0) {
     logProceso('Escaneo: todo nuevo, procesando directo.');
     sendFlush(false, false);
@@ -3447,6 +4055,7 @@ async function sendFlush(forzar, soloEscanear, reintentarPdfs) {
         periodo: periodoStr(),
         cliente_cuit: clienteSeleccionado.cuit,
         cliente_nombre: clienteSeleccionado.nombre || '',
+        cliente_actividad: clienteSeleccionado.actividad || '',   // 17/11/2026: para que Gemini distinga uso propio de reventa
         tiene_registro: registroSubido,
         forzar: forzar === true,
         soloEscanear: soloEscanear === true,
@@ -3515,6 +4124,8 @@ function actualizarPeriodo(sinConsultaPrn) {
     if (_ultimoExcelParseado && !registroSubido) {
       validarPeriodoYGuardarExcel();
     }
+    // 17/11/2026 (hallazgo 31): cambiar el período a mano limpia el resultado del período anterior.
+    if (sinConsultaPrn !== true && !uploading && !pollingInterval) resetProcesoUX();
     if (sinConsultaPrn !== true) consultarUltimoPrn(); // cartel "Tenés un PRN listo"
   }
 }
@@ -3622,7 +4233,7 @@ console.log('Holistor uploader inline JS cargado OK');
   function periodoActual(){ const mes=qs('selMes')?.value||''; const anio=qs('selAnio')?.value||''; return anio && mes ? `${anio}-${String(mes).padStart(2,'0')}` : ''; }
   function clienteActual(){ return qs('selCliente')?.value || ''; }
   function keyActual(body){ return String(body?.cliente_cuit || clienteActual() || '') + '|' + String(body?.periodo || periodoActual() || ''); }
-  function setProcesarDisabled(disabled){ ['btnSubir','btnProcesar','selCliente','selMes','selAnio'].forEach(id => { const el=qs(id); if (el) el.disabled = !!disabled; }); }
+  function setProcesarDisabled(disabled){ if (!disabled && window.__holistorBucleTandas) return; /* 17/11/2026 (hallazgo 11) */ ['btnSubir','btnProcesar','selCliente','selMes','selAnio'].forEach(id => { const el=qs(id); if (el) el.disabled = !!disabled; }); }
   function jsonResponse(obj){ return new Response(JSON.stringify(obj), { status:200, headers:{'Content-Type':'application/json'} }); }
   // Hook para que el timeout de iniciarPolling() (definido en el otro bloque
   // <script>, fuera de esta IIFE, sin acceso a `state`) pueda liberar el
@@ -3646,8 +4257,10 @@ console.log('Holistor uploader inline JS cargado OK');
       // distinguía una corrida de la anterior).
       state.inFlight = true; state.activeKey = key; state.finalizado = false; state.requestId = `${Date.now()}_${Math.random().toString(36).slice(2,10)}`;
       window.__holistorActiveRunId = state.requestId;
+      // 18/11/2026 (etapa 1 Supabase): código al azar de esta tanda; n8n lo guarda y la página lee el avance con él.
+      window.__holistorProgresoId = (window.crypto && typeof window.crypto.randomUUID === 'function') ? window.crypto.randomUUID() : '';
       setProcesarDisabled(true);
-      if (init && typeof init.body === 'string') init = { ...init, body: JSON.stringify({ ...body, request_id: state.requestId, frontend_run_id: state.requestId }) };
+      if (init && typeof init.body === 'string') init = { ...init, body: JSON.stringify({ ...body, request_id: state.requestId, frontend_run_id: state.requestId, progreso_id: window.__holistorProgresoId }) };
       try {
         const res = await originalFetch(input, init);
        try {
@@ -3677,6 +4290,8 @@ console.log('Holistor uploader inline JS cargado OK');
           || (Array.isArray(data?.otro_cliente) && data.otro_cliente.length > 0)
           || (Array.isArray(data?.duplicados_en_lote) && data.duplicados_en_lote.length > 0)
           || (Array.isArray(data?.nuevas_en_escaneo)  && data.nuevas_en_escaneo.length  > 0)
+          || String(data?.error_critico || '').trim() !== ''   // 17/11/2026: tanda cortada por error crítico
+          || (data?.prn_guardado === false && Number(data?.lineas_finales_generadas) > 0)   // 17/11/2026 (bajas): solo falló Drive
           || (data?.conciliacion && Array.isArray(data.conciliacion.procesadas_registradas)
               && data.conciliacion.procesadas_registradas.length > 0);
         if (data?.listo === true && !tieneContenido) return;  // listo prematuro, seguir esperando

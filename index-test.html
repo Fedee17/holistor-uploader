@@ -797,6 +797,9 @@ function actualizarResultadoTrasRubro(aplicadas, totales) {
     R.verifFaltaProcesar = quedan;
   }
   mostrarEstadoProceso('listo', R.fallidos, R.prnReal, R.naCount, null, R.prnNombre, null, R.manuales, R.otrosCliente, R.facturasCount, R.yaProcesadas.length, R.duplicadosEnLote.length);
+  // 24/11/2026: también el recuadro "Estado del proceso" (mismo texto que arma el cierre de la tanda, con el acumulado).
+  const _incid = [R.fallidos.length ? `${R.fallidos.length} error(es)` : '', R.manuales.length ? `${R.manuales.length} carga manual` : '', R.otrosCliente.length ? `${R.otrosCliente.length} omitida(s)` : ''].filter(Boolean).join(' · ');
+  updateProcesoUX('final', 100, _incid ? 'PRN listo con avisos' : 'PRN listo', _incid ? `PRN generado. Avisos: ${_incid}.` : 'PRN generado correctamente.', { progressText: _incid ? 'Revisar avisos.' : 'Proceso completo.' });
   agregarBotonDescargaPrnFinal();
   mostrarCargaManual(R.manuales);
   if (R.hayVerif) mostrarConciliacion({ resumen: R.verifResumen, conciliadas: R.verifConciliadas, total_a_revisar: R.verifTotalARevisar, falta_procesar: R.verifFaltaProcesar, fuera_de_arca: R.verifFueraDeArca }, null, R.noEnArca, R.yaProcesadas, R.duplicadosEnLote);

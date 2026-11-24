@@ -1,165 +1,56 @@
-:root {
-  --balances-color-fondo: #f4f5f7;
-  --balances-color-superficie: #ffffff;
-  --balances-color-borde: #dde1e6;
-  --balances-color-texto: #1f2933;
-  --balances-color-texto-secundario: #5b6572;
-  --balances-color-primario: #1d5f8a;
-  --balances-color-primario-hover: #164a6d;
-  --balances-color-exito: #1d7a4c;
-  --balances-color-exito-fondo: #e7f5ec;
-  --balances-color-alerta: #9a6400;
-  --balances-color-alerta-fondo: #fdf3d9;
-  --balances-color-error: #a3231f;
-  --balances-color-error-fondo: #fbe9e8;
-  --balances-radio: 10px;
-  --balances-sombra: 0 1px 3px rgba(15, 23, 30, 0.08);
-  --balances-fuente: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  font-family: var(--balances-fuente);
-  background: var(--balances-color-fondo);
-  color: var(--balances-color-texto);
-  line-height: 1.5;
-}
-
-/* ---------- Header ---------- */
-
-.balances-header {
-  background: var(--balances-color-superficie);
-  border-bottom: 1px solid var(--balances-color-borde);
-  padding: 1.25rem 1.5rem;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.balances-header h1 {
-  font-size: 1.25rem;
-  margin: 0;
-}
-
-.balances-nav {
-  display: flex;
-  gap: 1.25rem;
-}
-
-.balances-nav a {
-  color: var(--balances-color-texto-secundario);
-  text-decoration: none;
-  font-size: 0.95rem;
-  padding-bottom: 2px;
-  border-bottom: 2px solid transparent;
-}
-
-.balances-nav a:hover {
-  color: var(--balances-color-texto);
-}
-
-.balances-nav a[aria-current="page"] {
-  color: var(--balances-color-primario);
-  border-bottom-color: var(--balances-color-primario);
-  font-weight: 600;
-}
-
-/* ---------- Menú desplegable (Balances Bancarios ▾) ---------- */
-
-.balances-nav-item {
-  position: relative;
-}
-
-.balances-nav-item > a {
-  color: var(--balances-color-primario);
-  text-decoration: none;
-  font-size: 0.95rem;
-  font-weight: 600;
-  border-bottom: 2px solid var(--balances-color-primario);
-  padding-bottom: 2px;
-}
-
-.balances-nav-dropdown {
-  display: none;
-  position: absolute;
-  /* Sin margin-top: un hueco entre el link y el menú corta el hover al
-     mover el mouse en diagonal hacia abajo, cerrando el menú antes de
-     llegar a las opciones — por eso el desplegable se cerraba solo. El
-     padding-top de acá da la misma separación visual sin crear ese hueco,
-     porque sigue siendo parte del área "hover" continua. */
-  top: 100%;
-  left: 0;
-  padding-top: 0.5rem;
-  min-width: 180px;
-  z-index: 30;
-}
-
-.balances-nav-item:hover .balances-nav-dropdown,
-.balances-nav-item:focus-within .balances-nav-dropdown {
-  display: block;
-}
-
-.balances-nav-dropdown-caja {
-  background: var(--balances-color-superficie);
-  border: 1px solid var(--balances-color-borde);
-  border-radius: 8px;
-  box-shadow: var(--balances-sombra);
-  overflow: hidden;
-  padding: 0.35rem 0;
-}
-
-.balances-nav-dropdown-caja a {
-  display: block;
-  padding: 0.55rem 0.9rem;
-  font-size: 0.9rem;
-  color: var(--balances-color-texto);
-  text-decoration: none;
-  border-bottom: none;
-}
-
-.balances-nav-dropdown-caja a:hover {
-  background: var(--balances-color-fondo);
-}
-
-.balances-nav-dropdown-caja a.balances-nav-activa {
-  color: var(--balances-color-primario);
-  font-weight: 600;
-}
+/* Estilos propios de "Cargar resúmenes". Los tokens (colores, fuentes, radio), la barra superior,
+   las notas, los mensajes y los chips de banco están en estilos-base.css. Ningún color suelto acá. */
 
 /* ---------- Layout general ---------- */
 
 .balances-main {
-  max-width: 720px;
+  max-width: 760px;
   margin: 0 auto;
-  padding: 2rem 1.5rem 4rem;
+  padding: 1.75rem 1rem 3rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.1rem;
 }
 
 .balances-card {
   background: var(--balances-color-superficie);
   border: 1px solid var(--balances-color-borde);
-  border-radius: var(--balances-radio);
-  box-shadow: var(--balances-sombra);
-  padding: 1.5rem;
+  border-radius: 12px;
+  padding: 1.25rem 1.4rem;
 }
 
+/* Título de tarjeta: etiqueta chica en mayúsculas ("PASO 1") y subtítulo en negro debajo */
 .balances-card h2 {
-  margin-top: 0;
-  font-size: 1.05rem;
+  margin: 0 0 0.9rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--balances-color-texto-secundario);
 }
 
-.balances-nota {
-  color: var(--balances-color-texto-secundario);
-  font-size: 0.9rem;
-  margin: 0.5rem 0 0;
+.balances-card h2 b {
+  display: block;
+  margin-top: 2px;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--balances-color-texto);
+}
+
+.balances-card h2 b:empty {
+  display: none;
+}
+
+.balances-card .balances-nota {
+  margin: 0 0 0.9rem;
+}
+
+.balances-num {
+  font-family: var(--tabla-fuente-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
 /* ---------- Campos de formulario ---------- */
@@ -168,78 +59,99 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.9rem;
 }
 
-.balances-campo label {
-  font-size: 0.9rem;
+.balances-campo > label,
+.balances-campo-titulo {
+  font-size: 0.8rem;
   font-weight: 600;
-  color: var(--balances-color-texto);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--balances-color-texto-secundario);
 }
 
 .balances-campo select,
-.balances-campo input[type="text"] {
-  font-family: inherit;
-  font-size: 1rem;
+.balances-campo input[type="text"],
+.balances-campo input[type="password"] {
+  font: inherit;
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--balances-color-borde);
   border-radius: 8px;
-  background: var(--balances-color-superficie);
+  background: var(--tabla-superficie-2);
   color: var(--balances-color-texto);
+  width: 100%;
 }
 
-.balances-campo select:focus,
-.balances-campo input[type="text"]:focus {
-  outline: 2px solid var(--balances-color-primario);
+.balances-campo select:focus-visible,
+.balances-campo input[type="text"]:focus-visible,
+.balances-campo input[type="password"]:focus-visible {
+  outline: 2px solid var(--tabla-acento);
   outline-offset: 1px;
+}
+
+/* "Bancos habilitados" en gris seguido de los chips de cada banco */
+.balances-chips-linea {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.balances-chips-linea:empty {
+  display: none;
 }
 
 /* ---------- Botones ---------- */
 
 .balances-acciones {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.6rem;
   flex-wrap: wrap;
-  margin-top: 0.5rem;
+  align-items: center;
+  margin-top: 1rem;
 }
 
 button {
-  font-family: inherit;
-  font-size: 0.95rem;
+  font: inherit;
   font-weight: 600;
-  padding: 0.65rem 1.25rem;
+  padding: 0.6rem 1.25rem;
   border-radius: 8px;
-  border: none;
+  border: 1px solid var(--balances-color-borde);
+  background: var(--balances-color-superficie);
+  color: var(--balances-color-texto);
   cursor: pointer;
-  background: var(--balances-color-primario);
-  color: #ffffff;
-  transition: background 0.15s ease;
 }
 
 button:hover:not(:disabled) {
+  background: var(--tabla-hover);
+}
+
+.balances-boton-primario {
+  background: var(--tabla-acento);
+  border-color: var(--tabla-acento);
+  color: var(--tabla-acento-texto);
+}
+
+.balances-boton-primario:hover:not(:disabled) {
   background: var(--balances-color-primario-hover);
+  border-color: var(--balances-color-primario-hover);
 }
 
 button:disabled {
-  background: var(--balances-color-borde);
-  color: var(--balances-color-texto-secundario);
-  cursor: not-allowed;
+  opacity: 0.45;
+  cursor: default;
 }
 
 button:focus-visible {
-  outline: 2px solid var(--balances-color-primario);
+  outline: 3px solid color-mix(in srgb, var(--tabla-acento) 45%, transparent);
   outline-offset: 2px;
 }
 
-.balances-boton-secundario {
-  background: transparent;
-  color: var(--balances-color-texto-secundario);
-  border: 1px solid var(--balances-color-borde);
-}
-
-.balances-boton-secundario:hover:not(:disabled) {
-  background: var(--balances-color-fondo);
-  color: var(--balances-color-texto);
+.balances-boton-chico {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.85rem;
 }
 
 .balances-link-boton {
@@ -252,41 +164,148 @@ button:focus-visible {
   cursor: pointer;
 }
 
-.balances-link-boton:hover {
+.balances-link-boton:hover:not(:disabled),
+.balances-link-boton[aria-expanded="true"] {
   text-decoration: underline;
   background: none;
+}
+
+/* ---------- Alta de cliente / de banco ---------- */
+
+.balances-alta-enlaces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin-top: 0.75rem;
+}
+
+.balances-alta {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--tabla-linea-suave);
+}
+
+.balances-alta h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.balances-alta .balances-nota {
+  margin: 0 0 0.75rem;
+}
+
+/* Casillas de bancos: un recuadro por banco, resaltado al tildar */
+.balances-bancos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.5rem;
+}
+
+.balances-banco {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--balances-color-borde);
+  border-radius: 8px;
+  background: var(--tabla-superficie-2);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.balances-banco input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--tabla-acento);
+}
+
+.balances-banco:has(input:checked) {
+  border-color: var(--tabla-acento);
+  background: color-mix(in srgb, var(--tabla-acento) 8%, transparent);
+}
+
+.balances-banco:has(input:focus-visible) {
+  outline: 2px solid var(--tabla-acento);
+  outline-offset: 1px;
+}
+
+.balances-banco-ya {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.balances-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+#balances-alta-mensaje {
+  margin-top: 0.75rem;
+}
+
+#balances-alta-mensaje:empty {
+  display: none;
 }
 
 /* ---------- Zona de carga de archivos ---------- */
 
 .balances-dropzone {
   border: 2px dashed var(--balances-color-borde);
-  border-radius: var(--balances-radio);
-  padding: 2rem 1rem;
+  border-radius: 10px;
+  padding: 1.6rem 1rem;
   text-align: center;
   color: var(--balances-color-texto-secundario);
+  background: var(--tabla-superficie-2);
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .balances-dropzone:hover,
 .balances-dropzone.balances-dropzone-activa {
-  border-color: var(--balances-color-primario);
-  background: var(--balances-color-fondo);
+  border-color: var(--tabla-acento);
+  background: color-mix(in srgb, var(--tabla-acento) 8%, transparent);
 }
 
 .balances-dropzone p {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
+.balances-lista-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--balances-color-texto-secundario);
+}
+
+.balances-lista-cabecera[hidden] {
+  display: none;
+}
+
+/* Lista con altura máxima: con muchos archivos se desplaza dentro de su recuadro */
 .balances-lista-archivos {
   list-style: none;
-  margin: 1rem 0 0;
+  margin: 0.75rem 0 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--tabla-superficie-2);
+  border: 1px solid var(--tabla-linea-suave);
+  border-radius: 8px;
+}
+
+.balances-lista-archivos:empty {
+  display: none;
+}
+
+.balances-lista-cabecera:not([hidden]) + .balances-lista-archivos {
+  margin-top: 0.4rem;
 }
 
 .balances-lista-archivos li {
@@ -294,10 +313,18 @@ button:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.6rem 0.85rem;
-  background: var(--balances-color-fondo);
-  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--tabla-linea-suave);
   font-size: 0.9rem;
+}
+
+.balances-lista-archivos li:last-child {
+  border-bottom: 0;
+}
+
+.balances-lista-archivos li span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .balances-lista-archivos .balances-archivo-quitar {
@@ -306,7 +333,6 @@ button:focus-visible {
   color: var(--balances-color-error);
   font-weight: 700;
   padding: 0 0.25rem;
-  cursor: pointer;
 }
 
 /* ---------- Barra de progreso ---------- */
@@ -314,57 +340,250 @@ button:focus-visible {
 .balances-barra-progreso {
   width: 100%;
   height: 8px;
-  background: var(--balances-color-borde);
+  background: var(--tabla-linea-suave);
   border-radius: 999px;
   overflow: hidden;
-  margin-bottom: 0.75rem;
+  margin: 0.6rem 0 0.5rem;
 }
 
 .balances-barra-progreso-relleno {
   height: 100%;
   width: 0%;
-  background: var(--balances-color-primario);
+  background: var(--tabla-acento);
+  border-radius: 999px;
   transition: width 0.3s ease;
 }
 
-/* ---------- Mensajes de resultado ---------- */
-
-.balances-mensaje {
-  border-radius: 8px;
-  padding: 0.85rem 1rem;
-  font-size: 0.9rem;
-  margin-bottom: 0.75rem;
+.balances-estado-tag {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--balances-color-texto-secundario);
 }
 
-.balances-mensaje-exito {
-  background: var(--balances-color-exito-fondo);
+/* ---------- Resultado: cifras y grupos plegables ---------- */
+
+.balances-cifras {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+}
+
+.balances-cifra {
+  background: var(--tabla-superficie-2);
+  border: 1px solid var(--tabla-linea-suave);
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+}
+
+.balances-cifra-etiqueta {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--balances-color-texto-secundario);
+}
+
+.balances-cifra-valor {
+  font-family: var(--tabla-fuente-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.balances-cifra-exito .balances-cifra-valor {
   color: var(--balances-color-exito);
 }
 
-.balances-mensaje-alerta {
+.balances-cifra-alerta .balances-cifra-valor {
+  color: var(--balances-color-alerta);
+}
+
+#balances-resultado-resumen .balances-mensaje {
+  margin-bottom: 0.75rem;
+}
+
+.balances-desplegable {
+  border: 1px solid var(--tabla-linea-suave);
+  border-radius: 10px;
+  margin-top: 0.6rem;
+  background: var(--balances-color-superficie);
+}
+
+.balances-desplegable summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.balances-desplegable summary::-webkit-details-marker {
+  display: none;
+}
+
+.balances-desplegable summary::after {
+  content: "▾";
+  margin-left: auto;
+  color: var(--balances-color-texto-secundario);
+}
+
+.balances-desplegable[open] summary::after {
+  content: "▴";
+}
+
+.balances-etiqueta {
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+
+.balances-etiqueta-error {
+  background: var(--balances-color-error-fondo);
+  color: var(--balances-color-error);
+}
+
+.balances-etiqueta-alerta {
   background: var(--balances-color-alerta-fondo);
   color: var(--balances-color-alerta);
 }
 
-.balances-mensaje-error {
-  background: var(--balances-color-error-fondo);
-  color: var(--balances-color-error);
+.balances-etiqueta-info {
+  background: var(--balances-color-info-fondo);
+  color: var(--balances-color-info);
+}
+
+.balances-desplegable ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 0.9rem 0.6rem;
+}
+
+.balances-desplegable li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.6rem;
+  align-items: start;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--tabla-linea-suave);
+  font-size: 0.9rem;
+}
+
+.balances-desplegable li .tabla-chip {
+  margin-right: 0.25rem;
+  vertical-align: middle;
+}
+
+.balances-archivo {
+  font-family: var(--tabla-fuente-mono);
+  font-size: 0.75rem;
+  color: var(--balances-color-texto-secundario);
+  white-space: nowrap;
+  max-width: 230px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-top: 0.15rem;
+}
+
+/* Renglón compacto por cuenta ("Sin movimientos"): una sola columna, con la lista de archivos
+   en mono gris chica debajo del texto; se corta en varias líneas para no desbordar */
+.balances-desplegable li.balances-cuenta-compacta {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.2rem;
+}
+
+.balances-archivos-lista {
+  font-family: var(--tabla-fuente-mono);
+  font-size: 0.75rem;
+  color: var(--balances-color-texto-secundario);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Ventana de contraseña de PDF ---------- */
+
+.balances-dialogo {
+  width: min(27rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  padding: 1.25rem 1.4rem;
+  border: 1px solid var(--balances-color-borde);
+  border-radius: 12px;
+  background: var(--balances-color-superficie);
+  color: var(--balances-color-texto);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--balances-color-texto) 18%, transparent);
+}
+
+.balances-dialogo::backdrop {
+  background: color-mix(in srgb, var(--balances-color-fondo) 60%, transparent);
+}
+
+.balances-dialogo h2 {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--balances-color-texto-secundario);
+}
+
+.balances-dialogo h2 strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 1rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--balances-color-texto);
+  overflow-wrap: anywhere;
+}
+
+.balances-dialogo-texto {
+  margin: 0 0 0.9rem;
+}
+
+.balances-dialogo-mostrar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+  font-size: 0.9rem;
+  color: var(--balances-color-texto-secundario);
+}
+
+#balances-dialogo-mensaje:not(:empty) {
+  margin-bottom: 0.9rem;
 }
 
 /* ---------- Responsive ---------- */
 
 @media (max-width: 480px) {
-  .balances-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .balances-main {
-    padding: 1.5rem 1rem 3rem;
-  }
-
   .balances-card {
-    padding: 1.15rem;
+    padding: 1rem;
+  }
+
+  .balances-cifras {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .balances-desplegable li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .balances-archivo {
+    max-width: 100%;
+  }
+
+  .balances-dialogo {
+    padding: 1rem;
+  }
+
+  .balances-dialogo .balances-acciones button {
+    flex: 1 1 100%;
   }
 }
 

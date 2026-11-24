@@ -1,0 +1,280 @@
+/* Estilos compartidos por "Cargar resúmenes" (balances.html) y "Tabla de datos" (tabla-datos.html).
+   Acá viven los tokens (colores, fuentes, radio), la barra superior, las notas/mensajes y los chips de banco.
+   Lo propio de cada página queda en balances.css y tabla-datos.css. */
+
+/* ---------- Tokens: todo color sale de estas variables. El modo oscuro las redefine. ---------- */
+
+:root {
+  --balances-color-fondo: #f3f5f8;
+  --balances-color-superficie: #ffffff;
+  --balances-color-borde: #dfe4ea;
+  --balances-color-texto: #17212b;
+  --balances-color-texto-secundario: #56626f;
+  --balances-color-primario: #1d5c8a;
+  --balances-color-primario-hover: #164a6d;
+  --balances-color-exito: #1e6b3a;
+  --balances-color-exito-fondo: #e4f3e9;
+  --balances-color-alerta: #7a5200;
+  --balances-color-alerta-fondo: #fff4dc;
+  --balances-color-error: #a3231f;
+  --balances-color-error-fondo: #fbe9e8;
+  --balances-color-info: #3d5063;
+  --balances-color-info-fondo: #eef2f6;
+  --balances-radio: 10px;
+  --balances-sombra: 0 1px 3px rgba(15, 23, 30, 0.08);
+  --balances-fuente: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --tabla-fuente-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --tabla-superficie-2: #f7f9fb;
+  --tabla-linea-suave: #eceff3;
+  --tabla-texto-3: #8a95a1;
+  --tabla-acento: #1d5c8a;
+  --tabla-acento-texto: #ffffff;
+  --tabla-negativo: #b4262b;
+  --tabla-hover: #eef3f8;
+  --tabla-galicia: #cf5a17;
+  --tabla-macro: #1b5fa8;
+  --tabla-nacion: #2a7a6f;
+  --tabla-santander: #c41e2a;
+  --tabla-credicoop: #7a4fb0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --balances-color-fondo: #0f161d;
+    --balances-color-superficie: #17212b;
+    --balances-color-borde: #2a3846;
+    --balances-color-texto: #e8edf2;
+    --balances-color-texto-secundario: #a6b2bf;
+    --balances-color-primario: #6fb0e0;
+    --balances-color-primario-hover: #8fc2ea;
+    --balances-color-exito: #9fd8b3;
+    --balances-color-exito-fondo: #173627;
+    --balances-color-alerta: #f0cf7a;
+    --balances-color-alerta-fondo: #3b2f12;
+    --balances-color-error: #ff7b80;
+    --balances-color-error-fondo: #3a1f22;
+    --balances-color-info: #b9c6d2;
+    --balances-color-info-fondo: #1f2a34;
+    --balances-sombra: none;
+    --tabla-superficie-2: #1b2733;
+    --tabla-linea-suave: #223040;
+    --tabla-texto-3: #76828f;
+    --tabla-acento: #6fb0e0;
+    --tabla-acento-texto: #0b1822;
+    --tabla-negativo: #ff7b80;
+    --tabla-hover: #1e2c3a;
+    --tabla-galicia: #ff9a5c;
+    --tabla-macro: #6fb0e8;
+    --tabla-nacion: #5fd0bf;
+    --tabla-santander: #ff7b83;
+    --tabla-credicoop: #b79ae0;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --balances-color-fondo: #0f161d;
+  --balances-color-superficie: #17212b;
+  --balances-color-borde: #2a3846;
+  --balances-color-texto: #e8edf2;
+  --balances-color-texto-secundario: #a6b2bf;
+  --balances-color-primario: #6fb0e0;
+  --balances-color-primario-hover: #8fc2ea;
+  --balances-color-exito: #9fd8b3;
+  --balances-color-exito-fondo: #173627;
+  --balances-color-alerta: #f0cf7a;
+  --balances-color-alerta-fondo: #3b2f12;
+  --balances-color-error: #ff7b80;
+  --balances-color-error-fondo: #3a1f22;
+  --balances-color-info: #b9c6d2;
+  --balances-color-info-fondo: #1f2a34;
+  --balances-sombra: none;
+  --tabla-superficie-2: #1b2733;
+  --tabla-linea-suave: #223040;
+  --tabla-texto-3: #76828f;
+  --tabla-acento: #6fb0e0;
+  --tabla-acento-texto: #0b1822;
+  --tabla-negativo: #ff7b80;
+  --tabla-hover: #1e2c3a;
+  --tabla-galicia: #ff9a5c;
+  --tabla-macro: #6fb0e8;
+  --tabla-nacion: #5fd0bf;
+  --tabla-santander: #ff7b83;
+  --tabla-credicoop: #b79ae0;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--balances-fuente);
+  background: var(--balances-color-fondo);
+  color: var(--balances-color-texto);
+  line-height: 1.45;
+}
+
+/* ---------- Barra superior y navegación (con desplegable) ---------- */
+
+.balances-header {
+  background: var(--balances-color-superficie);
+  border-bottom: 1px solid var(--balances-color-borde);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  position: relative;
+  z-index: 20;
+}
+
+.balances-header h1 {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.balances-nav {
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+.balances-nav > a {
+  color: var(--balances-color-texto-secundario);
+  text-decoration: none;
+  font-size: 0.95rem;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.balances-nav > a:hover {
+  color: var(--balances-color-texto);
+}
+
+.balances-nav-item {
+  position: relative;
+}
+
+.balances-nav-item > a {
+  color: var(--balances-color-primario);
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-bottom: 2px solid var(--balances-color-primario);
+  padding-bottom: 2px;
+}
+
+.balances-nav-dropdown {
+  display: none;
+  position: absolute;
+  /* Sin margin-top: un hueco entre el link y el menú corta el hover al
+     mover el mouse en diagonal hacia abajo, cerrando el menú antes de
+     llegar a las opciones — por eso el desplegable se cerraba solo. El
+     padding-top de acá da la misma separación visual sin crear ese hueco. */
+  top: 100%;
+  left: 0;
+  padding-top: 0.5rem;
+  min-width: 180px;
+  z-index: 30;
+}
+
+.balances-nav-item:hover .balances-nav-dropdown,
+.balances-nav-item:focus-within .balances-nav-dropdown {
+  display: block;
+}
+
+.balances-nav-dropdown-caja {
+  background: var(--balances-color-superficie);
+  border: 1px solid var(--balances-color-borde);
+  border-radius: 8px;
+  box-shadow: var(--balances-sombra);
+  overflow: hidden;
+  padding: 0.35rem 0;
+}
+
+.balances-nav-dropdown-caja a {
+  display: block;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.9rem;
+  color: var(--balances-color-texto);
+  text-decoration: none;
+}
+
+.balances-nav-dropdown-caja a:hover {
+  background: var(--balances-color-fondo);
+}
+
+.balances-nav-dropdown-caja a.balances-nav-activa {
+  color: var(--balances-color-primario);
+  font-weight: 600;
+}
+
+/* ---------- Notas y mensajes ---------- */
+
+.balances-nota {
+  color: var(--balances-color-texto-secundario);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.balances-mensaje {
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  font-size: 0.9rem;
+}
+
+.balances-mensaje-exito {
+  background: var(--balances-color-exito-fondo);
+  color: var(--balances-color-exito);
+}
+
+.balances-mensaje-alerta {
+  background: var(--balances-color-alerta-fondo);
+  color: var(--balances-color-alerta);
+}
+
+.balances-mensaje-error {
+  background: var(--balances-color-error-fondo);
+  color: var(--balances-color-error);
+}
+
+.balances-mensaje-info {
+  background: var(--balances-color-info-fondo);
+  color: var(--balances-color-info);
+}
+
+/* ---------- Chip de banco (el color de cada banco llega en --c) ---------- */
+
+.tabla-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  white-space: nowrap;
+}
+
+.tabla-chip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 480px) {
+  .balances-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

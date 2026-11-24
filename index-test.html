@@ -580,7 +580,7 @@ function descargarPrn(lineas, nombreArchivo, cuitClic, perClic) {
 function agregarBotonDescargaPrnFinal() {
   const R = _resumenTandas;
   const el = document.getElementById('estadoProceso');
-  if (!el || !R.lineasPrn.length) return;
+  if (!el || !(R.lineasPrn.length || R.rubrosAplicados)) return;   // 24/11/2026: también si solo hubo rubros aplicados
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'btn-p'; b.id = '_epDescargarPrn';
   b.style.marginLeft = '8px';
@@ -719,11 +719,14 @@ async function aplicarRubrosElegidos() {
       const data = await jsonSeguro(res);
       if (data && data.ok === true) {
         _reintentosAplicar = 0;
+        // 24/11/2026: el total de cada factura se toma antes de sacarla de la lista (lo usa actualizarResultadoTrasRubro).
+        const _totalesAplicadas = new Map((data.aplicadas || []).map(a => [String(a.k), String(((_pendRubro.get(String(a.k)) || {}).total) || '')]));
         for (const a of (data.aplicadas || [])) { _pendRubro.delete(String(a.k)); _rubroElegido.delete(String(a.k)); }
         const n = (data.aplicadas || []).length;
         if (n) {
           logProceso(`Rubro aplicado a ${n} factura(s): ya están en el PRN pendiente de descarga.`);
           showAlert(`Rubro aplicado a ${n} ${pluralizar(n, 'factura')}: ya ${n === 1 ? 'está' : 'están'} en el PRN.`, 'success', true);
+          actualizarResultadoTrasRubro(data.aplicadas, _totalesAplicadas);   // 24/11/2026
         }
         // 17/11/2026 (hallazgo 6): facturas que el servidor guardó sin la línea del PRN (la lista no entraba
         // en la hoja): no se pueden agregar desde acá, se cargan a mano en Holistor.
@@ -751,6 +754,52 @@ async function aplicarRubrosElegidos() {
     }
   })();
   try { await _aplicandoRubros; } finally { _aplicandoRubros = null; }
+}
+// 24/11/2026: después de aplicar rubros, el cartel final, "carga manual" y la conciliación de la corrida ya
+// mostrada se vuelven a armar (antes seguían mostrando esas facturas como pendientes). Solo con la corrida
+// terminada: si arrancó otra tanda, la pantalla ya se limpió y la arma la tanda nueva.
+function _centavosImporte(v) {
+  let s = String(v == null ? '' : v).replace(/[^\d.,-]/g, '');
+  if (!s) return null;
+  const uc = s.lastIndexOf(','), up = s.lastIndexOf('.');
+  if (uc > -1 && up > -1) s = uc > up ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  else if (uc > -1) s = s.replace(',', '.');
+  else if (up > -1 && s.length - up - 1 !== 2) s = s.replace(/\./g, '');
+  const n = Number(s);
+  return Number.isFinite(n) ? Math.round(n * 100) : null;
+}
+function actualizarResultadoTrasRubro(aplicadas, totales) {
+  if (!_resultadoYaMostrado || pollingInterval) return;
+  const R = _resumenTandas;
+  const claves = new Set((aplicadas || []).map(a => String(a.k)));
+  if (!claves.size) return;
+  const sinCuit = v => String(v || '').replace(/^\d{11}__/, '');
+  const pdfs = new Set((aplicadas || []).map(a => sinCuit(a.pdf)).filter(Boolean));
+  R.manuales = R.manuales.filter(m => !(pdfs.has(sinCuit(m.pdf_nombre)) && String(m.motivo || '').trim().toLowerCase().startsWith('sin rubro:')));
+  R.facturasCount += claves.size;
+  R.prnReal = true;
+  R.rubrosAplicados = (R.rubrosAplicados || 0) + claves.size;
+  if (R.hayVerif) {
+    const quedan = [];
+    for (const f of R.verifFaltaProcesar) {
+      const k = String(f.clave || '');
+      if (!claves.has(k)) { quedan.push(f); continue; }
+      const cReg = _centavosImporte(f.total_registro), cPrn = _centavosImporte(totales && totales.get(k));
+      if (cReg !== null && cReg === cPrn) {
+        R.verifConciliadas.push({ clave: f.clave, total: f.total_registro });
+        R.verifResumen.conciliadas += 1;
+      } else {
+        R.verifTotalARevisar.push({ clave: f.clave, denominacion: f.denominacion, total_registro: f.total_registro, total_extraido: (totales && totales.get(k)) || '' });
+        R.verifResumen.total_a_revisar += 1;
+      }
+    }
+    R.verifResumen.falta_procesar = Math.max(0, (Number(R.verifResumen.falta_procesar) || 0) - (R.verifFaltaProcesar.length - quedan.length));
+    R.verifFaltaProcesar = quedan;
+  }
+  mostrarEstadoProceso('listo', R.fallidos, R.prnReal, R.naCount, null, R.prnNombre, null, R.manuales, R.otrosCliente, R.facturasCount, R.yaProcesadas.length, R.duplicadosEnLote.length);
+  agregarBotonDescargaPrnFinal();
+  mostrarCargaManual(R.manuales);
+  if (R.hayVerif) mostrarConciliacion({ resumen: R.verifResumen, conciliadas: R.verifConciliadas, total_a_revisar: R.verifTotalARevisar, falta_procesar: R.verifFaltaProcesar, fuera_de_arca: R.verifFueraDeArca }, null, R.noEnArca, R.yaProcesadas, R.duplicadosEnLote);
 }
 // Lista actual del servidor (después de cada corrida y al cambiar de cliente/período).
 async function refrescarPendientesRubro() {
@@ -954,6 +1003,7 @@ function crearResumenTandasVacio() {
     duplicadosEnLote: [],
     // Líneas del PRN de todas las tandas (resultados_por_pdf, estado al_prn) para armar el .prn en la página.
     lineasPrn: [],
+    rubrosAplicados: 0,   // 24/11/2026: facturas sin rubro que se aplicaron después de la tanda (actualizarResultadoTrasRubro)
     prnNombre: '',        // nombre del PRN de Drive de la última tanda
     prnDriveFallo: false, // true si alguna tanda devolvió prn_guardado:false (Drive no respondió)
     // Conciliación (verificacion.resumen + sus listas) — se suman/concatenan tanda a tanda.

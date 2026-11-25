@@ -759,7 +759,7 @@ function _centavosImporte(v) {
   const uc = s.lastIndexOf(','), up = s.lastIndexOf('.');
   if (uc > -1 && up > -1) s = uc > up ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
   else if (uc > -1) s = s.replace(',', '.');
-  else if (up > -1 && s.length - up - 1 !== 2) s = s.replace(/\./g, '');
+  else if (up > -1 && !/^-?\d+\.\d{1,2}$/.test(s)) s = s.replace(/\./g, '');
   const n = Number(s);
   return Number.isFinite(n) ? Math.round(n * 100) : null;
 }

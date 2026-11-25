@@ -3755,7 +3755,14 @@ async function _startUploadTandas() {
     logProceso(`Subiendo ${pending.length} PDF(s) a n8n/Drive${etiquetaTanda}.`);
     showAlert(`Subiendo ${pending.length} ${pluralizar(pending.length, 'PDF', 'PDFs')}${etiquetaTanda}…`, 'info');
 
-    for (const item of pending) {
+    // 25/11/2026: se suben de a SUBIDAS_A_LA_VEZ archivos al mismo tiempo (antes de a uno, con 1 s de
+    // pausa: ~6 s por PDF, 4 min por tanda de 40). Cada subida es independiente en n8n (Validar Subida →
+    // Upload PDF a Drive → Responder OK), así que no se pisan. La tanda sigue esperando que terminen
+    // TODAS las subidas antes de procesar. Si la clave vence, no arranca ninguna subida más; las que ya
+    // estaban en viaje terminan solas (fallan por la misma clave).
+    const SUBIDAS_A_LA_VEZ = 3;
+    let _proxSubida = 0, _cortarSubida = false;
+    const _subirItem = async (item) => {
       try {
         item.status = 'uploading';
         renderQueue();
@@ -3777,10 +3784,11 @@ async function _startUploadTandas() {
         // en el log y cortar la subida del resto de los PDFs de esta tanda:
         // todos van a fallar por lo mismo.
         if (_claveRechazada) {
-          logProceso(`Subida interrumpida: la clave de acceso venció (quedaron sin subir ${item.name} y los siguientes).`);
+          if (!_cortarSubida) logProceso(`Subida interrumpida: la clave de acceso venció (quedaron sin subir ${item.name} y los siguientes).`);
+          _cortarSubida = true;
           renderQueue();
           renderHistory();
-          break;
+          return;
         }
         const detalle = err.name === 'AbortError' ? 'timeout' : err.message;
         console.error('Error subiendo PDF', item.name, err);
@@ -3791,8 +3799,13 @@ async function _startUploadTandas() {
       }
       renderQueue();
       renderHistory();
-      await sleep(1000);
-    }
+    };
+    const _trabajadorSubida = async () => {
+      while (!_cortarSubida && !_claveRechazada && _proxSubida < pending.length) {
+        await _subirItem(pending[_proxSubida++]);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(SUBIDAS_A_LA_VEZ, pending.length) }, () => _trabajadorSubida()));
 
     uploading = false;
     setUploadControlsDisabled(false);

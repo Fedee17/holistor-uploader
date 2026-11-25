@@ -295,8 +295,36 @@
       </div>
     </div>
   </div>
-  <div id="timerBox" style="display:none; background:#eef2ff; border:0.5px solid #c7d2fe; border-radius:8px; padding:10px 14px; margin-bottom:1rem; font-size:14px; color:#3730a3; text-align:center; font-weight:600; font-variant-numeric:tabular-nums;">
-    <i class="ti ti-clock" style="font-size:14px;"></i> <span id="timerRestante"></span>
+  <!-- 25/11/2026: cartel de avance sin tiempo (paso, conteo, tanda). Reemplaza al reloj. -->
+  <style>
+    #timerBox.avance-box { background:#eef2ff; border:0.5px solid #c7d2fe; border-radius:8px; padding:10px 14px; margin-bottom:1rem; color:#3730a3; font-size:14px; }
+    .avance-fila { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .avance-titulo { display:flex; align-items:center; gap:8px; font-weight:600; }
+    .avance-cuenta { font-weight:400; font-variant-numeric:tabular-nums; }
+    .avance-tanda { font-size:12px; background:#fff; border:0.5px solid #c7d2fe; border-radius:6px; padding:2px 8px; white-space:nowrap; }
+    .avance-rueda { display:inline-block; animation:avanceGira 1.2s linear infinite; }
+    .avance-barra { position:relative; height:6px; background:#fff; border-radius:3px; overflow:hidden; margin:8px 0 6px; }
+    .avance-relleno { height:100%; width:0; background:#4f46e5; border-radius:3px; transition:width .4s ease; }
+    .avance-barra.indeterminada .avance-relleno { width:35% !important; animation:avanceVa 1.4s ease-in-out infinite; }
+    .avance-detalle { display:flex; align-items:center; gap:6px; min-height:16px; font-size:12px; color:#4338ca; }
+    .avance-punto { width:7px; height:7px; border-radius:50%; background:#4f46e5; animation:avanceLate 1.4s ease-in-out infinite; }
+    .avance-etapas { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+    .avance-etapa { font-size:11px; padding:2px 8px; border-radius:6px; background:#fff; color:#6b7280; border:0.5px solid #e5e7eb; }
+    .avance-etapa.actual { color:#3730a3; border-color:#c7d2fe; background:#e0e7ff; }
+    .avance-etapa.hecha { color:#166534; border-color:#bbf7d0; background:#dcfce7; }
+    @keyframes avanceGira { to { transform:rotate(360deg); } }
+    @keyframes avanceLate { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+    @keyframes avanceVa { 0% { transform:translateX(-100%); } 100% { transform:translateX(300%); } }
+    @media (prefers-reduced-motion: reduce) { .avance-rueda, .avance-punto, .avance-barra.indeterminada .avance-relleno { animation:none; } .avance-relleno { transition:none; } }
+  </style>
+  <div id="timerBox" class="avance-box" style="display:none;" role="status" aria-live="polite">
+    <div class="avance-fila">
+      <span class="avance-titulo"><span class="avance-rueda"><i class="ti ti-loader-2"></i></span> <span id="avancePaso"></span> <span id="avanceCuenta" class="avance-cuenta"></span></span>
+      <span id="avanceTanda" class="avance-tanda" style="display:none;"></span>
+    </div>
+    <div class="avance-barra"><div id="avanceRelleno" class="avance-relleno"></div></div>
+    <div class="avance-detalle"><span class="avance-punto"></span> <span id="avanceDetalle"></span></div>
+    <div id="avanceEtapas" class="avance-etapas"></div>
   </div>
   <div id="estadoProceso" class="alert" style="display:none;"></div>
 
@@ -2502,41 +2530,42 @@ function stopPolling() {
   detenerCountdown();
 }
 
-// Cuenta regresiva visible del tiempo máximo estimado para esta corrida.
-// Es solo informativo — el timeout real lo sigue manejando pollingTimeoutMax;
-// esto nunca corta el proceso, solo le muestra al usuario cuánto falta.
+// 25/11/2026: el cartel muestra el avance (paso, conteo y tanda), sin tiempo. El tiempo máximo de espera
+// sigue cortando por su lado (pollingTimeoutMax), sin mostrarse. Se mantienen los nombres iniciarCountdown
+// y detenerCountdown para no tocar los lugares que los llaman.
+const _AVANCE_ETAPAS = [['sube', 'Subida'], ['revisa', 'Revisión'], ['lee', 'Lectura'], ['prn', 'PRN']];
+const _AVANCE_TEXTOS = { sube: 'Subiendo PDF', revisa: 'Revisando cuáles ya se procesaron', lee: 'Leyendo facturas', prn: 'Armando el PRN' };
+const _avance = { paso: 'sube', hechos: 0, total: 0, detalle: '', tanda: 1, tandas: 1 };
 function mostrarTimerBox(mostrar) {
   const box = document.getElementById('timerBox');
   if (box) box.style.display = mostrar ? 'block' : 'none';
 }
-
-function iniciarCountdown(ms) {
-  detenerCountdown();
-  const el = document.getElementById('timerRestante');
-  if (!el) return;
-  mostrarTimerBox(true);
-  const fin = Date.now() + ms;
-  function tick() {
-    const restanteMs = fin - Date.now();
-    if (restanteMs <= 0) {
-      el.textContent = 'Tiempo estimado agotado — el proceso puede seguir trabajando en n8n';
-      clearInterval(countdownInterval);
-      countdownInterval = null;
-      return;
-    }
-    const totalSeg = Math.ceil(restanteMs / 1000);
-    const mm = Math.floor(totalSeg / 60);
-    const ss = totalSeg % 60;
-    el.textContent = `Tiempo restante estimado: ${mm}:${String(ss).padStart(2,'0')}`;
-  }
-  tick();
-  countdownInterval = setInterval(tick, 1000);
+function pintarAvance() {
+  const relleno = document.getElementById('avanceRelleno');
+  if (!relleno) return;
+  const idx = _AVANCE_ETAPAS.findIndex(e => e[0] === _avance.paso);
+  const conCuenta = _avance.total > 0 && _avance.paso !== 'prn';
+  document.getElementById('avancePaso').textContent = _AVANCE_TEXTOS[_avance.paso] || '';
+  document.getElementById('avanceCuenta').textContent = conCuenta ? `${_avance.hechos} de ${_avance.total}` : '';
+  const tandaEl = document.getElementById('avanceTanda');
+  tandaEl.style.display = _avance.tandas > 1 ? '' : 'none';
+  tandaEl.textContent = `Tanda ${_avance.tanda} de ${_avance.tandas}`;
+  relleno.parentElement.classList.toggle('indeterminada', !conCuenta);
+  relleno.style.width = conCuenta ? Math.min(100, Math.round((_avance.hechos / _avance.total) * 100)) + '%' : '0%';
+  document.getElementById('avanceDetalle').textContent = _avance.detalle || '';
+  document.getElementById('avanceEtapas').innerHTML = _AVANCE_ETAPAS.map((e, j) =>
+    `<span class="avance-etapa${j < idx ? ' hecha' : j === idx ? ' actual' : ''}">${j < idx ? '<i class="ti ti-check"></i> ' : ''}${e[1]}</span>`).join('');
 }
-
+function setAvance(cambios) {
+  Object.assign(_avance, cambios || {});
+  pintarAvance();
+}
+function iniciarCountdown(ms) {   // 25/11/2026: ya no cuenta tiempo (ms no se usa): solo muestra el cartel de avance
+  mostrarTimerBox(true);
+  pintarAvance();
+}
 function detenerCountdown() {
   if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-  const el = document.getElementById('timerRestante');
-  if (el) el.textContent = '';
   mostrarTimerBox(false);
 }
 
@@ -2581,6 +2610,9 @@ function iniciarPolling() {
   // stopPolling() (llamado arriba, al entrar a esta función) apaga el timer
   // visible vía detenerCountdown() — hay que prenderlo de nuevo acá SIEMPRE,
   // sin importar la rama, o se queda apagado justo al pasar a "IA + PRN".
+  setAvance(escaneoEnCurso   // 25/11/2026
+    ? { paso: 'revisa', hechos: 0, total: 0, detalle: 'Arrancando la revisión…' }
+    : { paso: 'lee', hechos: 0, total: 0, detalle: 'Arrancando la lectura…' });
   iniciarCountdown(_timeoutProcesoMs);
   logProceso(`Tiempo máximo estimado restante: ${Math.round(_timeoutProcesoMs/60000)} min.`);
 
@@ -2630,7 +2662,7 @@ function iniciarPolling() {
       if (_genSondeo !== _sondeoGen || !pollingInterval) return;
       let _preguntarN8n;
       if (_sb) {
-        if (Number(_sb.total) > 0) actualizarProgresoProceso(Number(_sb.hechos) || 0, Number(_sb.total) || 0);
+        if (Number(_sb.total) > 0) actualizarProgresoProceso(Number(_sb.hechos) || 0, Number(_sb.total) || 0, Number(_sb.pendientes_rubro) || 0);
         const _pend = Number(_sb.pendientes_rubro) || 0;
         if ((_sbPendUltimo === null) ? _pend !== 0 : _pend !== _sbPendUltimo) _sbEventoPendiente = true;
         _sbPendUltimo = _pend;
@@ -2888,7 +2920,7 @@ function aplicarEstadosArchivos(estados) {
   }
 }
 
-function actualizarProgresoProceso(procesadas, total) {
+function actualizarProgresoProceso(procesadas, total, pendientesRubro) {
   const el = document.getElementById('_epMsg');
   const p = Number(procesadas) || 0;
   const t = Number(total) || 0;
@@ -2905,6 +2937,13 @@ function actualizarProgresoProceso(procesadas, total) {
   } else if (p > 0) {
     updateProcesoUX('ia', Math.max(procesoActual.pct, 70), titulo, `${p} facturas ${verbo}.`, { progressText:`${p} ${verbo}` });
     setStepDetail('ia', `${p} ${verbo}`);
+  }
+  // 25/11/2026: cartel de avance (sin tiempo).
+  if (t > 0) {
+    const pr = Number(pendientesRubro) || 0;
+    if (escaneoEnCurso) setAvance({ paso: 'revisa', hechos: p, total: t, detalle: `${p} revisadas` });
+    else if (p >= t) setAvance({ paso: 'prn', hechos: p, total: t, detalle: 'Guardando líneas y moviendo PDF a Procesados…' });
+    else setAvance({ paso: 'lee', hechos: p, total: t, detalle: `${p} leídas` + (pr > 0 ? ` · ${pr} sin rubro para elegir` : '') });
   }
 }
 
@@ -3120,6 +3159,7 @@ function buildDupSection(duplicadosEnLote) {
 // FALLIDOS
 // ──────────────────────────────────────────────────────────────────────────────
 async function reintentar() {
+  _avance.tandas = 1;   // 25/11/2026: el cartel no muestra tandas en un reintento
   if (!archivosFallidos.length) return;
   if (!exigirRegistro()) return;
   if (_reintentoCliente) clienteSeleccionado = _reintentoCliente;
@@ -3747,6 +3787,7 @@ async function _startUploadTandas() {
 
     _procesoInicioTs = Date.now();
     _procesoTimeoutTotalMs = calcularTimeoutProceso(pending.length);
+    setAvance({ paso: 'sube', hechos: 0, total: pending.length, detalle: 'Preparando la subida…', tanda: t + 1, tandas: tandas.length });   // 25/11/2026
     iniciarCountdown(_procesoTimeoutTotalMs);
 
     uploading = true;
@@ -3779,6 +3820,7 @@ async function _startUploadTandas() {
         updateProcesoUX('upload', pctUpload, 'Subiendo PDFs' + etiquetaTanda, `${upOk}/${pending.length} PDF(s) subidos a Drive.`, { progressText:`${upOk}/${pending.length} PDFs subidos` });
         setStepDetail('upload', `${upOk}/${pending.length} subidos`);
         logProceso(`PDF subido: ${item.name}`);
+        setAvance({ paso: 'sube', hechos: upOk, total: pending.length, detalle: `${item.name} subido` });   // 25/11/2026
         history.unshift({ name: item.name, ok: true, time: new Date().toLocaleTimeString() });
       } catch (err) {
         item.status = 'error';
@@ -3868,6 +3910,7 @@ async function _startUploadTandas() {
     updateProcesoUX('ia', 58, 'Esperando Drive', 'PDFs subidos. Esperando indexación de Google Drive antes de revisar qué ya está hecho.', { progressText:'Indexando archivos…' });
     setStepDetail('ia', 'Revisando qué ya está hecho');
     if (!fallidosNombres.length) showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
+    setAvance({ paso: 'revisa', hechos: 0, total: 0, detalle: 'Esperando que Drive registre los archivos…' });   // 25/11/2026
     await sleep(calcularEsperaIndexacion(pending.length));
     _corridaVencida = false;
     _corridaSinFacturas = false;
@@ -4172,6 +4215,7 @@ async function sendFlush(forzar, soloEscanear, reintentarPdfs) {
 }
 
 async function procesarAhoraConEspera() {
+  _avance.tandas = 1;   // 25/11/2026: el cartel no muestra tandas sin el bucle de tandas
   if (!exigirRegistro()) return;
   showAlert('Esperando indexación de Drive…', 'info');
   await sleep(DRIVE_INDEX_DELAY_MS);

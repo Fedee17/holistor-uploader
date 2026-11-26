@@ -733,13 +733,23 @@ async function aplicarRubrosElegidos() {
         // en la hoja): no se pueden agregar desde acá, se cargan a mano en Holistor.
         const aMano = Array.isArray(data.a_mano) ? data.a_mano : [];
         for (const a of aMano) { _pendRubro.delete(String(a.k)); _rubroElegido.delete(String(a.k)); }
+        // 26/11/2026: los avisos de rubro van en un solo cartel (showAlert pisa el anterior).
+        const avisosRubro = [];
         if (aMano.length) {
           const det = aMano.map(a => `${escapeHtml(a.proveedor || a.pdf || a.k)} ${escapeHtml(a.comprobante || '')} $ ${escapeHtml(a.total || '')}`).join('<br>');
-          showAlert(`${aMano.length} ${pluralizar(aMano.length, 'factura')} sin rubro no ${aMano.length === 1 ? 'entra' : 'entran'} en el PRN automático: ${aMano.length === 1 ? 'cargala' : 'cargalas'} a mano en Holistor con el rubro elegido.<br>${det}`, 'warn');
+          avisosRubro.push(`${aMano.length} ${pluralizar(aMano.length, 'factura')} sin rubro no ${aMano.length === 1 ? 'entra' : 'entran'} en el PRN automático: ${aMano.length === 1 ? 'cargala' : 'cargalas'} a mano en Holistor con el rubro elegido.<br>${det}`);
         }
         // 17/11/2026 (hallazgo 17): avisos del servidor sobre REGISTRO_ESPERADO / PRN_LINEAS.
-        if (Array.isArray(data.sin_fila_registro) && data.sin_fila_registro.length) logProceso(`Rubro aplicado, pero ${data.sin_fila_registro.length} factura(s) no se encontraron en REGISTRO_ESPERADO para marcarlas procesadas.`);
-        if (data.prn_lineas_error === true) logProceso('Rubro aplicado y PRN guardado, pero no se pudo anotar la línea en PRN_LINEAS.');
+        const nSinFila = Array.isArray(data.sin_fila_registro) ? data.sin_fila_registro.length : 0;
+        if (nSinFila) {
+          logProceso(`Rubro aplicado, pero ${nSinFila} factura(s) no se encontraron en REGISTRO_ESPERADO para marcarlas procesadas.`);
+          avisosRubro.push(`${nSinFila} ${pluralizar(nSinFila, 'factura')} con rubro aplicado no ${nSinFila === 1 ? 'se encontró' : 'se encontraron'} en el registro de ARCA: ${nSinFila === 1 ? 'va a seguir' : 'van a seguir'} figurando como ${nSinFila === 1 ? 'pendiente' : 'pendientes'} en la Conciliación aunque ya ${nSinFila === 1 ? 'está' : 'están'} en el PRN.`);
+        }
+        if (data.prn_lineas_error === true) {
+          logProceso('Rubro aplicado y PRN guardado, pero no se pudo anotar la línea en PRN_LINEAS.');
+          avisosRubro.push('El PRN quedó bien, pero no se pudo guardar la copia de la línea: si más adelante llega una nota de crédito o débito de esta factura, puede salir "sin rubro".');
+        }
+        if (avisosRubro.length) showAlert(avisosRubro.join('<br><br>'), 'warn');
       } else if (data && data.codigo === 'en_curso') {
         logProceso('Rubros elegidos: hay una tanda procesándose, se aplican cuando termine.');
         if (_reintentosAplicar < 6 && !pollingInterval) { _reintentosAplicar++; setTimeout(aplicarRubrosElegidos, 10000); }
@@ -862,6 +872,14 @@ async function descargarPrnPendiente(nombreRespaldo) {
   }
 }
 
+// 26/11/2026: si el servidor no registra la descarga, el PRN sigue "pendiente" y la próxima corrida de este
+// cliente/período lo volvería a traer entero (facturas duplicadas en Holistor). Antes solo iba al panel viejo.
+function avisarPrnNoMarcado(detalle) {
+  showAlert(`No se pudo registrar en el sistema que este PRN ya está descargado (${escapeHtml(String(detalle || ''))}).<br><br>` +
+    `Recargá la página y elegí de nuevo el cliente: va a volver a aparecer <b>"Tenés un PRN listo"</b>. Tocá otra vez <b>"Descargar PRN"</b> o <b>"Ya lo tengo, ocultar"</b> para que quede registrado. ` +
+    `Si vuelve a fallar, <b>no hagas otra corrida de este cliente y período</b> y avisá: la próxima traería otra vez estas facturas.`, 'error');
+}
+
 // Avisa al servidor que el PRN ya se descargó y oculta el cartel pase lo que pase.
 async function marcarPrnDescargado(cuitClic, perClic) {
   // 17/11/2026 (hallazgo 27): si viene del clic de descarga, se marca ese cliente/período (no el que esté
@@ -877,9 +895,13 @@ async function marcarPrnDescargado(cuitClic, perClic) {
       body: JSON.stringify({ cliente_cuit: cuit, periodo: per })
     }, 20000);
     const data = await jsonSeguro(res);
-    if (!res.ok || data.ok === false) logProceso(`No se pudo marcar el PRN como descargado (${data.mensaje || 'HTTP ' + res.status}).`);
+    if (!res.ok || data.ok === false) {
+      logProceso(`No se pudo marcar el PRN como descargado (${data.mensaje || 'HTTP ' + res.status}).`);
+      avisarPrnNoMarcado(data.mensaje || ('HTTP ' + res.status));
+    }
   } catch (err) {
     logProceso(`No se pudo marcar el PRN como descargado (${err.message}).`);
+    avisarPrnNoMarcado(err.message);
   }
   refrescarPendientesRubro();   // 17/11/2026 (hallazgo 30): después de descargar, el recuadro se pone al día
 }

@@ -120,41 +120,6 @@
   .concil-total { color: #888; white-space: nowrap; font-size: 11px; }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-  /* UX proceso: tablero de etapas */
-  .process-card { display:none; border-color:#c7d2fe; background:#fbfcff; }
-  .process-card.active { display:block; }
-  .process-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px; }
-  .process-title { font-size:15px; font-weight:600; display:flex; align-items:center; gap:8px; }
-  .process-sub { font-size:12px; color:#666; margin-top:3px; }
-  .process-pill { font-size:12px; font-weight:600; padding:4px 9px; border-radius:999px; background:#e8f0fe; color:#1a73e8; white-space:nowrap; }
-  .process-steps { display:grid; grid-template-columns: repeat(5, 1fr); gap:8px; margin-top:10px; }
-  .pstep { border:0.5px solid #e0e7ff; border-radius:10px; padding:9px 8px; background:#fff; min-height:68px; }
-  .pstep-icon { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#f0f0ea; color:#888; font-size:13px; margin-bottom:6px; }
-  .pstep-label { font-size:12px; font-weight:600; color:#333; line-height:1.2; }
-  .pstep-detail { font-size:11px; color:#888; margin-top:3px; line-height:1.2; }
-  .pstep.done { border-color:#bbf7d0; background:#f0faf3; }
-  .pstep.done .pstep-icon { background:#e6f4ea; color:#188038; }
-  .pstep.active { border-color:#93c5fd; background:#eff6ff; box-shadow:0 0 0 1px rgba(26,115,232,.08); }
-  .pstep.active .pstep-icon { background:#1a73e8; color:#fff; animation:pulse-step 1.3s ease-in-out infinite; }
-  .pstep.error { border-color:#fecaca; background:#fff5f5; }
-  .pstep.error .pstep-icon { background:#fce8e6; color:#c5221f; }
-  @keyframes pulse-step { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
-  .process-progress { margin-top:12px; }
-  .process-progress-head { display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#666; margin-bottom:5px; }
-    .process-bar-bg { height:7px; border-radius:999px; background:#e5e7eb; overflow:hidden; }
-  .process-bar-fill {
-    height:100%; width:0%; transition:width .25s ease;
-    background-color:#1a73e8;
-    background-image: linear-gradient(135deg, rgba(255,255,255,.28) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.28) 50%, rgba(255,255,255,.28) 75%, transparent 75%, transparent);
-    background-size: 28px 28px;
-    animation: barra-viva 1s linear infinite;
-  }
-  @keyframes barra-viva { from { background-position: 0 0; } to { background-position: 28px 0; } }
-  .process-log { margin-top:10px; max-height:120px; overflow-y:auto; border-top:0.5px solid #e8e8e0; padding-top:8px; }
-  .process-log-line { font-size:12px; color:#555; padding:3px 0; display:flex; gap:6px; }
-  .process-log-time { color:#999; flex-shrink:0; font-variant-numeric:tabular-nums; }
-  @media (max-width: 720px) { .process-steps { grid-template-columns:1fr; } .process-top { flex-direction:column; } }
-
 
   .b-otro_cliente { background: #eef2ff; color: #3730a3; }
   .b-cargar_manual { background: #fff8e0; color: #92400e; font-weight:600; }
@@ -803,9 +768,6 @@ function actualizarResultadoTrasRubro(aplicadas, totales) {
     R.verifFaltaProcesar = quedan;
   }
   mostrarEstadoProceso('listo', R.fallidos, R.prnReal, R.naCount, null, R.prnNombre, null, R.manuales, R.otrosCliente, R.facturasCount, R.yaProcesadas.length, R.duplicadosEnLote.length);
-  // 24/11/2026: también el recuadro "Estado del proceso" (mismo texto que arma el cierre de la tanda, con el acumulado).
-  const _incid = [R.fallidos.length ? `${R.fallidos.length} error(es)` : '', R.manuales.length ? `${R.manuales.length} carga manual` : '', R.otrosCliente.length ? `${R.otrosCliente.length} omitida(s)` : ''].filter(Boolean).join(' · ');
-  updateProcesoUX('final', 100, _incid ? 'PRN listo con avisos' : 'PRN listo', _incid ? `PRN generado. Avisos: ${_incid}.` : 'PRN generado correctamente.', { progressText: _incid ? 'Revisar avisos.' : 'Proceso completo.' });
   agregarBotonDescargaPrnFinal();
   mostrarCargaManual(R.manuales);
   if (R.hayVerif) mostrarConciliacion({ resumen: R.verifResumen, conciliadas: R.verifConciliadas, total_a_revisar: R.verifTotalARevisar, falta_procesar: R.verifFaltaProcesar, fuera_de_arca: R.verifFueraDeArca }, null, R.noEnArca, R.yaProcesadas, R.duplicadosEnLote);
@@ -1805,8 +1767,6 @@ async function _guardarRegistroEnN8n(zone, registros, receptorCuit) {
       const estadoTexto = 'Registro guardado ✓';
       ezCache.ezSub.textContent = `${registros.length} comprobantes · ${estadoTexto}`;
       showAlert(`${registros.length} ${pluralizar(registros.length, 'comprobante', 'comprobantes')} guardados.`, 'success');
-      updateProcesoUX('registro', Math.max(procesoActual.pct || 0, 45), 'Registro ARCA cargado', `${registros.length} comprobantes disponibles para conciliación.`, { progressText:'Registro guardado' });
-      setStepDetail('registro', `${registros.length} comprobantes`);
       logProceso(`Registro ARCA guardado: ${registros.length} comprobantes.`);
     } else {
       // F2: el webhook puede responder ok:false cuando falla la lectura/escritura en Sheets.
@@ -2377,35 +2337,14 @@ function handleSubir() {
 // ──────────────────────────────────────────────────────────────────────────────
 // UX DE PROCESO / ETAPAS
 // ──────────────────────────────────────────────────────────────────────────────
-const PROCESS_STEPS = ['validacion','upload','registro','ia','final'];
-const PROCESS_STEP_LABEL = {
-  validacion: 'Validando datos',
-  upload: 'Subiendo PDFs',
-  registro: 'Cargando registro',
-  ia: 'Procesando con IA',
-  final: 'Proceso finalizado'
-};
-let procesoActual = { step:'validacion', pct:0, total:0, procesadas:0 };
-let pasosVistos = new Set();
-let _procesoUXIniciado = false;
-
+// 26/11/2026: el panel "Estado del proceso" ya no existe; los mensajes van a la consola del navegador (F12).
+// Los que avisan un error o un problema salen con console.warn; el resto con console.log.
 function logProceso(msg) {
-  const log = document.getElementById('processLog');
-  if (!log) return;
-  const line = document.createElement('div');
-  line.className = 'process-log-line';
-  const time = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
-  line.innerHTML = `<span class="process-log-time">${escapeHtml(time)}</span><span>${escapeHtml(msg)}</span>`;
-  log.prepend(line);
-  while (log.children.length > 30) log.removeChild(log.lastChild);
+  const esAviso = /error|no se pudo|fall[óo]|rechaz|interrump|venci[óo]|advertencia|cancelad|se cort/i.test(msg);
+  (esAviso ? console.warn : console.log)('[Holistor] ' + msg);
 }
 
 function resetProcesoUX() {
-  // Limpia el panel del proceso sin llamar a updateProcesoUX (que agrega 'active' internamente
-  // y causaría un flash visual o dejaría el card visible cuando no debería estarlo).
-  procesoActual = { step:'validacion', pct:0, total:0, procesadas:0 };
-  const log = document.getElementById('processLog');
-  if (log) log.innerHTML = '';
   // Limpiar el banner de estado visible (✓ PRN listo / Procesando... / etc.)
   const ep = document.getElementById('estadoProceso');
   if (ep) { ep.style.display = 'none'; ep.innerHTML = ''; }
@@ -2440,54 +2379,11 @@ function resetProcesoUX() {
   const listD = document.getElementById('listDiscrepancias');
   if (listD) listD.innerHTML = '';
   _corridaEnPantalla = false;   // 26/11/2026
-  setStepDetail('ia', 'Gemini y formato Holistor');
   archivosFallidos = [];
-  pasosVistos.clear();
-  _procesoUXIniciado = false;
   detenerCountdown();
   _procesoInicioTs = null;
   _procesoTimeoutTotalMs = null;
   _resultadoYaMostrado = false;
-}
-
-function updateProcesoUX(step, pct, statusText, subtitle, opts = {}) {
-  const stepAnterior = procesoActual.step;
-  if (_procesoUXIniciado && stepAnterior && stepAnterior !== step) {
-    pasosVistos.add(stepAnterior);
-  }
-  _procesoUXIniciado = true;
-  procesoActual.step = step || procesoActual.step;
-  procesoActual.pct = Math.max(0, Math.min(100, Number(pct ?? procesoActual.pct) || 0));
-  const idx = PROCESS_STEPS.indexOf(procesoActual.step);
-  document.querySelectorAll('.pstep').forEach(el => {
-    const s = el.dataset.step;
-    const sIdx = PROCESS_STEPS.indexOf(s);
-    el.classList.remove('done','active','error');
-    if (opts.error && s === procesoActual.step) el.classList.add('error');
-    else if (pasosVistos.has(s)) el.classList.add('done');
-    else if (sIdx === idx) el.classList.add('active');
-  });
-  const pill = document.getElementById('processPill');
-  if (pill) pill.textContent = statusText || PROCESS_STEP_LABEL[procesoActual.step] || 'Procesando';
-  const sub = document.getElementById('processSubtitle');
-  if (sub) sub.textContent = subtitle || '';
-  const fill = document.getElementById('processBarFill');
-  if (fill) fill.style.width = procesoActual.pct + '%';
-  const pctLabel = document.getElementById('processProgressLabel');
-  if (pctLabel) pctLabel.textContent = Math.round(procesoActual.pct) + '%';
-  const txt = document.getElementById('processProgressText');
-  if (txt) txt.textContent = opts.progressText || statusText || '';
-}
-
-function setStepDetail(step, text) {
-  const el = document.getElementById(`step-${step}-detail`);
-  if (el) el.textContent = text;
-}
-
-function progresoPorArchivos() {
-  const total = files.filter(f => ['pending','uploading','done','en_cola','procesando','al_prn','fallida','error'].includes(f.status)).length || files.length || 0;
-  const terminados = files.filter(f => ['done','al_prn','fallida','error'].includes(f.status)).length;
-  return { total, terminados };
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -2542,11 +2438,8 @@ function iniciarPolling() {
   _resultadoYaMostrado = false;
   mostrarEstadoProceso('procesando');
     if (escaneoEnCurso) {
-    updateProcesoUX('ia', 65, 'Revisando el lote', 'Comparando cada factura contra lo ya procesado antes.', { progressText:'Escaneando…' });
-    setStepDetail('ia', 'Revisando qué ya está hecho');
     logProceso('Escaneo iniciado: revisando qué facturas ya estaban procesadas.');
   } else {
-    updateProcesoUX('ia', 65, 'Procesando en n8n', 'Gemini está leyendo las facturas y generando líneas PRN.', { progressText:'Esperando avance del backend…' });
     logProceso('Procesamiento iniciado: PDFs en cola para Gemini y PRN.');
   }
   files.forEach(f => { if (f.status === 'done') f.status = 'en_cola'; });
@@ -2588,7 +2481,6 @@ function iniciarPolling() {
     if (pollingInterval) {
       stopPolling();
       showAlert('Procesamiento tardando demasiado. Recargá si el PRN está en Drive.', 'warn');
-      updateProcesoUX('ia', procesoActual.pct || 70, 'Demorado', 'El proceso sigue sin confirmar finalización. Puede estar bloqueado o n8n puede seguir trabajando.', { error:true, progressText:'Revisar n8n o usar Liberar proceso si quedó zombie.' });
       logProceso('Advertencia: el procesamiento superó el tiempo esperado.');
       // NO pasar prnReal=false acá: eso significa "confirmado, no se generó PRN",
       // que es un dato que NO tenemos en este punto -- solo sabemos que la página
@@ -2762,13 +2654,6 @@ function iniciarPolling() {
         const _lineas = data.lineas_finales_generadas;
         const prnReal = data.prn_guardado === true && (_lineas == null || Number(_lineas) > 0);
         const incidenciasTxt = [nf ? `${fallidosVisibles.length} error(es)` : '', manuales.length ? `${manuales.length} carga manual` : '', otrosCliente.length ? `${otrosCliente.length} omitida(s)` : ''].filter(Boolean).join(' · ');
-        if (!prnReal) {
-          const _soloYa = !naCount && !nf && !manuales.length && !otrosCliente.length && Array.isArray(data.ya_procesadas) && data.ya_procesadas.length > 0;
-          if (_soloYa) updateProcesoUX('final', 100, 'Sin cambios', 'Todas las facturas de este lote ya estaban procesadas: no hay nada nuevo.', { progressText:'Sin facturas nuevas.' });
-          else updateProcesoUX('final', 100, 'Sin PRN generado', naCount ? `${naCount} factura(s) no figuran en ARCA (no entran al PRN).` : 'No se genero ninguna linea de PRN en esta corrida.', { error:true, progressText:'No se genero PRN.' });
-        } else {
-          updateProcesoUX('final', 100, incidenciasTxt ? 'PRN listo con avisos' : 'PRN listo', incidenciasTxt ? `PRN generado. Avisos: ${incidenciasTxt}.` : 'PRN generado correctamente.', { progressText: incidenciasTxt ? 'Revisar avisos.' : 'Proceso completo.' });
-        }
         logProceso(!prnReal ? 'Proceso terminado SIN generar PRN.' : (incidenciasTxt ? 'Proceso terminado con avisos: ' + incidenciasTxt : 'Proceso terminado correctamente.'));
         // Cantidad real de facturas en el archivo (en_prn), no solo las conciliadas exactas contra ARCA:
         // sin ARCA o con totales "a revisar", facturas_finales_generadas daba 0 aunque el PRN tuviera líneas.
@@ -2877,14 +2762,6 @@ function aplicarEstadosArchivos(estados) {
   });
   if (actualizado) {
     renderQueue();
-    const alPrn = files.filter(f => f.status === 'al_prn').length;
-    const fallidas = files.filter(f => f.status === 'fallida').length;
-    const total = files.filter(f => ['en_cola','procesando','al_prn','fallida'].includes(f.status)).length || files.length;
-    if (total > 0) {
-      const pct = 65 + Math.min(30, ((alPrn + fallidas) / total) * 30);
-      updateProcesoUX('ia', pct, 'Procesando archivos', `${alPrn} al PRN · ${fallidas} fallidas · ${total} total.`, { progressText:`${alPrn + fallidas}/${total} archivos resueltos` });
-      setStepDetail('ia', `${alPrn} OK / ${fallidas} error`);
-    }
   }
 }
 
@@ -2893,18 +2770,9 @@ function actualizarProgresoProceso(procesadas, total, pendientesRubro) {
   const p = Number(procesadas) || 0;
   const t = Number(total) || 0;
   const verbo = escaneoEnCurso ? 'escaneadas' : 'al PRN';
-  const titulo = escaneoEnCurso ? 'Escaneando facturas' : 'Procesando facturas';
   if (el) {
     if (t > 0) el.textContent = `${p}/${t} ${verbo}…`;
     else if (p > 0) el.textContent = `${p} ${escaneoEnCurso ? 'escaneada' : 'agregada'}${p !== 1 ? 's' : ''}…`;
-  }
-  if (t > 0) {
-    const pct = 65 + Math.min(30, (p / t) * 30);
-    updateProcesoUX('ia', pct, titulo, `${p} de ${t} facturas ${verbo}.`, { progressText:`${p}/${t} ${verbo}` });
-    setStepDetail('ia', `${p}/${t} ${verbo}`);
-  } else if (p > 0) {
-    updateProcesoUX('ia', Math.max(procesoActual.pct, 70), titulo, `${p} facturas ${verbo}.`, { progressText:`${p} ${verbo}` });
-    setStepDetail('ia', `${p} ${verbo}`);
   }
   // 25/11/2026: cartel de avance (sin tiempo).
   if (t > 0) {
@@ -3766,10 +3634,7 @@ async function _startUploadTandas() {
     mostrarAvisoSubida('');
     setUploadControlsDisabled(true);
     mostrarEstadoProceso('procesando');
-    updateProcesoUX('validacion', 8, 'Validando' + etiquetaTanda, `Cliente: ${clienteSeleccionado.nombre || clienteSeleccionado.cuit} · Período ${periodoStr()}`, { progressText:'Validación inicial completa' });
-    setStepDetail('validacion', 'Datos completos');
     logProceso('Validación completa: cliente, período y PDFs listos' + etiquetaTanda + '.');
-    updateProcesoUX('upload', 15, 'Subiendo PDFs' + etiquetaTanda, `${pending.length} archivo(s) se enviarán a Google Drive.`, { progressText:'Iniciando subida…' });
     logProceso(`Subiendo ${pending.length} PDF(s) a n8n/Drive${etiquetaTanda}.`);
     showAlert(`Subiendo ${pending.length} ${pluralizar(pending.length, 'PDF', 'PDFs')}${etiquetaTanda}…`, 'info');
 
@@ -3789,9 +3654,6 @@ async function _startUploadTandas() {
         item.file = null;   // 26/11/2026: ya está en Drive; se libera la copia en memoria
         subidos++;
         const upOk = pending.filter(f => f.status === 'done').length;
-        const pctUpload = 15 + Math.min(30, (upOk / pending.length) * 30);
-        updateProcesoUX('upload', pctUpload, 'Subiendo PDFs' + etiquetaTanda, `${upOk}/${pending.length} PDF(s) subidos a Drive.`, { progressText:`${upOk}/${pending.length} PDFs subidos` });
-        setStepDetail('upload', `${upOk}/${pending.length} subidos`);
         logProceso(`PDF subido: ${item.name}`);
         setAvance({ paso: 'sube', hechos: upOk, total: pending.length, detalle: `${item.name} subido` });   // 25/11/2026
         history.unshift({ name: item.name, ok: true, time: new Date().toLocaleTimeString() });
@@ -3877,11 +3739,7 @@ async function _startUploadTandas() {
       logProceso(`Subida parcial: fallaron ${fallidosNombres.length} de ${pending.length} — ${fallidosNombres.join(', ')}`);
     }
 
-    updateProcesoUX('registro', 50, 'Registro ARCA cargado', 'El registro ARCA quedó disponible para conciliación.', { progressText: 'Registro listo' });
-    setStepDetail('registro', 'Cargado');
     logProceso('Registro ARCA disponible para conciliación.');
-    updateProcesoUX('ia', 58, 'Esperando Drive', 'PDFs subidos. Esperando indexación de Google Drive antes de revisar qué ya está hecho.', { progressText:'Indexando archivos…' });
-    setStepDetail('ia', 'Revisando qué ya está hecho');
     if (!fallidosNombres.length) showAlert('PDFs subidos. Esperando indexación de Drive antes de procesar…', 'info');
     setAvance({ paso: 'revisa', hechos: 0, total: 0, detalle: 'Esperando que Drive registre los archivos…' });   // 25/11/2026
     await sleep(calcularEsperaIndexacion(pending.length));
@@ -3990,8 +3848,6 @@ function manejarResultadoEscaneo(data) {
   if (nuevas === 0 && repetidas === 0) {
     logProceso('Escaneo: no hay facturas de este cliente/período en la carpeta de entrada.');
     showAlert('No hay facturas para procesar: la carpeta de entrada no tiene PDFs de este cliente y período.', 'warn');
-    // FIX 09/10/2026: el panel de progreso quedaba en "Escaneando… 65 %" aunque ya no había nada para hacer.
-    updateProcesoUX('final', 100, 'Sin facturas', 'La carpeta de entrada no tiene PDFs de este cliente y período.', { progressText:'Sin facturas para procesar.' });
     _corridaSinFacturas = true;   // 17/11/2026 (bajas): el bucle de tandas no lo trata como "la orden no salió"
     _corridaTerminada(false);
     return;
@@ -4129,7 +3985,6 @@ async function sendFlush(forzar, soloEscanear, reintentarPdfs) {
   escaneoEnCurso = soloEscanear === true;
 
   try {
-    updateProcesoUX('ia', 62, 'Iniciando n8n', 'Se envió la orden de procesamiento al workflow.', { progressText:'Disparando holistor-procesar…' });
     logProceso('Enviando orden a n8n: holistor-procesar.');
     _registroEnviadoUltimo = (registroSubido === true);
     const res = await fetchConTimeout(WEBHOOK.procesar(), {
@@ -4174,13 +4029,11 @@ async function sendFlush(forzar, soloEscanear, reintentarPdfs) {
     // cartel único al respecto -- no repetirlo acá con el mensaje genérico
     // de "no se pudo iniciar n8n", que además es menos claro para el usuario.
     if (_claveRechazada) {
-      updateProcesoUX('ia', procesoActual.pct || 60, 'Error al iniciar', 'La clave de acceso venció.', { error:true, progressText:'Clave de acceso vencida' });
       logProceso('No se pudo iniciar el procesamiento: la clave de acceso venció.');
       _corridaTerminada(false);
       return;
     }
     const detalle = err.name === 'AbortError' ? 'timeout al iniciar procesamiento' : err.message;
-    updateProcesoUX('ia', procesoActual.pct || 60, 'Error al iniciar', `No se pudo iniciar n8n: ${detalle}`, { error:true, progressText:'Revisar webhook holistor-procesar' });
     logProceso(`Error iniciando procesamiento: ${detalle}`);
     showAlert(`No se pudo iniciar el procesamiento: ${escapeHtml(detalle)}`, 'error');
     _corridaTerminada(false);

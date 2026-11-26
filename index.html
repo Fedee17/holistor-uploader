@@ -1003,7 +1003,6 @@ let pollingInterval = null;
 let _sondeoGen = 0;          // 17/11/2026 (hallazgo 28): número del sondeo vigente
 let _sondeoEnVuelo = false;  // 17/11/2026 (hallazgo 28): hay una consulta de estado sin respuesta
 let pollingTimeoutMax = null;
-let countdownInterval = null;
 let _procesoInicioTs = null;
 let _procesoTimeoutTotalMs = null;
 // FIX 21/09/2026 ("24 facturas"): cuando una corrida se parte en varias tandas,
@@ -2560,7 +2559,6 @@ function iniciarCountdown(ms) {   // 25/11/2026: ya no cuenta tiempo (ms no se u
   pintarAvance();
 }
 function detenerCountdown() {
-  if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
   mostrarTimerBox(false);
 }
 

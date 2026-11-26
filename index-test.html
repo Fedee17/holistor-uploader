@@ -713,7 +713,7 @@ async function aplicarRubrosElegidos() {
         const nSinFila = Array.isArray(data.sin_fila_registro) ? data.sin_fila_registro.length : 0;
         if (nSinFila) {
           logProceso(`Rubro aplicado, pero ${nSinFila} factura(s) no se encontraron en REGISTRO_ESPERADO para marcarlas procesadas.`);
-          avisosRubro.push(`${nSinFila} ${pluralizar(nSinFila, 'factura')} con rubro aplicado no ${nSinFila === 1 ? 'se encontró' : 'se encontraron'} en el registro de ARCA: ${nSinFila === 1 ? 'va a seguir' : 'van a seguir'} figurando como pendientes en la Conciliación aunque ya ${nSinFila === 1 ? 'está' : 'están'} en el PRN.`);
+          avisosRubro.push(`${nSinFila} ${pluralizar(nSinFila, 'factura')} con rubro aplicado no ${nSinFila === 1 ? 'se encontró' : 'se encontraron'} en el registro de ARCA: ${nSinFila === 1 ? 'va a seguir' : 'van a seguir'} figurando como ${nSinFila === 1 ? 'pendiente' : 'pendientes'} en la Conciliación aunque ya ${nSinFila === 1 ? 'está' : 'están'} en el PRN.`);
         }
         if (data.prn_lineas_error === true) {
           logProceso('Rubro aplicado y PRN guardado, pero no se pudo anotar la línea en PRN_LINEAS.');
@@ -842,8 +842,8 @@ async function descargarPrnPendiente(nombreRespaldo) {
 // 26/11/2026: si el servidor no registra la descarga, el PRN sigue "pendiente" y la próxima corrida de este
 // cliente/período lo volvería a traer entero (facturas duplicadas en Holistor). Antes solo iba al panel viejo.
 function avisarPrnNoMarcado(detalle) {
-  showAlert(`El PRN se descargó, pero el sistema no lo registró (${escapeHtml(String(detalle || ''))}).<br><br>` +
-    `Tocá de nuevo <b>"Descargar PRN"</b> (baja el mismo archivo) para que quede marcado. ` +
+  showAlert(`No se pudo registrar en el sistema que este PRN ya está descargado (${escapeHtml(String(detalle || ''))}).<br><br>` +
+    `Recargá la página y elegí de nuevo el cliente: va a volver a aparecer <b>"Tenés un PRN listo"</b>. Tocá otra vez <b>"Descargar PRN"</b> o <b>"Ya lo tengo, ocultar"</b> para que quede registrado. ` +
     `Si vuelve a fallar, <b>no hagas otra corrida de este cliente y período</b> y avisá: la próxima traería otra vez estas facturas.`, 'error');
 }
 

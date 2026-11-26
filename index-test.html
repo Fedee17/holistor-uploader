@@ -2406,8 +2406,6 @@ function resetProcesoUX() {
   procesoActual = { step:'validacion', pct:0, total:0, procesadas:0 };
   const log = document.getElementById('processLog');
   if (log) log.innerHTML = '';
-  const card = document.getElementById('processCard');
-  if (card) card.classList.remove('active');
   // Limpiar el banner de estado visible (✓ PRN listo / Procesando... / etc.)
   const ep = document.getElementById('estadoProceso');
   if (ep) { ep.style.display = 'none'; ep.innerHTML = ''; }
@@ -2460,8 +2458,6 @@ function updateProcesoUX(step, pct, statusText, subtitle, opts = {}) {
   _procesoUXIniciado = true;
   procesoActual.step = step || procesoActual.step;
   procesoActual.pct = Math.max(0, Math.min(100, Number(pct ?? procesoActual.pct) || 0));
-  const card = document.getElementById('processCard');
-  if (card) card.classList.add('active');
   const idx = PROCESS_STEPS.indexOf(procesoActual.step);
   document.querySelectorAll('.pstep').forEach(el => {
     const s = el.dataset.step;

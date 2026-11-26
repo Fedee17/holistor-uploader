@@ -3490,7 +3490,28 @@ async function addFilesInner(newFiles) {
   // cliente, para que los botones vuelvan a verse. Si hay un proceso en marcha no se toca nada.
   if (_resultadoYaMostrado === true && !pollingInterval) resetProcesoUX();
 
-  const nuevosItems = pdfs.map(f => ({ name: f.name, size: f.size, file: f, status: 'uploading' }));
+  // 26/11/2026: copia en memoria de cada PDF al arrastrarlo. Antes la página leía el archivo de la carpeta
+  // recién al subir su tanda: si la persona lo borraba o movía mientras corría la tanda anterior (o lo había
+  // arrastrado desde un ZIP sin descomprimir), la tanda siguiente fallaba entera con "Failed to fetch".
+  // Tope de 300 MB entre lo ya copiado y lo nuevo, para no llenar la memoria del navegador.
+  const LIMITE_COPIA_BYTES = 300 * 1024 * 1024;
+  const _yaCopiado = files.reduce((s, x) => s + (x.file ? (Number(x.size) || 0) : 0), 0);
+  const _aCopiar = pdfs.reduce((s, f) => s + (Number(f.size) || 0), 0);
+  if (_yaCopiado + _aCopiar > LIMITE_COPIA_BYTES) {
+    showAlert(`Son demasiados PDF juntos (${Math.round((_yaCopiado + _aCopiar) / 1048576)} MB). Agregalos en dos veces: primero una parte y, cuando termine, el resto.`, 'error');
+    return;
+  }
+  const _copias = [], _noLeidos = [];
+  for (const f of pdfs) {
+    try { _copias.push(new File([await f.arrayBuffer()], f.name, { type: 'application/pdf' })); }
+    catch (e) { _noLeidos.push(f.name); }
+  }
+  if (_noLeidos.length) {
+    showAlert(`No se pudo leer: ${_noLeidos.map(escapeHtml).join(', ')}. Volvé a arrastrarlo desde una carpeta (si estaba en un ZIP, descomprimilo primero).`, 'error');
+  }
+  if (!_copias.length) return;
+
+  const nuevosItems = _copias.map(f => ({ name: f.name, size: f.size, file: f, status: 'uploading' }));
   nuevosItems.forEach(it => files.push(it));
   renderQueue();
 
@@ -3812,6 +3833,7 @@ async function _startUploadTandas() {
         renderQueue();
         await subirUnPDF(item);
         item.status = 'done';
+        item.file = null;   // 26/11/2026: ya está en Drive; se libera la copia en memoria
         subidos++;
         const upOk = pending.filter(f => f.status === 'done').length;
         const pctUpload = 15 + Math.min(30, (upOk / pending.length) * 30);

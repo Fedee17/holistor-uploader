@@ -962,7 +962,7 @@ let _reintentoCliente = null;
 let _reintentoPeriodo = null;
 let files = [];
 let _corridaEnPantalla = false;   // 26/11/2026: reemplaza al botón "Ver detalle" como marca de corrida en pantalla (oculta la cola)
-let history = [];
+let historialSubidas = [];
 let uploading = false;
 let subidos = 0;
 let errores = 0;
@@ -3260,11 +3260,11 @@ function renderQueue() {
 
 function renderHistory() {
   const el = document.getElementById('historyList');
-  if (!history.length) {
+  if (!historialSubidas.length) {
     el.innerHTML = '<div class="empty"><i class="ti ti-inbox"></i>Todavía no se subieron archivos</div>';
     return;
   }
-  el.innerHTML = history.map(h => `
+  el.innerHTML = historialSubidas.map(h => `
     <div class="history-item">
       <i class="ti ti-file-type-pdf" style="font-size:15px;color:#c5221f;flex-shrink:0;"></i>
       <span class="history-name">${escapeHtml(h.name)}</span>
@@ -3634,11 +3634,11 @@ async function _startUploadTandas() {
         const upOk = pending.filter(f => f.status === 'done').length;
         logProceso(`PDF subido: ${item.name}`);
         setAvance({ paso: 'sube', hechos: upOk, total: pending.length, detalle: `${item.name} subido` });   // 25/11/2026
-        history.unshift({ name: item.name, ok: true, time: new Date().toLocaleTimeString() });
+        historialSubidas.unshift({ name: item.name, ok: true, time: new Date().toLocaleTimeString() });
       } catch (err) {
         item.status = 'error';
         errores++;
-        history.unshift({ name: item.name, ok: false, time: new Date().toLocaleTimeString() });
+        historialSubidas.unshift({ name: item.name, ok: false, time: new Date().toLocaleTimeString() });
         // FIX 02/10/2026: si fue la clave de acceso, ya se mostró el cartel
         // único al respecto (ver fetchConTimeout). Acá solo queda registrarlo
         // en el log y cortar la subida del resto de los PDFs de esta tanda:

@@ -136,6 +136,13 @@
   .prn-listo-line { font-size: 12px; color: #3f6b4f; margin-top: 3px; line-height: 1.4; word-break: break-word; }
   .prn-listo-nota { font-size: 12px; color: #92400e; margin-top: 6px; }
   .prn-listo-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  /* 27/11/2026: cartel a todo el ancho, botones a la derecha (vale para los dos carteles de PRN) */
+  .prn-listo { gap: 14px; align-items: center; flex-wrap: wrap; padding: 16px 18px; }
+  .prn-listo > i { font-size: 26px; margin-top: 0; }
+  .prn-listo-body { min-width: 220px; }
+  .prn-listo-title { font-size: 15px; }
+  .prn-listo-btns { margin-top: 0; }
+  .prn-listo .btn-p { padding: 9px 18px; font-size: 14px; }
   .btn-p { background: #188038; color: #fff; border: none; border-radius: 8px; padding: 7px 14px; font-size: 13px; font-weight: 500; cursor: pointer; }
   .btn-s { background: #fff; color: #1a1a1a; border: 0.5px solid #ccc; border-radius: 8px; padding: 7px 14px; font-size: 13px; cursor: pointer; text-decoration: none; display: inline-block; }
   .btn-l { background: none; border: none; color: #3f6b4f; font-size: 12px; text-decoration: underline; cursor: pointer; padding: 7px 4px; }
@@ -291,7 +298,6 @@
     <div class="avance-detalle"><span class="avance-punto"></span> <span id="avanceDetalle"></span></div>
     <div id="avanceEtapas" class="avance-etapas"></div>
   </div>
-  <div id="estadoProceso" class="alert" style="display:none;"></div>
 
   <!-- 26/11/2026: el avance de la corrida se ve solo en el cartel de arriba (#timerBox). Se sacaron el panel
        "Estado del proceso", el recuadro azul de avance y "Ver detalle de las facturas" (al terminar la lista
@@ -323,20 +329,14 @@
     <div class="card-header" style="color:#92400e;"><i class="ti ti-zoom-question"></i> Facturas con baja confianza de lectura</div>
     <div id="listBajaConfianza" style="max-height:220px; overflow-y:auto;"></div>
   </div>
-  <button class="btn-secondary" id="btnAuditoria" onclick="verAuditoria()" style="display:none; margin-bottom:1rem;">
-    <i class="ti ti-clipboard-check"></i> Ver auditoría — facturas que faltan
-  </button>
-  <div class="card" id="cardAuditoria" style="display:none; border-color:#fcd34d; background:#fffdf5;">
-    <div class="card-header" style="color:#92400e;"><i class="ti ti-file-off"></i> Facturas en ARCA sin PDF subido</div>
-    <div id="listAuditoria" style="max-height:280px; overflow-y:auto;"></div>
-  </div>
   <div class="card" id="cardConciliacion" style="display:none;">
     <div class="card-header"><i class="ti ti-report-analytics" style="color:#1a73e8;"></i> Conciliación de comprobantes</div>
     <div id="concilContent"></div>
   </div>
+  <div id="estadoProceso" class="alert" style="display:none;"></div>
   <div class="card">
     <div class="card-header"><i class="ti ti-history"></i> Historial de esta sesión</div>
-    <div id="historyList"><div class="empty"><i class="ti ti-inbox"></i>Todavía no se subieron archivos</div></div>
+    <div id="historyList" style="max-height:280px; overflow-y:auto;"><div class="empty"><i class="ti ti-inbox"></i>Todavía no se subieron archivos</div></div>
   </div>
   </div>
   <div id="vistaMaestros" style="display:none;">
@@ -367,7 +367,6 @@ const BASE_WEBHOOK = 'https://fede123.app.n8n.cloud/webhook';
 const CARPETA_NO_EN_ARCA_URL = 'https://drive.google.com/drive/folders/1AY_D9ewIumZgIS_08Zj9ENdy8Pam1Zzp';
 const WEBHOOK = {
   upload:    () => BASE_WEBHOOK + '/holistor-upload-test',
-  auditoria: () => BASE_WEBHOOK + '/holistor-auditoria-test',
   procesar:  () => BASE_WEBHOOK + '/holistor-procesar-test-v51',
   verificar: () => BASE_WEBHOOK + '/holistor-verificar-test',
   estado:    () => BASE_WEBHOOK + '/holistor-estado-test',
@@ -554,17 +553,17 @@ function agregarBotonDescargaPrnFinal() {
   if (!el || !(R.lineasPrn.length || R.rubrosAplicados)) return;   // 24/11/2026: también si solo hubo rubros aplicados
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'btn-p'; b.id = '_epDescargarPrn';
-  b.style.marginLeft = '8px';
   b.innerHTML = '<i class="ti ti-download"></i> Descargar PRN';
   // 12/11/2026 (A-6): el archivo sale del PRN pendiente que guarda la hoja (el mismo del cartel
   // "Tenés un PRN listo"), no de lo que juntó la página: así un reintento no mezcla líneas.
   b.addEventListener('click', () => descargarPrnPendiente(R.prnNombre));
-  el.appendChild(b);
+  const _cont = document.getElementById('_epBtns') || el;   // 27/11/2026
+  _cont.appendChild(b);
   if (R.prnDriveFallo) {
     const n = document.createElement('span');
     n.style.cssText = 'margin-left:8px;font-size:12px;';
     n.textContent = 'Drive no respondió; el archivo se arma acá';
-    el.appendChild(n);
+    _cont.appendChild(n);
   }
 }
 
@@ -895,7 +894,7 @@ function mostrarCartelPrn(data) {
     + '<div class="prn-listo-title">Tenés un PRN listo que todavía no descargaste</div>'
     + `<div class="prn-listo-line">${escapeHtml(linea)}</div>`
     + (recortado ? '<div class="prn-listo-nota">No se puede descargar desde acá: el PRN tiene demasiadas facturas o no se pudo leer. Importá los PRN de cada tanda que están en la carpeta PRN de Drive y apretá «Ya lo tengo».</div>' : '')
-    + '<div class="prn-listo-btns"></div></div>';
+    + '</div><div class="prn-listo-btns"></div>';   // 27/11/2026: botones fuera del cuerpo, a la derecha
   const btns = box.querySelector('.prn-listo-btns');
   if (!recortado) {
     const b = document.createElement('button');
@@ -2860,11 +2859,10 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prn
     _corridaEnPantalla = files.length > 0;   // 26/11/2026
   } else if (estado === 'listo') {
     el.style.display = 'flex';
-    // No ocultar resetPanel — puede haberse llegado a 'listo' por caché mientras
-    // el proceso real sigue corriendo en n8n. El botón queda disponible como
-    // válvula de escape ante zombies o resultados de caché que tapan el proceso.
+    // 27/11/2026: "Liberar proceso" solo cuando no se pudo confirmar el final (prnReal === null:
+    // posible corrida trabada). Con el final confirmado no sirve y se oculta.
     const rp = document.getElementById('resetPanel');
-    if (rp) rp.style.display = 'block';
+    if (rp) rp.style.display = (prnReal === null) ? 'block' : 'none';
     const nf = fallidos && fallidos.length > 0;
     if (prnReal === null) {
       // Caso incierto: la página dejó de esperar por su propio timeout,
@@ -2895,19 +2893,22 @@ function mostrarEstadoProceso(estado, fallidos, prnReal, naCount, prnFileId, prn
         ? `No se generó PRN: ${naCount} factura(s) no figuran en ARCA. Cargalas a mano en Holistor, o si ya figuran en ARCA, subí de nuevo el Excel actualizado y reprocesá.`
         : 'No se generó ningún PRN en esta corrida. Revisá el detalle o Drive.';
     } else {
-      const btnAud = document.getElementById('btnAuditoria');
-      if (btnAud) btnAud.style.display = 'inline-flex';
-      el.className = 'alert a-success';
+      // 27/11/2026: mismo estilo que el cartel "Tenés un PRN listo" (.prn-listo); el botón va en _epBtns.
+      el.className = 'prn-listo';
+      el.style.marginBottom = '1rem';
      const _facturasTxt = (facturasCount && Number(facturasCount) > 0) ? ` · ${facturasCount} ${pluralizar(Number(facturasCount),'factura','facturas')}` : '';
       // 12/11/2026: sin enlace "Ver en Drive". El PRN se descarga solo con "Descargar PRN"
       // (agregarBotonDescargaPrnFinal), así queda marcado como descargado.
-      el.innerHTML = '<i class="ti ti-circle-check" style="font-size:16px;margin-top:1px;flex-shrink:0;"></i><span id="_epMsg"></span>';
+      const _lineaEp = [((clienteSeleccionado && clienteSeleccionado.nombre) || ''), periodoStr()].filter(Boolean).join(' ') + (prnFileName ? ' · ' + prnFileName : '');
+      el.innerHTML = '<i class="ti ti-file-check"></i><div class="prn-listo-body"><div class="prn-listo-title"><span id="_epMsg"></span></div>'
+        + (_lineaEp ? `<div class="prn-listo-line">${escapeHtml(_lineaEp)}</div>` : '')
+        + '</div><div class="prn-listo-btns" id="_epBtns"></div>';
       const nm_ep = manuales && manuales.length > 0;
       const no_ep = otrosCliente && otrosCliente.length > 0;
       const avisos_ep = [nf ? `${fallidos.length} ${pluralizar(fallidos.length, 'error', 'errores')}` : '', nm_ep ? `${manuales.length} carga manual` : '', no_ep ? `${otrosCliente.length} otro cliente` : ''].filter(Boolean).join(' · ');
       document.getElementById('_epMsg').textContent = avisos_ep
-        ? `✓ PRN generado${_facturasTxt}. Avisos: ${avisos_ep}.`
-        : `✓ PRN listo${_facturasTxt}.`;
+        ? `PRN generado${_facturasTxt}. Avisos: ${avisos_ep}.`
+        : `PRN listo${_facturasTxt}.`;
     }
   }
 }
@@ -2941,7 +2942,7 @@ function mostrarConciliacion(verif, concil, noEnArca, yaProcesadas, duplicadosEn
       + `<span class="concil-badge cb-ok">✓ ${r.conciliadas||0} conciliadas</span>`
       + `<span class="concil-badge cb-warn">⚠ ${r.total_a_revisar||0} total a revisar</span>`
       + `<span class="concil-badge cb-err">✗ ${r.falta_procesar||0} falta procesar</span>`
-      + ((Number(r.procesadas_antes) || 0) > 0 ? `<span class="concil-badge cb-ok">↺ ${Number(r.procesadas_antes)} ya procesadas antes</span>` : '')   // 17/11/2026 (hallazgo 14)
+      + ((Number(r.procesadas_antes) || 0) > 0 ? `<span class="concil-badge cb-ok">↺ ${Number(r.procesadas_antes)} en PRN de corridas anteriores</span>` : '')   // 17/11/2026 (hallazgo 14)
       + (_mostrarFuera ? `<span class="concil-badge cb-warn">↗ ${r.fuera_de_arca||0} en el PRN sin figurar en ARCA</span>` : '')
       + `</div>`;
     html += buildConcilSection('circle-check', 'Conciliadas — clave y total OK', (verif.conciliadas || []).map(x => ({ clave:x.clave, total:x.total })), 'ok');
@@ -3004,7 +3005,7 @@ function buildNaSection(noEnArca) {
 
 function buildYpSection(yaProcesadas) {
   const rows = yaProcesadas.slice(0,150).map(it => `<div class="concil-row"><span class="concil-key">${escapeHtml(it.emisor||it.pdf||'')}</span><span class="concil-denom">procesada el ${escapeHtml(it.procesada_en||'')}</span><span class="concil-total">${escapeHtml(it.total||'')}</span></div>`).join('');
-  return `<div class="concil-section"><div class="concil-head"><i class="ti ti-history concil-icon ci-ok"></i><span class="concil-title">Ya procesadas antes — no regeneradas</span><span class="concil-badge cb-ok">${yaProcesadas.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${yaProcesadas.length ? rows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
+  return `<div class="concil-section"><div class="concil-head"><i class="ti ti-history concil-icon ci-ok"></i><span class="concil-title">Salteadas en esta corrida — ya estaban procesadas</span><span class="concil-badge cb-ok">${yaProcesadas.length}</span><i class="ti ti-chevron-down concil-toggle"></i></div><div class="concil-body">${yaProcesadas.length ? rows : '<div class="empty" style="padding:1rem;">Sin elementos</div>'}</div></div>`;
 }
 
 function buildDupSection(duplicadosEnLote) {
@@ -3193,51 +3194,6 @@ function mostrarBajaConfianza(items) {
       </span>
     </div>`;
   }).join('');
-}
-
-async function verAuditoria() {
-  const btn = document.getElementById('btnAuditoria');
-  const card = document.getElementById('cardAuditoria');
-  const lista = document.getElementById('listAuditoria');
-  if (!btn || !card || !lista) return;
-
-  // Interruptor: si el panel ya está abierto, este mismo click lo cierra
-  // sin volver a pedir nada al servidor.
-  if (card.style.display === 'block') {
-    card.style.display = 'none';
-    return;
-  }
-
-  btn.disabled = true;
-  try {
-    const res = await fetchConTimeout(WEBHOOK.auditoria(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cliente_cuit: clienteSeleccionado.cuit,
-        periodo: periodoStr()
-      })
-    }, 30000);
-    const data = await jsonSeguro(res);
-    if (!data || data.ok !== true) throw new Error('Respuesta inválida');
-    const items = data.pendientes || [];
-    card.style.display = 'block';
-    if (!items.length) {
-      lista.innerHTML = '<div class="history-item"><i class="ti ti-circle-check" style="color:#1a6e38;"></i><span>No falta ninguna factura — todo lo que está en ARCA ya fue procesado.</span></div>';
-    } else {
-      lista.innerHTML = items.map(it => `<div class="history-item" style="align-items:flex-start;">
-        <i class="ti ti-file-off" style="font-size:15px;color:#92400e;flex-shrink:0;margin-top:2px;"></i>
-        <span class="history-name" style="white-space:normal;line-height:1.35;">
-          ${escapeHtml(it.proveedor || '')} — ${escapeHtml(it.fecha || '')}
-          <div class="other-note">CUIT ${escapeHtml(String(it.cuit_emisor||''))} · Total: ${escapeHtml(String(it.total||''))}</div>
-        </span>
-      </div>`).join('');
-    }
-  } catch (e) {
-    showAlert('No se pudo cargar la auditoría.', 'error');
-  } finally {
-    btn.disabled = false;
-  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -3809,6 +3765,7 @@ async function _startUploadTandas() {
       // están en Drive pero nadie los procesó: cortar acá, no subir más tandas.
       const restantes = tandas.length - (t + 1);
       logProceso(`Tanda ${t + 1} de ${tandas.length}: la orden de procesar no pudo salir. Se corta acá${restantes > 0 ? ` (quedan ${restantes} ${pluralizar(restantes, 'tanda', 'tandas')} sin subir)` : ''}.`);
+      { const _rp = document.getElementById('resetPanel'); if (_rp) _rp.style.display = 'block'; }   // 27/11/2026: el cartel pide usarlo
       showAlert(`No se pudo iniciar el procesamiento de la tanda ${t + 1}. Los PDF ya subidos quedaron en Drive sin procesar: no los vuelvas a subir (se duplicarían en Drive). Usá "Liberar proceso" y avisá para que se dispare el procesamiento de lo que ya está en Drive.`, 'error');
       return;
     }
